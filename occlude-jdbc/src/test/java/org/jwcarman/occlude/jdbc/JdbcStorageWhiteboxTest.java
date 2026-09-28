@@ -18,11 +18,14 @@ package org.jwcarman.occlude.jdbc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.PrintWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
 import java.time.Instant;
+import java.util.logging.Logger;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -288,22 +291,22 @@ class JdbcStorageWhiteboxTest {
   private DataSource unusedDataSource() {
     return new DataSource() {
       @Override
-      public java.sql.Connection getConnection() {
+      public Connection getConnection() {
         throw new UnsupportedOperationException("not needed by this test");
       }
 
       @Override
-      public java.sql.Connection getConnection(String username, String password) {
+      public Connection getConnection(String username, String password) {
         throw new UnsupportedOperationException("not needed by this test");
       }
 
       @Override
-      public java.io.PrintWriter getLogWriter() {
+      public PrintWriter getLogWriter() {
         throw new UnsupportedOperationException("not needed by this test");
       }
 
       @Override
-      public void setLogWriter(java.io.PrintWriter out) {
+      public void setLogWriter(PrintWriter out) {
         throw new UnsupportedOperationException("not needed by this test");
       }
 
@@ -318,7 +321,7 @@ class JdbcStorageWhiteboxTest {
       }
 
       @Override
-      public java.util.logging.Logger getParentLogger() {
+      public Logger getParentLogger() {
         throw new UnsupportedOperationException("not needed by this test");
       }
 

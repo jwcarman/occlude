@@ -15,32 +15,34 @@
  */
 package org.jwcarman.occlude.jdbc;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
+import java.util.function.Function;
 import javax.sql.DataSource;
 import org.jwcarman.codec.CodecFactory;
+import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.lattice.Axes;
 
 /**
  * What a database-backed store needs that has nothing to do with policy.
  *
- * <p>Deliberately not a kind of {@link org.jwcarman.occlude.Charter}. An application declares what
- * it allows -- the labels, the doors, who may reach them -- without knowing or caring where the
- * values end up, and the code declaring portals should compile against the generic thing. This is
- * the other half: where the tables are, how bytes are serialised, and how they are sealed. Both are
- * asked for the {@link JdbcStorage} a charter is sealed to.
+ * <p>Deliberately not a kind of {@link Charter}. An application declares what it allows -- the
+ * labels, the doors, who may reach them -- without knowing or caring where the values end up, and
+ * the code declaring portals should compile against the generic thing. This is the other half:
+ * where the tables are, how bytes are serialised, and how they are sealed. Both are asked for the
+ * {@link JdbcStorage} a charter is sealed to.
  *
  * @param <A> the application's label type, which is stored encrypted like any other value
  */
 public final class JdbcStorageConfig {
 
   /** The root of a graph nobody has rooted: tamper-evident, and forgeable by whoever can write. */
-  private static final byte[] ROOTED_IN_THE_OPEN =
-      "occlude".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+  private static final byte[] ROOTED_IN_THE_OPEN = "occlude".getBytes(StandardCharsets.UTF_8);
 
   private DataSource dataSource;
   private CodecFactory codecs;
   private String rootId = "open";
-  private java.util.function.Function<String, byte[]> roots = id -> ROOTED_IN_THE_OPEN;
+  private Function<String, byte[]> roots = id -> ROOTED_IN_THE_OPEN;
   private StorageCodec storageCodec;
   private boolean migrate = true;
 
@@ -153,7 +155,7 @@ public final class JdbcStorageConfig {
    * the payload codec uses for its keys, and the id is signed as well, so two stores sharing a
    * secret still produce different digests.
    */
-  public JdbcStorageConfig rootedIn(String id, java.util.function.Function<String, byte[]> roots) {
+  public JdbcStorageConfig rootedIn(String id, Function<String, byte[]> roots) {
     this.rootId = Objects.requireNonNull(id, "a root needs a name");
     this.roots = Objects.requireNonNull(roots, "a root must not be null");
     return this;

@@ -17,6 +17,7 @@ package org.jwcarman.occlude;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import org.jwcarman.codec.TypeRef;
 
 /**
@@ -39,16 +41,15 @@ import org.jwcarman.codec.TypeRef;
  */
 public final class MemoryStorage implements Storage {
 
-  private final java.util.List<AuditRecord> audit =
-      java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+  private final List<AuditRecord> audit = Collections.synchronizedList(new ArrayList<>());
 
   /** Everything recorded so far, oldest first. The in-memory equivalent of the audit table. */
-  public java.util.List<AuditRecord> audit() {
-    return java.util.List.copyOf(audit);
+  public List<AuditRecord> audit() {
+    return List.copyOf(audit);
   }
 
   /** Just the lines for one kind of operation, oldest first. */
-  public java.util.List<AuditRecord> audit(AuditRecord.Operation operation) {
+  public List<AuditRecord> audit(AuditRecord.Operation operation) {
     return audit().stream().filter(entry -> entry.operation() == operation).toList();
   }
 
@@ -87,8 +88,8 @@ public final class MemoryStorage implements Storage {
   }
 
   /** Everything currently held, for tests that need to prove something was not stored. */
-  public java.util.Set<String> everything() {
-    return java.util.Set.copyOf(values.keySet());
+  public Set<String> everything() {
+    return Set.copyOf(values.keySet());
   }
 
   @Override
@@ -97,7 +98,7 @@ public final class MemoryStorage implements Storage {
   }
 
   @Override
-  public List<String> erase(String root, java.util.function.Function<String, AuditRecord> lineFor) {
+  public List<String> erase(String root, Function<String, AuditRecord> lineFor) {
     Set<String> doomed = new HashSet<>();
     Deque<String> pending = new ArrayDeque<>();
     pending.add(root);

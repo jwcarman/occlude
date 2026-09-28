@@ -15,6 +15,7 @@
  */
 package org.jwcarman.occlude.example.billing;
 
+import java.util.Base64;
 import java.util.Map;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -45,7 +46,7 @@ public class StorageConfiguration {
 
   @Bean
   public StorageCodec storageCodec(@Value("${billing.key}") String key) {
-    SecretKey kek = new SecretKeySpec(java.util.Base64.getDecoder().decode(key), "AES");
+    SecretKey kek = new SecretKeySpec(Base64.getDecoder().decode(key), "AES");
     return StorageCodec.of(
         Compression.whenItHelps(new GzipCodec())
             .andThen(

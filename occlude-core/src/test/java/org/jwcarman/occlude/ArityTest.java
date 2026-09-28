@@ -17,9 +17,15 @@ package org.jwcarman.occlude;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.codec.TypeRef;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
@@ -100,8 +106,7 @@ class ArityTest {
   @Test
   @DisplayName("reads many parents in two goes rather than two each")
   void reads_many_parents_in_two_goes() {
-    java.util.concurrent.atomic.AtomicInteger reads =
-        new java.util.concurrent.atomic.AtomicInteger();
+    AtomicInteger reads = new AtomicInteger();
     Counting counting = new Counting(reads);
     DefaultCharter counted = new DefaultCharter(TENANT);
     Occlude<Note> intake = counted.source("notes", NOTE, ctx -> Label.of(TENANT, "acme"));
@@ -114,7 +119,7 @@ class ArityTest {
             d -> d.accepting(Ceiling.of(TENANT, Constraint.atMost("acme"))));
     counted.seal(counting);
 
-    java.util.List<Occluded<Note>> parents = new java.util.ArrayList<>();
+    List<Occluded<Note>> parents = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
       parents.add(intake.occlude(new Note("note " + i)));
     }
@@ -128,21 +133,20 @@ class ArityTest {
   private static final class Counting implements Storage {
 
     private final MemoryStorage kept = new MemoryStorage();
-    private final java.util.concurrent.atomic.AtomicInteger reads;
+    private final AtomicInteger reads;
 
-    private Counting(java.util.concurrent.atomic.AtomicInteger reads) {
+    private Counting(AtomicInteger reads) {
       this.reads = reads;
     }
 
     @Override
-    public java.util.Map<String, StoredMetadata> metadata(java.util.List<String> ids) {
+    public Map<String, StoredMetadata> metadata(List<String> ids) {
       reads.incrementAndGet();
       return kept.metadata(ids);
     }
 
     @Override
-    public java.util.Map<String, Object> values(
-        java.util.Map<String, org.jwcarman.codec.TypeRef<?>> wanted) {
+    public Map<String, Object> values(Map<String, TypeRef<?>> wanted) {
       reads.incrementAndGet();
       return kept.values(wanted);
     }
@@ -158,13 +162,13 @@ class ArityTest {
     }
 
     @Override
-    public java.util.Optional<StoredMetadata> metadata(String id) {
+    public Optional<StoredMetadata> metadata(String id) {
       reads.incrementAndGet();
       return kept.metadata(id);
     }
 
     @Override
-    public <T> java.util.Optional<T> value(String id, org.jwcarman.codec.TypeRef<T> type) {
+    public <T> Optional<T> value(String id, TypeRef<T> type) {
       reads.incrementAndGet();
       return kept.value(id, type);
     }
@@ -175,8 +179,7 @@ class ArityTest {
     }
 
     @Override
-    public java.util.List<String> erase(
-        String root, java.util.function.Function<String, AuditRecord> lineFor) {
+    public List<String> erase(String root, Function<String, AuditRecord> lineFor) {
       return kept.erase(root, lineFor);
     }
   }

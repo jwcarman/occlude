@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
@@ -179,7 +180,7 @@ class ErasingAcrossTenantsTest {
     Occluded<Record> root = records.occlude(new Record("root"));
     Occluded<Branch> leftChild = left.derive(root).orThrow();
     Occluded<Branch> rightChild = right.derive(root).orThrow();
-    Occluded<Combined> combined = combine.fold(java.util.List.of(leftChild, rightChild)).orThrow();
+    Occluded<Combined> combined = combine.fold(List.of(leftChild, rightChild)).orThrow();
 
     int removed = config.erase(root);
 

@@ -15,6 +15,7 @@
  */
 package org.jwcarman.occlude.spring;
 
+import java.util.Optional;
 import org.jwcarman.occlude.AccessContextProvider;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.DefaultCharter;
@@ -68,7 +69,7 @@ public class CharterAutoConfiguration {
   @Bean
   @ConditionalOnBean(Axes.class)
   @ConditionalOnMissingBean
-  public Charter charter(Axes axes, java.util.Optional<AccessContextProvider> access) {
+  public Charter charter(Axes axes, Optional<AccessContextProvider> access) {
     DefaultCharter charter = new DefaultCharter(axes);
     this.constituted = charter;
     // Identity is where an access comes from, not what this application allows, so it belongs with

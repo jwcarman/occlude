@@ -16,10 +16,18 @@
 package org.jwcarman.occlude;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Axis;
@@ -41,8 +49,8 @@ public final class DefaultCharter implements Charter {
   // application wires itself on one thread, and nothing it constitutes can act until it is sealed.
   // Sealing copies all of it into an immutable snapshot and publishes that with one atomic write,
   // which is the only moment any of it crosses to the threads that will use a portal.
-  private final java.util.Map<String, OccludedType<?>> types = new LinkedHashMap<>();
-  private final java.util.Map<String, OccludedType<?>> sources = new LinkedHashMap<>();
+  private final Map<String, OccludedType<?>> types = new LinkedHashMap<>();
+  private final Map<String, OccludedType<?>> sources = new LinkedHashMap<>();
 
   /**
    * What each door hands out, which the charter did not used to know.
@@ -52,13 +60,13 @@ public final class DefaultCharter implements Charter {
    * A door nobody can reach is dead authority, and it is also the shape a half-applied rename
    * takes.
    */
-  private final java.util.Map<String, java.util.Set<String>> sinkReads = new LinkedHashMap<>();
+  private final Map<String, Set<String>> sinkReads = new LinkedHashMap<>();
 
   private final List<SinkSpec> sinks = new ArrayList<>();
   private final List<DerivationSpec<?>> derivations = new ArrayList<>();
   private final List<QuerySpec<?, ?>> queries = new ArrayList<>();
   private AccessContextProvider currentAccess = AccessContextProvider.none();
-  private java.util.function.BiPredicate<Label, AccessContext> mayErase = (label, context) -> false;
+  private BiPredicate<Label, AccessContext> mayErase = (label, context) -> false;
   private final Lifecycle lifecycle = new Lifecycle();
   private final Portals portals = new Portals(lifecycle);
 
@@ -148,8 +156,8 @@ public final class DefaultCharter implements Charter {
   }
 
   /** Everything this charter was told it may keep, for the manifest. */
-  java.util.Collection<OccludedType<?>> types() {
-    return java.util.List.copyOf(configuration().types().values());
+  Collection<OccludedType<?>> types() {
+    return List.copyOf(configuration().types().values());
   }
 
   /** Validates each type and folds it into the configuration the caller is about to leave. */
@@ -176,16 +184,12 @@ public final class DefaultCharter implements Charter {
    * marking inside a document, a sender the ingest verified, a scan that found card numbers.
    */
   public <T> Occlude<T> source(
-      String name,
-      OccludedType<T> type,
-      java.util.function.Function<AccessContext, Label> labelling) {
+      String name, OccludedType<T> type, Function<AccessContext, Label> labelling) {
     return source(name, type, (value, context) -> labelling.apply(context));
   }
 
   public <T> Occlude<T> source(
-      String name,
-      OccludedType<T> type,
-      java.util.function.BiFunction<T, AccessContext, Label> labelling) {
+      String name, OccludedType<T> type, BiFunction<T, AccessContext, Label> labelling) {
     Objects.requireNonNull(name, "a source needs a name");
     Objects.requireNonNull(type, "a source needs to know what it accepts");
     Objects.requireNonNull(labelling, "a source needs to say how it labels what arrives");
@@ -210,9 +214,7 @@ public final class DefaultCharter implements Charter {
    */
   @SafeVarargs
   public final Sink sink(
-      String name,
-      java.util.function.Function<AccessContext, Ceiling> ceiling,
-      OccludedType<?>... reads) {
+      String name, Function<AccessContext, Ceiling> ceiling, OccludedType<?>... reads) {
     Objects.requireNonNull(name, "a sink needs a name");
     Objects.requireNonNull(ceiling, "a sink needs a ceiling");
     if (reads.length == 0) {
@@ -224,15 +226,15 @@ public final class DefaultCharter implements Charter {
               + " next year.");
     }
     // Declaration order, not hash order: this list ends up in an error message somebody reads.
-    java.util.Set<String> names = new java.util.LinkedHashSet<>();
+    Set<String> names = new LinkedHashSet<>();
     for (OccludedType<?> type : reads) {
       names.add(type.name());
     }
     lifecycle.stillWriting();
     recording(reads);
     sinks.add(Sinks.varying(name, ceiling));
-    sinkReads.put(name, java.util.Collections.unmodifiableSet(names));
-    return portals.sink(name, java.util.Collections.unmodifiableSet(names));
+    sinkReads.put(name, Collections.unmodifiableSet(names));
+    return portals.sink(name, Collections.unmodifiableSet(names));
   }
 
   /** The same, for a ceiling that does not depend on who is asking. */
@@ -258,7 +260,7 @@ public final class DefaultCharter implements Charter {
       OccludedType<I> input,
       OccludedType<O> output,
       Function<I, O> function,
-      java.util.function.Consumer<DerivationConfig> customizer) {
+      Consumer<DerivationConfig> customizer) {
     return constitute(
         name,
         List.<OccludedType<?>>of(input),
@@ -280,8 +282,8 @@ public final class DefaultCharter implements Charter {
       String name,
       OccludedType<I> input,
       OccludedType<O> output,
-      java.util.function.BiFunction<I, AccessContext, Optional<O>> function,
-      java.util.function.Consumer<DerivationConfig> customizer) {
+      BiFunction<I, AccessContext, Optional<O>> function,
+      Consumer<DerivationConfig> customizer) {
     return constitute(
         name,
         List.<OccludedType<?>>of(input),
@@ -307,7 +309,7 @@ public final class DefaultCharter implements Charter {
       OccludedType<I> input,
       OccludedType<O> output,
       Function<List<I>, O> function,
-      java.util.function.Consumer<DerivationConfig> customizer) {
+      Consumer<DerivationConfig> customizer) {
     return constitute(
         name,
         List.<OccludedType<?>>of(input),
@@ -331,9 +333,9 @@ public final class DefaultCharter implements Charter {
       String name,
       List<OccludedType<?>> inputTypes,
       OccludedType<O> outputType,
-      java.util.function.BiFunction<List<Object>, AccessContext, Optional<O>> function,
+      BiFunction<List<Object>, AccessContext, Optional<O>> function,
       boolean fold,
-      java.util.function.Consumer<DerivationConfig> customizer,
+      Consumer<DerivationConfig> customizer,
       Function<DerivationSpec<O>, C> capability) {
     Objects.requireNonNull(name, "a derivation needs a name");
     Objects.requireNonNull(customizer, "a derivation needs to say what it may read");
@@ -427,14 +429,14 @@ public final class DefaultCharter implements Charter {
    * value derived from two customers dies with either of them.
    */
   @Override
-  public DefaultCharter mayErase(java.util.function.BiPredicate<Label, AccessContext> mayErase) {
+  public DefaultCharter mayErase(BiPredicate<Label, AccessContext> mayErase) {
     Objects.requireNonNull(mayErase, "an erasure policy must not be null");
     lifecycle.stillWriting();
     this.mayErase = mayErase;
     return this;
   }
 
-  java.util.function.BiPredicate<Label, AccessContext> mayErase() {
+  BiPredicate<Label, AccessContext> mayErase() {
     return mayErase;
   }
 
@@ -442,7 +444,7 @@ public final class DefaultCharter implements Charter {
     return configuration().sinks();
   }
 
-  java.util.Set<String> sources() {
+  Set<String> sources() {
     return configuration().sources().keySet();
   }
 
@@ -460,7 +462,7 @@ public final class DefaultCharter implements Charter {
       OccludedType<I> input,
       Class<Q> against,
       Query.Asking<I, Q> asking,
-      java.util.function.Consumer<QueryConfig> customizer) {
+      Consumer<QueryConfig> customizer) {
     Objects.requireNonNull(name, "a question needs a name");
     Objects.requireNonNull(customizer, "a question needs to say what it may read");
     QueryConfig settings = new QueryConfig();

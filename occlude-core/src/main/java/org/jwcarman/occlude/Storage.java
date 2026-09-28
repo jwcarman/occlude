@@ -15,7 +15,12 @@
  */
 package org.jwcarman.occlude;
 
+import com.fasterxml.uuid.Generators;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import org.jwcarman.codec.TypeRef;
 
 /**
@@ -66,8 +71,8 @@ public interface Storage {
    * <p>Ids it is not holding are simply absent from the result, which is what lets one missing
    * parent be reported without a second lookup to find out which.
    */
-  default java.util.Map<String, StoredMetadata> metadata(java.util.List<String> ids) {
-    java.util.Map<String, StoredMetadata> found = new java.util.LinkedHashMap<>();
+  default Map<String, StoredMetadata> metadata(List<String> ids) {
+    Map<String, StoredMetadata> found = new LinkedHashMap<>();
     for (String id : ids) {
       metadata(id).ifPresent(entry -> found.put(id, entry));
     }
@@ -81,8 +86,8 @@ public interface Storage {
    * checked before a payload is decrypted, so a read that is going to be refused never decrypts
    * anything -- merging the two would be one fewer round trip and one more place plaintext exists.
    */
-  default java.util.Map<String, Object> values(java.util.Map<String, TypeRef<?>> wanted) {
-    java.util.Map<String, Object> found = new java.util.LinkedHashMap<>();
+  default Map<String, Object> values(Map<String, TypeRef<?>> wanted) {
+    Map<String, Object> found = new LinkedHashMap<>();
     wanted.forEach((id, type) -> value(id, type).ifPresent(value -> found.put(id, value)));
     return found;
   }
@@ -102,7 +107,7 @@ public interface Storage {
    * <p>74 bits of randomness either way, which is what keeps one unguessable.
    */
   default String freshId() {
-    return "occ_" + com.fasterxml.uuid.Generators.timeBasedEpochGenerator().generate();
+    return "occ_" + Generators.timeBasedEpochGenerator().generate();
   }
 
   boolean contains(String id);
@@ -129,6 +134,5 @@ public interface Storage {
    * @param lineFor the record to write for a value that was removed, called once per value
    * @return the values removed, the root included, in no particular order
    */
-  java.util.List<String> erase(
-      String root, java.util.function.Function<String, AuditRecord> lineFor);
+  List<String> erase(String root, Function<String, AuditRecord> lineFor);
 }

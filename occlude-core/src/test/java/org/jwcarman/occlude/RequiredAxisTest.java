@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -217,12 +218,12 @@ class RequiredAxisTest {
         new AuditRecord(
             AuditRecord.Operation.CONCEAL,
             "occ_from-before",
-            java.util.Optional.empty(),
+            Optional.empty(),
             AuditRecord.Outcome.ALLOWED,
-            java.util.Optional.empty(),
-            java.util.Optional.empty(),
-            java.util.Optional.empty(),
-            java.util.Map.of()));
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            Map.of()));
 
     edge.set(AccessContext.of(Map.of("tenant", "globex")));
 

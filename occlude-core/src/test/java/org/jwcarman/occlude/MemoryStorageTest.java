@@ -17,6 +17,7 @@ package org.jwcarman.occlude;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,7 +46,7 @@ class MemoryStorageTest {
                     Optional.empty(),
                     Optional.empty(),
                     Optional.empty(),
-                    java.util.Map.of()));
+                    Map.of()));
 
     assertThat(removed).isEmpty();
     assertThat(storage.audit()).isEmpty();

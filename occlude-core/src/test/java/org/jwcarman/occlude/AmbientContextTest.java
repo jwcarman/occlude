@@ -18,6 +18,8 @@ package org.jwcarman.occlude;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.occlude.lattice.Axis;
@@ -55,8 +57,7 @@ class AmbientContextTest {
   record Wired(Charter store, Occlude<String> cards, Reveal<String> card) {}
 
   private static Wired wire(
-      java.util.function.Consumer<Charter> settings,
-      java.util.function.Function<AccessContext, Clearance> ceiling) {
+      Consumer<Charter> settings, Function<AccessContext, Clearance> ceiling) {
     DefaultCharter config = new DefaultCharter(CLEARANCE);
     settings.accept(config);
     Occlude<String> cards =

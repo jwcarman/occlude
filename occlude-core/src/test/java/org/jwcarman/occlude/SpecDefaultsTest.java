@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
+import org.jwcarman.occlude.lattice.Label;
 
 /**
  * What a query or a derivation says it may read, when nobody said anything at all.
@@ -71,9 +72,7 @@ class SpecDefaultsTest {
   void a_query_may_accept_a_constant_ceiling() {
     Ceiling ceiling = Ceiling.of(TENANT, Constraint.any());
     DefaultCharter charter = new DefaultCharter(TENANT);
-    Occlude<String> source =
-        charter.source(
-            "mail", STRING_TYPE, ctx -> org.jwcarman.occlude.lattice.Label.of(TENANT, "acme"));
+    Occlude<String> source = charter.source("mail", STRING_TYPE, ctx -> Label.of(TENANT, "acme"));
     Query<String, String> asksSomething =
         charter.query(
             "mentions",

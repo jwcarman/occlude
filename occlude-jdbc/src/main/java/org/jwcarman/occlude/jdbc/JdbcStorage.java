@@ -20,6 +20,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -27,11 +29,24 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import javax.sql.DataSource;
 import org.jwcarman.codec.Codec;
 import org.jwcarman.codec.CodecFactory;
@@ -70,12 +85,12 @@ public final class JdbcStorage implements Storage {
    * time and keyed by name, so reading one back needs to know which axes the charter declares.
    */
   static JdbcStorage of(
-      javax.sql.DataSource dataSource,
+      DataSource dataSource,
       CodecFactory codecs,
       StorageCodec storageCodec,
       Axes axes,
       String rootId,
-      java.util.function.Function<String, byte[]> roots) {
+      Function<String, byte[]> roots) {
     return new JdbcStorage(dataSource, codecs, storageCodec, axes, rootId, roots);
   }
 
@@ -151,11 +166,11 @@ public final class JdbcStorage implements Storage {
    * Serialisation then encryption, for the two things stored as a map of strings that must not be
    * in the clear: a label, and whatever the application calls identity.
    */
-  private final Codec<java.util.Map<String, String>> protectedMap;
+  private final Codec<Map<String, String>> protectedMap;
 
   private final Axes axes;
   private final String rootId;
-  private final java.util.function.Function<String, byte[]> roots;
+  private final Function<String, byte[]> roots;
   private final Map<String, Codec<?>> byType = new ConcurrentHashMap<>();
 
   private JdbcStorage(
@@ -164,7 +179,7 @@ public final class JdbcStorage implements Storage {
       StorageCodec storageCodec,
       Axes axes,
       String rootId,
-      java.util.function.Function<String, byte[]> roots) {
+      Function<String, byte[]> roots) {
     this.dataSource = dataSource;
     this.codecs = codecs;
     this.storageCodec = storageCodec;
@@ -187,7 +202,7 @@ public final class JdbcStorage implements Storage {
         read("schema-postgresql.sql")
             .lines()
             .map(line -> line.strip().startsWith("--") ? "" : line)
-            .collect(java.util.stream.Collectors.joining("\n"));
+            .collect(Collectors.joining("\n"));
     try (Connection connection = dataSource.getConnection();
         Statement statement = connection.createStatement()) {
       for (String each : sql.split(";")) {
@@ -259,8 +274,7 @@ public final class JdbcStorage implements Storage {
 
   /** The same, for a write that has something to report back. */
   private <T> T inTransactionReturning(String what, SqlAnswer<T> work) {
-    java.util.concurrent.atomic.AtomicReference<T> answer =
-        new java.util.concurrent.atomic.AtomicReference<>();
+    AtomicReference<T> answer = new AtomicReference<>();
     inTransaction(what, connection -> answer.set(work.run(connection)));
     return answer.get();
   }
@@ -317,7 +331,7 @@ public final class JdbcStorage implements Storage {
     // application server believed it decided something is not one of them. Truncated once, because
     // TIMESTAMPTZ keeps microseconds and an Instant offers nanoseconds -- signing what was in hand
     // rather than what reached the column made every line fail its own check when it was read back.
-    Instant recordedAt = head.recordedAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+    Instant recordedAt = head.recordedAt().truncatedTo(ChronoUnit.MICROS);
     byte[] digest = lineDigest(rootId, previous, recordedAt, entry, detail, label, context);
     try (PreparedStatement statement = connection.prepareStatement(INSERT_AUDIT)) {
       statement.setTimestamp(1, Timestamp.from(recordedAt));
@@ -337,7 +351,7 @@ public final class JdbcStorage implements Storage {
   }
 
   /** Label-shaped, so it goes to disk the way a label does and never in the clear. */
-  private byte[] protect(java.util.Optional<String> value) {
+  private byte[] protect(Optional<String> value) {
     return value.map(text -> storageCodec.encode(text.getBytes(UTF_8))).orElse(null);
   }
 
@@ -380,7 +394,7 @@ public final class JdbcStorage implements Storage {
    */
   private List<byte[]> parentDigests(Connection connection, StoredValue value) throws SQLException {
     List<String> parents = value.lineage().parents();
-    List<byte[]> digests = new java.util.ArrayList<>();
+    List<byte[]> digests = new ArrayList<>();
     try (PreparedStatement statement =
         connection.prepareStatement(
             "SELECT digest FROM occlude_value WHERE value_id = ? FOR SHARE")) {
@@ -440,7 +454,7 @@ public final class JdbcStorage implements Storage {
       byte[] label,
       String derivation,
       List<byte[]> parents) {
-    javax.crypto.Mac mac = keyed(Domain.VALUE, under);
+    Mac mac = keyed(Domain.VALUE, under);
     // Counted before they are fed. The parents are the only run whose length varies, so without a
     // count a value with two parents and a value with one could be fed identical bytes.
     feedCount(mac, parents.size());
@@ -475,32 +489,32 @@ public final class JdbcStorage implements Storage {
    * <p>Named, so rotating a root does not invalidate what was written under the last one. The id is
    * signed too, so two stores sharing a secret still produce different digests.
    */
-  private javax.crypto.Mac keyed(Domain domain, String id) {
+  private Mac keyed(Domain domain, String id) {
     byte[] secret = roots.apply(id);
     if (secret == null) {
       throw new IllegalStateException(
           "nothing supplies the root '" + id + "', which some of this was written under");
     }
     try {
-      javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
-      mac.init(new javax.crypto.spec.SecretKeySpec(secret, "HmacSHA256"));
+      Mac mac = Mac.getInstance("HmacSHA256");
+      mac.init(new SecretKeySpec(secret, "HmacSHA256"));
       mac.update((byte) domain.ordinal());
       feed(mac, id.getBytes(UTF_8));
       return mac;
-    } catch (java.security.NoSuchAlgorithmException | java.security.InvalidKeyException e) {
+    } catch (NoSuchAlgorithmException | InvalidKeyException e) {
       throw new IllegalStateException("this JVM cannot compute HMAC-SHA256", e);
     }
   }
 
   /** How many of whatever follows, so two different shapes cannot feed the same bytes. */
-  private static void feedCount(javax.crypto.Mac mac, int count) {
+  private static void feedCount(Mac mac, int count) {
     mac.update(
         new byte[] {
           (byte) (count >>> 24), (byte) (count >>> 16), (byte) (count >>> 8), (byte) count
         });
   }
 
-  private static void feed(javax.crypto.Mac mac, byte[] field) {
+  private static void feed(Mac mac, byte[] field) {
     int length = field == null ? -1 : field.length;
     mac.update(
         new byte[] {
@@ -570,21 +584,17 @@ public final class JdbcStorage implements Storage {
       if (!(other instanceof Predecessor(byte[] thatDigest, Instant thatRecordedAt))) {
         return false;
       }
-      return java.util.Arrays.equals(digest, thatDigest) && recordedAt.equals(thatRecordedAt);
+      return Arrays.equals(digest, thatDigest) && recordedAt.equals(thatRecordedAt);
     }
 
     @Override
     public int hashCode() {
-      return java.util.Objects.hash(java.util.Arrays.hashCode(digest), recordedAt);
+      return Objects.hash(Arrays.hashCode(digest), recordedAt);
     }
 
     @Override
     public String toString() {
-      return "Predecessor[digest="
-          + java.util.Arrays.toString(digest)
-          + ", recordedAt="
-          + recordedAt
-          + "]";
+      return "Predecessor[digest=" + Arrays.toString(digest) + ", recordedAt=" + recordedAt + "]";
     }
   }
 
@@ -643,7 +653,7 @@ public final class JdbcStorage implements Storage {
       byte[] detail,
       byte[] label,
       byte[] context) {
-    javax.crypto.Mac mac = keyed(Domain.LINE, under);
+    Mac mac = keyed(Domain.LINE, under);
     feed(mac, previous);
     feed(mac, recordedAt.toString().getBytes(UTF_8));
     feed(mac, facts.operation().getBytes(UTF_8));
@@ -704,7 +714,7 @@ public final class JdbcStorage implements Storage {
    *
    * @return the id of the first line that does not agree, or empty when the trail is intact
    */
-  public java.util.Optional<Long> firstBrokenEntry() {
+  public Optional<Long> firstBrokenEntry() {
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement =
             connection.prepareStatement(
@@ -717,8 +727,8 @@ public final class JdbcStorage implements Storage {
       byte[] expected = null;
       while (rows.next()) {
         byte[] previous = rows.getBytes("previous");
-        if (!java.util.Arrays.equals(previous, expected)) {
-          return java.util.Optional.of(rows.getLong(COL_ENTRY_ID));
+        if (!Arrays.equals(previous, expected)) {
+          return Optional.of(rows.getLong(COL_ENTRY_ID));
         }
         // A root nothing supplies is a broken line, not a crashed verifier. Left to throw, an
         // attacker who could edit a line could rewrite its root_id instead and turn "broken at
@@ -739,12 +749,12 @@ public final class JdbcStorage implements Storage {
                 rows.getBytes("detail"),
                 rows.getBytes(COL_LABEL),
                 rows.getBytes("context"));
-        if (digest == null || !java.util.Arrays.equals(digest, rows.getBytes(COL_DIGEST))) {
-          return java.util.Optional.of(rows.getLong(COL_ENTRY_ID));
+        if (digest == null || !Arrays.equals(digest, rows.getBytes(COL_DIGEST))) {
+          return Optional.of(rows.getLong(COL_ENTRY_ID));
         }
         expected = digest;
       }
-      return java.util.Optional.empty();
+      return Optional.empty();
     } catch (SQLException e) {
       throw new IllegalStateException("could not read the trail back", e);
     }
@@ -774,7 +784,7 @@ public final class JdbcStorage implements Storage {
    * @return the identifiers of values the trail announced, never erased, and which are not here
    */
   public List<String> missingValues() {
-    List<String> missing = new java.util.ArrayList<>();
+    List<String> missing = new ArrayList<>();
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement =
             connection.prepareStatement(
@@ -813,9 +823,9 @@ public final class JdbcStorage implements Storage {
                 "SELECT value_id, value_type, payload, label, digest, root_id, derivation"
                     + " FROM occlude_value ORDER BY value_id");
         ResultSet rows = statement.executeQuery()) {
-      java.util.Map<String, ValueRow> byId = loadValueRows(rows);
+      Map<String, ValueRow> byId = loadValueRows(rows);
       List<String> broken = verifyToFixpoint(connection, byId);
-      broken.sort(java.util.Comparator.naturalOrder());
+      broken.sort(Comparator.naturalOrder());
       return broken;
     } catch (SQLException e) {
       throw new IllegalStateException("could not read the values back", e);
@@ -843,20 +853,20 @@ public final class JdbcStorage implements Storage {
                   String otherDerivation,
                   String otherType,
                   String otherRootId)
-          && java.util.Arrays.equals(digest, otherDigest)
-          && java.util.Arrays.equals(payload, otherPayload)
-          && java.util.Arrays.equals(label, otherLabel)
-          && java.util.Objects.equals(derivation, otherDerivation)
-          && java.util.Objects.equals(type, otherType)
-          && java.util.Objects.equals(rootId, otherRootId);
+          && Arrays.equals(digest, otherDigest)
+          && Arrays.equals(payload, otherPayload)
+          && Arrays.equals(label, otherLabel)
+          && Objects.equals(derivation, otherDerivation)
+          && Objects.equals(type, otherType)
+          && Objects.equals(rootId, otherRootId);
     }
 
     @Override
     public int hashCode() {
-      return java.util.Objects.hash(
-          java.util.Arrays.hashCode(digest),
-          java.util.Arrays.hashCode(payload),
-          java.util.Arrays.hashCode(label),
+      return Objects.hash(
+          Arrays.hashCode(digest),
+          Arrays.hashCode(payload),
+          Arrays.hashCode(label),
           derivation,
           type,
           rootId);
@@ -869,8 +879,8 @@ public final class JdbcStorage implements Storage {
     }
   }
 
-  private java.util.Map<String, ValueRow> loadValueRows(ResultSet rows) throws SQLException {
-    java.util.Map<String, ValueRow> byId = new java.util.LinkedHashMap<>();
+  private Map<String, ValueRow> loadValueRows(ResultSet rows) throws SQLException {
+    Map<String, ValueRow> byId = new LinkedHashMap<>();
     while (rows.next()) {
       String id = rows.getString(COL_VALUE_ID);
       byId.put(
@@ -897,15 +907,15 @@ public final class JdbcStorage implements Storage {
    * <p>Each pass verifies whatever has become checkable. When a pass verifies nothing new, what is
    * left is genuinely unverifiable: broken, or descended from something broken or missing.
    */
-  private List<String> verifyToFixpoint(Connection connection, java.util.Map<String, ValueRow> byId)
+  private List<String> verifyToFixpoint(Connection connection, Map<String, ValueRow> byId)
       throws SQLException {
-    java.util.Map<String, byte[]> seen = new java.util.LinkedHashMap<>();
-    List<String> broken = new java.util.ArrayList<>();
-    java.util.Set<String> unresolved = new java.util.LinkedHashSet<>(byId.keySet());
+    Map<String, byte[]> seen = new LinkedHashMap<>();
+    List<String> broken = new ArrayList<>();
+    Set<String> unresolved = new LinkedHashSet<>(byId.keySet());
     boolean progressing = true;
     while (progressing) {
       progressing = false;
-      java.util.Iterator<String> remaining = unresolved.iterator();
+      Iterator<String> remaining = unresolved.iterator();
       while (remaining.hasNext()) {
         String id = remaining.next();
         Optional<List<byte[]>> checkable = checkableParents(connection, id, seen);
@@ -923,7 +933,7 @@ public final class JdbcStorage implements Storage {
                 row.label(),
                 row.derivation(),
                 parents);
-        if (java.util.Arrays.equals(computed, row.digest())) {
+        if (Arrays.equals(computed, row.digest())) {
           seen.put(id, computed);
         } else {
           broken.add(id);
@@ -945,8 +955,8 @@ public final class JdbcStorage implements Storage {
    * has none and verifies on its own.
    */
   private Optional<List<byte[]>> checkableParents(
-      Connection connection, String id, java.util.Map<String, byte[]> seen) throws SQLException {
-    List<byte[]> parents = new java.util.ArrayList<>();
+      Connection connection, String id, Map<String, byte[]> seen) throws SQLException {
+    List<byte[]> parents = new ArrayList<>();
     for (String parent : parentsOf(connection, id)) {
       byte[] digest = seen.get(parent);
       if (digest == null) {
@@ -995,14 +1005,14 @@ public final class JdbcStorage implements Storage {
   }
 
   @Override
-  public java.util.Map<String, StoredMetadata> metadata(java.util.List<String> ids) {
+  public Map<String, StoredMetadata> metadata(List<String> ids) {
     if (ids.isEmpty()) {
-      return java.util.Map.of();
+      return Map.of();
     }
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement = connection.prepareStatement(SELECT_METADATA_MANY)) {
       statement.setArray(1, connection.createArrayOf("text", ids.toArray()));
-      java.util.Map<String, StoredMetadata> found = new java.util.LinkedHashMap<>();
+      Map<String, StoredMetadata> found = new LinkedHashMap<>();
       try (ResultSet rows = statement.executeQuery()) {
         while (rows.next()) {
           String id = rows.getString(COL_VALUE_ID);
@@ -1022,14 +1032,14 @@ public final class JdbcStorage implements Storage {
   }
 
   @Override
-  public java.util.Map<String, Object> values(java.util.Map<String, TypeRef<?>> wanted) {
+  public Map<String, Object> values(Map<String, TypeRef<?>> wanted) {
     if (wanted.isEmpty()) {
-      return java.util.Map.of();
+      return Map.of();
     }
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement = connection.prepareStatement(SELECT_PAYLOAD_MANY)) {
       statement.setArray(1, connection.createArrayOf("text", wanted.keySet().toArray()));
-      java.util.Map<String, Object> found = new java.util.LinkedHashMap<>();
+      Map<String, Object> found = new LinkedHashMap<>();
       try (ResultSet rows = statement.executeQuery()) {
         while (rows.next()) {
           String id = rows.getString(COL_VALUE_ID);
@@ -1086,12 +1096,12 @@ public final class JdbcStorage implements Storage {
   }
 
   @Override
-  public List<String> erase(String root, java.util.function.Function<String, AuditRecord> lineFor) {
+  public List<String> erase(String root, Function<String, AuditRecord> lineFor) {
     return inTransactionReturning(
         "could not erase " + root,
         connection -> {
           lockLineageExclusively(connection);
-          List<String> removed = new java.util.ArrayList<>();
+          List<String> removed = new ArrayList<>();
           // RETURNING, so the identities come back from the same statement that destroys them.
           // Selecting them first would be a second snapshot and a window to disagree with.
           try (PreparedStatement statement = connection.prepareStatement(DELETE_REACHABLE)) {

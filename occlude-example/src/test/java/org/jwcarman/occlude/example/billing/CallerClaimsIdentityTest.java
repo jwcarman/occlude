@@ -20,8 +20,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.occlude.Charter;
+import org.jwcarman.occlude.Derivation;
+import org.jwcarman.occlude.Occlude;
+import org.jwcarman.occlude.Occluded;
+import org.jwcarman.occlude.Query;
+import org.jwcarman.occlude.Reveal;
+import org.jwcarman.occlude.lattice.Axes;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -42,7 +49,7 @@ class CallerClaimsIdentityTest {
     r.add("spring.datasource.password", PG::getPassword);
   }
 
-  @Autowired org.springframework.context.ApplicationContext context;
+  @Autowired ApplicationContext context;
 
   /**
    * The gate is only worth anything if identity comes from somewhere a caller does not control.
@@ -58,9 +65,7 @@ class CallerClaimsIdentityTest {
   void cannot_create_a_value_through_the_charter() {
     assertThat(Charter.class.getMethods())
         .isNotEmpty()
-        .noneSatisfy(
-            method ->
-                assertThat(method.getReturnType()).isEqualTo(org.jwcarman.occlude.Occluded.class));
+        .noneSatisfy(method -> assertThat(method.getReturnType()).isEqualTo(Occluded.class));
   }
 
   /**
@@ -88,29 +93,25 @@ class CallerClaimsIdentityTest {
   @Test
   @DisplayName("can obtain the charter, because declaring a portal is what it is for")
   void can_obtain_the_charter() {
-    assertThat(context.getBeanNamesForType(org.jwcarman.occlude.Charter.class))
-        .containsExactly("charter");
+    assertThat(context.getBeanNamesForType(Charter.class)).containsExactly("charter");
   }
 
   /** And the application is not the thing that made it. */
   @Test
   @DisplayName("does not declare the charter itself, only the axes it is made from")
   void does_not_declare_the_charter_itself() {
-    assertThat(context.getBeanNamesForType(org.jwcarman.occlude.lattice.Axes.class))
-        .containsExactly("billingAxes");
+    assertThat(context.getBeanNamesForType(Axes.class)).containsExactly("billingAxes");
     assertThat(CharterConfiguration.class.getDeclaredMethods())
         .isNotEmpty()
-        .noneSatisfy(
-            method ->
-                assertThat(method.getReturnType()).isEqualTo(org.jwcarman.occlude.Charter.class));
+        .noneSatisfy(method -> assertThat(method.getReturnType()).isEqualTo(Charter.class));
   }
 
   @Test
   @DisplayName("cannot obtain a portal from the application context")
   void cannot_obtain_a_portal_from_the_context() {
-    assertThat(context.getBeanNamesForType(org.jwcarman.occlude.Occlude.class)).isEmpty();
-    assertThat(context.getBeanNamesForType(org.jwcarman.occlude.Reveal.class)).isEmpty();
-    assertThat(context.getBeanNamesForType(org.jwcarman.occlude.Derivation.class)).isEmpty();
-    assertThat(context.getBeanNamesForType(org.jwcarman.occlude.Query.class)).isEmpty();
+    assertThat(context.getBeanNamesForType(Occlude.class)).isEmpty();
+    assertThat(context.getBeanNamesForType(Reveal.class)).isEmpty();
+    assertThat(context.getBeanNamesForType(Derivation.class)).isEmpty();
+    assertThat(context.getBeanNamesForType(Query.class)).isEmpty();
   }
 }

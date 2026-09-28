@@ -17,6 +17,8 @@ package org.jwcarman.occlude;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Map;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.occlude.lattice.Axis;
@@ -106,8 +108,7 @@ class WhatACharterPermitsTest {
 
     assertThat(scoped.manifest().toString()).contains("could not decide for this access");
 
-    String forAcme =
-        scoped.manifest(AccessContext.of(java.util.Map.of("tenant", "acme"))).toString();
+    String forAcme = scoped.manifest(AccessContext.of(Map.of("tenant", "acme"))).toString();
 
     assertThat(forAcme).contains("acme").doesNotContain("could not decide");
   }
@@ -116,7 +117,7 @@ class WhatACharterPermitsTest {
   @DisplayName("says which access it was rendered for, because the ceilings depend on it")
   void says_which_access_it_was_rendered_for() {
     assertThat(charter.manifest().toString()).contains("nobody in particular");
-    assertThat(charter.manifest(AccessContext.of(java.util.Map.of("tenant", "acme"))).toString())
+    assertThat(charter.manifest(AccessContext.of(Map.of("tenant", "acme"))).toString())
         .contains("tenant=acme");
   }
 
@@ -255,8 +256,7 @@ class WhatACharterPermitsTest {
     var sinks = before.sinks();
 
     assertThat(sinks).isNotEmpty();
-    org.assertj.core.api.Assertions.assertThatThrownBy(sinks::clear)
-        .isInstanceOf(UnsupportedOperationException.class);
+    Assertions.assertThatThrownBy(sinks::clear).isInstanceOf(UnsupportedOperationException.class);
     assertThat(charter.manifest().sinks()).hasSameSizeAs(before.sinks());
   }
 
@@ -267,14 +267,14 @@ class WhatACharterPermitsTest {
     Card card = new Card("4111111111114821");
     Occluded<Card> cardHandle = Occluded.of("occ_x");
     Occluded<Last4> last4Handle = Occluded.of("occ_x");
-    org.assertj.core.api.Assertions.assertThatThrownBy(() -> cards.occlude(card))
+    Assertions.assertThatThrownBy(() -> cards.occlude(card))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("before its charter is sealed");
-    org.assertj.core.api.Assertions.assertThatThrownBy(() -> truncate.derive(cardHandle))
+    Assertions.assertThatThrownBy(() -> truncate.derive(cardHandle))
         .isInstanceOf(IllegalStateException.class);
-    org.assertj.core.api.Assertions.assertThatThrownBy(() -> approvalDesk.reveal(last4Handle))
+    Assertions.assertThatThrownBy(() -> approvalDesk.reveal(last4Handle))
         .isInstanceOf(IllegalStateException.class);
-    org.assertj.core.api.Assertions.assertThatThrownBy(() -> mentions.ask(cardHandle, "4111"))
+    Assertions.assertThatThrownBy(() -> mentions.ask(cardHandle, "4111"))
         .isInstanceOf(IllegalStateException.class);
   }
 }

@@ -22,7 +22,9 @@ import java.sql.ResultSet;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.codec.Codec;
 import org.jwcarman.occlude.Charter;
+import org.jwcarman.occlude.MemoryStorage;
 import org.jwcarman.occlude.Storage;
 import org.jwcarman.occlude.jdbc.JdbcStorage;
 import org.jwcarman.occlude.jdbc.StorageCodec;
@@ -78,7 +80,7 @@ class JdbcCharterAutoConfigurationTest {
     }
 
     @Bean
-    javax.sql.DataSource dataSource() {
+    DataSource dataSource() {
       return new EmbeddedDatabaseBuilder().setType(EmbeddedDatabaseType.H2).build();
     }
 
@@ -86,7 +88,7 @@ class JdbcCharterAutoConfigurationTest {
     StorageCodec storageCodec() {
       // Nothing to hide in a test; the point here is the wiring, not the bytes.
       return StorageCodec.of(
-          new org.jwcarman.codec.Codec<byte[]>() {
+          new Codec<byte[]>() {
             @Override
             public byte[] encode(byte[] value) {
               return value;
@@ -142,7 +144,7 @@ class JdbcCharterAutoConfigurationTest {
     }
 
     @Bean
-    javax.sql.DataSource dataSource() {
+    DataSource dataSource() {
       return new EmbeddedDatabaseBuilder().setType(EmbeddedDatabaseType.H2).build();
     }
   }
@@ -153,7 +155,7 @@ class JdbcCharterAutoConfigurationTest {
   void leaves_application_storage_alone() {
     runner
         .withUserConfiguration(AnApplication.class)
-        .withBean(Storage.class, org.jwcarman.occlude.MemoryStorage::new)
+        .withBean(Storage.class, MemoryStorage::new)
         .run(
             context -> {
               assertThat(context).hasSingleBean(Storage.class);
@@ -207,7 +209,7 @@ class JdbcCharterAutoConfigurationTest {
     @Bean
     StorageCodec storageCodec() {
       return StorageCodec.of(
-          new org.jwcarman.codec.Codec<byte[]>() {
+          new Codec<byte[]>() {
             @Override
             public byte[] encode(byte[] value) {
               return value;

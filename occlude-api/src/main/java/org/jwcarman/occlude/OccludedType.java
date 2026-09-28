@@ -17,6 +17,7 @@ package org.jwcarman.occlude;
 
 import static java.util.Optional.ofNullable;
 
+import java.util.Locale;
 import java.util.Objects;
 import org.jwcarman.codec.TypeRef;
 
@@ -93,7 +94,7 @@ public record OccludedType<T>(String name, TypeRef<T> type) {
     return simpleName
         .replaceAll("(?<=[A-Z])(?=[A-Z][a-z])", "-")
         .replaceAll("(?<=[a-z0-9])(?=[A-Z])", "-")
-        .toLowerCase(java.util.Locale.ROOT);
+        .toLowerCase(Locale.ROOT);
   }
 
   @Override

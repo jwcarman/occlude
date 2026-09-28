@@ -18,6 +18,7 @@ package org.jwcarman.occlude.jdbc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.PrintWriter;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
@@ -26,12 +27,23 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
+import java.util.logging.Logger;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.sql.DataSource;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +53,7 @@ import org.jwcarman.codec.crypto.JceDataKeyProvider;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.codec.transform.compress.GzipCodec;
 import org.jwcarman.occlude.AccessContext;
+import org.jwcarman.occlude.AccessDeniedException;
 import org.jwcarman.occlude.AuditRecord;
 import org.jwcarman.occlude.DefaultCharter;
 import org.jwcarman.occlude.Derivation;
@@ -119,8 +132,7 @@ class JdbcCharterTest {
   private Reveal<List<Last4>> last4ListProcessor;
 
   /** Standing in for the edge. A caller is not allowed to say who it is. */
-  private final java.util.concurrent.atomic.AtomicReference<AccessContext> edge =
-      new java.util.concurrent.atomic.AtomicReference<>(AccessContext.empty());
+  private final AtomicReference<AccessContext> edge = new AtomicReference<>(AccessContext.empty());
 
   private AccessContext acme() {
     edge.set(AccessContext.of("tenant", "acme"));
@@ -337,8 +349,7 @@ class JdbcCharterTest {
         var statement =
             connection.prepareStatement(
                 "UPDATE occlude_value SET payload = ? WHERE value_id = ?")) {
-      statement.setBytes(
-          1, "not what was stored".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      statement.setBytes(1, "not what was stored".getBytes(StandardCharsets.UTF_8));
       statement.setString(2, card.id());
       assertThat(statement.executeUpdate()).isPositive();
     }
@@ -393,7 +404,7 @@ class JdbcCharterTest {
     acme();
     Occluded<Last4> last4 = cardLast4.derive(card).orThrow();
 
-    edge.set(AccessContext.of(java.util.Map.of("tenant", "acme", "role", "compliance")));
+    edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
     assertThat(store.erase(card)).isEqualTo(2);
 
     assertThat(store.holds(card.id())).isFalse();
@@ -419,9 +430,8 @@ class JdbcCharterTest {
     Occluded<Last4> last4 = cardLast4.derive(card).orThrow();
 
     // Fails on the second line, standing in for a dropped connection midway through.
-    java.util.concurrent.atomic.AtomicInteger written =
-        new java.util.concurrent.atomic.AtomicInteger();
-    java.util.function.Function<String, AuditRecord> failing =
+    AtomicInteger written = new AtomicInteger();
+    Function<String, AuditRecord> failing =
         id -> {
           if (written.incrementAndGet() == 2) {
             throw new IllegalStateException("connection dropped mid-erase");
@@ -429,12 +439,12 @@ class JdbcCharterTest {
           return new AuditRecord(
               AuditRecord.Operation.ERASE,
               id,
-              java.util.Optional.of(card.id()),
+              Optional.of(card.id()),
               AuditRecord.Outcome.ALLOWED,
-              java.util.Optional.of("erased"),
-              java.util.Optional.empty(),
-              java.util.Optional.empty(),
-              java.util.Map.of());
+              Optional.of("erased"),
+              Optional.empty(),
+              Optional.empty(),
+              Map.of());
         };
     String cardId = card.id();
 
@@ -488,7 +498,7 @@ class JdbcCharterTest {
   @DisplayName("deriving while erasing never leaves a child of an erased value behind")
   void deriving_while_erasing_leaves_nothing_behind() throws Exception {
     int rounds = 24;
-    java.util.List<java.util.concurrent.Callable<Void>> work = new java.util.ArrayList<>();
+    List<Callable<Void>> work = new ArrayList<>();
     for (int round = 0; round < rounds; round++) {
       work.add(
           () -> {
@@ -507,9 +517,7 @@ class JdbcCharterTest {
             Thread erasing =
                 new Thread(
                     () -> {
-                      edge.set(
-                          AccessContext.of(
-                              java.util.Map.of("tenant", "acme", "role", "compliance")));
+                      edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
                       store.erase(card);
                     });
             deriving.start();
@@ -519,9 +527,8 @@ class JdbcCharterTest {
             return null;
           });
     }
-    try (java.util.concurrent.ExecutorService pool =
-        java.util.concurrent.Executors.newFixedThreadPool(4)) {
-      for (java.util.concurrent.Future<Void> done : pool.invokeAll(work)) {
+    try (ExecutorService pool = Executors.newFixedThreadPool(4)) {
+      for (Future<Void> done : pool.invokeAll(work)) {
         done.get();
       }
     }
@@ -631,8 +638,7 @@ class JdbcCharterTest {
             .dataSource(dataSource)
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
             .storedPlainly()
-            .rootedIn(
-                "open", "somebody else's key".getBytes(java.nio.charset.StandardCharsets.UTF_8))
+            .rootedIn("open", "somebody else's key".getBytes(StandardCharsets.UTF_8))
             .withoutMigration()
             .storage(Axes.of(TENANT, INTEGRITY, DATA));
 
@@ -650,8 +656,8 @@ class JdbcCharterTest {
   @Test
   @DisplayName("verifies what an older root signed after a new one takes over")
   void verifies_across_a_rotation() {
-    byte[] first = "the first root".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-    byte[] second = "the second root".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    byte[] first = "the first root".getBytes(StandardCharsets.UTF_8);
+    byte[] second = "the second root".getBytes(StandardCharsets.UTF_8);
     Axes axes = Axes.of(TENANT, INTEGRITY, DATA);
 
     DefaultCharter under1 = new DefaultCharter(axes);
@@ -659,11 +665,11 @@ class JdbcCharterTest {
     Occlude<Card> early =
         under1.source(
             "cards", CARD, ctx -> labelFor(ctx, Integrity.ENDORSED, DataClass.CARDHOLDER));
-    under1.seal(rooted("r1", java.util.Map.of("r1", first), axes));
+    under1.seal(rooted("r1", Map.of("r1", first), axes));
     edge.set(AccessContext.of("tenant", "acme"));
     early.occlude(new Card("4111111111114821", "CARMAN"));
 
-    java.util.Map<String, byte[]> both = java.util.Map.of("r1", first, "r2", second);
+    Map<String, byte[]> both = Map.of("r1", first, "r2", second);
     DefaultCharter under2 = new DefaultCharter(axes);
     under2.currentAccess(edge::get);
     Occlude<Card> later =
@@ -678,7 +684,7 @@ class JdbcCharterTest {
     assertThat(rotated.brokenValues()).isEmpty();
   }
 
-  private JdbcStorage rooted(String id, java.util.Map<String, byte[]> roots, Axes axes) {
+  private JdbcStorage rooted(String id, Map<String, byte[]> roots, Axes axes) {
     return new JdbcStorageConfig()
         .dataSource(dataSource)
         .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
@@ -766,7 +772,7 @@ class JdbcCharterTest {
     acme();
     Occluded<Last4> last4 = cardLast4.derive(card).orThrow();
 
-    edge.set(AccessContext.of(java.util.Map.of("tenant", "acme", "role", "compliance")));
+    edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
     int removed = store.erase(card);
 
     assertThat(removed).isEqualTo(2);
@@ -781,7 +787,7 @@ class JdbcCharterTest {
     acme();
     Occluded<Last4> last4 = cardLast4.derive(card).orThrow();
 
-    edge.set(AccessContext.of(java.util.Map.of("tenant", "acme", "role", "compliance")));
+    edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
     assertThat(store.erase(last4)).isEqualTo(1);
     assertThat(store.holds(card)).isTrue();
   }
@@ -798,7 +804,7 @@ class JdbcCharterTest {
   @DisplayName("what happens to the bytes is a decision, not a default")
   void protection_is_a_decision() {
     assertThat(
-            org.assertj.core.api.Assertions.catchThrowable(
+            Assertions.catchThrowable(
                 () ->
                     new JdbcStorageConfig()
                         .dataSource(dataSource)
@@ -845,7 +851,7 @@ class JdbcCharterTest {
     cardLast4.derive(card);
     int before = rowCount("occlude_audit");
 
-    edge.set(AccessContext.of(java.util.Map.of("tenant", "acme", "role", "compliance")));
+    edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
     store.erase(card);
 
     // Two values erased, so two ERASE lines, and every earlier line is still there. ">= before"
@@ -856,8 +862,8 @@ class JdbcCharterTest {
     assertThat(auditColumn("outcome")).containsOnly("ALLOWED");
   }
 
-  private java.util.List<String> auditColumn(String column) throws SQLException {
-    java.util.List<String> values = new java.util.ArrayList<>();
+  private List<String> auditColumn(String column) throws SQLException {
+    List<String> values = new ArrayList<>();
     try (Connection connection = dataSource.getConnection();
         ResultSet rows =
             connection
@@ -890,7 +896,7 @@ class JdbcCharterTest {
   void erasing_a_leaf_removes_exactly_it() throws SQLException {
     Occluded<Card> card = card();
     acme();
-    edge.set(AccessContext.of(java.util.Map.of("tenant", "acme", "role", "compliance")));
+    edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
 
     assertThat(store.erase(card)).isEqualTo(1);
     assertThat(rowCount("occlude_value")).isZero();
@@ -1004,10 +1010,10 @@ class JdbcCharterTest {
   @DisplayName("refuses to erase for anyone the application did not name")
   void refuses_to_erase_for_anyone_not_named() {
     Occluded<Card> card = card();
-    edge.set(AccessContext.of(java.util.Map.of("tenant", "acme", "role", "agent")));
+    edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "agent")));
 
-    assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> store.erase(card)))
-        .isInstanceOf(org.jwcarman.occlude.AccessDeniedException.class);
+    assertThat(Assertions.catchThrowable(() -> store.erase(card)))
+        .isInstanceOf(AccessDeniedException.class);
     assertThat(store.holds(card)).isTrue();
   }
 
@@ -1101,7 +1107,7 @@ class JdbcCharterTest {
   }
 
   /** Every connection this data source hands out is real, wrapped by the given failure. */
-  private DataSource dataSourceWrapping(java.util.function.UnaryOperator<Connection> wrapper) {
+  private DataSource dataSourceWrapping(UnaryOperator<Connection> wrapper) {
     return new DataSource() {
       @Override
       public Connection getConnection() throws SQLException {
@@ -1114,12 +1120,12 @@ class JdbcCharterTest {
       }
 
       @Override
-      public java.io.PrintWriter getLogWriter() {
+      public PrintWriter getLogWriter() {
         throw new UnsupportedOperationException("not needed by this test");
       }
 
       @Override
-      public void setLogWriter(java.io.PrintWriter out) {
+      public void setLogWriter(PrintWriter out) {
         throw new UnsupportedOperationException("not needed by this test");
       }
 
@@ -1134,7 +1140,7 @@ class JdbcCharterTest {
       }
 
       @Override
-      public java.util.logging.Logger getParentLogger() {
+      public Logger getParentLogger() {
         throw new UnsupportedOperationException("not needed by this test");
       }
 

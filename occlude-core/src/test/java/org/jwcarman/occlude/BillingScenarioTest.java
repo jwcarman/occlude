@@ -19,9 +19,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.codec.TypeRef;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
@@ -122,13 +127,13 @@ class BillingScenarioTest {
   record Report(String text) {}
 
   /** What an operation reading plaintext may look at: always the acting tenant's own data. */
-  private static java.util.function.Function<AccessContext, Ceiling> reading(
+  private static Function<AccessContext, Ceiling> reading(
       Integrity integrity, Tlp tlp, DataClass dataClass) {
     return ctx -> ceilingFor(ctx, integrity, tlp, dataClass);
   }
 
   /** The approval card's ceiling: a finance approver sees more than anyone else does. */
-  private static java.util.function.Function<AccessContext, Ceiling> approvalCardCeiling() {
+  private static Function<AccessContext, Ceiling> approvalCardCeiling() {
     return ctx ->
         ceilingFor(
             ctx,
@@ -168,8 +173,7 @@ class BillingScenarioTest {
    * allowed to say who it is. That is not a testing detail; it is the property that makes any of
    * the rest of this mean anything.
    */
-  private final java.util.concurrent.atomic.AtomicReference<AccessContext> edge =
-      new java.util.concurrent.atomic.AtomicReference<>(AccessContext.empty());
+  private final AtomicReference<AccessContext> edge = new AtomicReference<>(AccessContext.empty());
 
   private final DefaultCharter config =
       new DefaultCharter(TENANT, INTEGRITY, TLP, DATA_CLASS).currentAccess(edge::get);
@@ -347,7 +351,7 @@ class BillingScenarioTest {
           DECLINES,
           DISPUTE_CLAIM_TYPE,
           INVOICE_NUMBER_TYPE,
-          (claim, ctx) -> java.util.Optional.empty(),
+          (claim, ctx) -> Optional.empty(),
           d -> d.accepting(reading(Integrity.UNENDORSED, Tlp.AMBER, DataClass.PII)));
 
   // A fold that lowers is as privileged as a derivation that lowers. Declared rather than kept:
@@ -383,7 +387,7 @@ class BillingScenarioTest {
   }
 
   private AccessContext acme(String key, String value) {
-    edge.set(AccessContext.of(java.util.Map.of("tenant", "acme", key, value)));
+    edge.set(AccessContext.of(Map.of("tenant", "acme", key, value)));
     return AccessContext.empty();
   }
 
@@ -411,7 +415,7 @@ class BillingScenarioTest {
     AccessContext previous = edge.get();
     edge.set(
         AccessContext.of(
-            java.util.Map.of(
+            Map.of(
                 "tenant", tenant,
                 "integrity", integrity.name(),
                 "tlp", tlp.name(),
@@ -1254,7 +1258,7 @@ class BillingScenarioTest {
           holdAs("acme", Integrity.ENDORSED, Tlp.CLEAR, DataClass.NONE, notes, "b");
 
       acme();
-      summarise.fold(java.util.List.of(first, second));
+      summarise.fold(List.of(first, second));
 
       assertThat(storage.audit(AuditRecord.Operation.DERIVE).getLast().reason())
           .contains("combined from 2 values");
@@ -1289,12 +1293,12 @@ class BillingScenarioTest {
             }
 
             @Override
-            public java.util.Optional<StoredMetadata> metadata(String id) {
+            public Optional<StoredMetadata> metadata(String id) {
               return kept.metadata(id);
             }
 
             @Override
-            public <T> java.util.Optional<T> value(String id, org.jwcarman.codec.TypeRef<T> t) {
+            public <T> Optional<T> value(String id, TypeRef<T> t) {
               return kept.value(id, t);
             }
 
@@ -1304,8 +1308,7 @@ class BillingScenarioTest {
             }
 
             @Override
-            public java.util.List<String> erase(
-                String root, java.util.function.Function<String, AuditRecord> lineFor) {
+            public List<String> erase(String root, Function<String, AuditRecord> lineFor) {
               return kept.erase(root, lineFor);
             }
           };
@@ -1455,7 +1458,7 @@ class BillingScenarioTest {
       storage.clearAudit();
 
       acme();
-      summarise.fold(java.util.List.of());
+      summarise.fold(List.of());
 
       assertThat(storage.audit(AuditRecord.Operation.DERIVE))
           .anySatisfy(

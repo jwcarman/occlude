@@ -15,7 +15,11 @@
  */
 package org.jwcarman.occlude;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Ceiling;
@@ -73,9 +77,7 @@ public interface Charter {
 
   /** The same, for a label that also depends on what is arriving. */
   <T> Occlude<T> source(
-      String name,
-      OccludedType<T> type,
-      java.util.function.BiFunction<T, AccessContext, Label> labelling);
+      String name, OccludedType<T> type, BiFunction<T, AccessContext, Label> labelling);
 
   /** Somewhere values may go, and the types it is allowed to read. */
   Sink sink(String name, Function<AccessContext, Ceiling> ceiling, OccludedType<?>... reads);
@@ -97,7 +99,7 @@ public interface Charter {
       OccludedType<I> input,
       OccludedType<O> output,
       Function<I, O> function,
-      java.util.function.Consumer<DerivationConfig> customizer);
+      Consumer<DerivationConfig> customizer);
 
   /**
    * The same, for a derivation that may decline: a lookup that finds nothing, a check that fails.
@@ -106,16 +108,16 @@ public interface Charter {
       String name,
       OccludedType<I> input,
       OccludedType<O> output,
-      java.util.function.BiFunction<I, AccessContext, java.util.Optional<O>> function,
-      java.util.function.Consumer<DerivationConfig> customizer);
+      BiFunction<I, AccessContext, Optional<O>> function,
+      Consumer<DerivationConfig> customizer);
 
   /** The authority to make one value from many of one type. */
   <I, O> Fold<I, O> fold(
       String name,
       OccludedType<I> input,
       OccludedType<O> output,
-      Function<java.util.List<I>, O> function,
-      java.util.function.Consumer<DerivationConfig> customizer);
+      Function<List<I>, O> function,
+      Consumer<DerivationConfig> customizer);
 
   /** The authority to ask one question of a value without the value leaving. */
   <I, Q> Query<I, Q> query(
@@ -123,7 +125,7 @@ public interface Charter {
       OccludedType<I> input,
       Class<Q> against,
       Query.Asking<I, Q> asking,
-      java.util.function.Consumer<QueryConfig> customizer);
+      Consumer<QueryConfig> customizer);
 
   // ------------------------------------------------------------------ settling how it behaves
 
