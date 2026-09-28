@@ -35,24 +35,6 @@ import org.jwcarman.occlude.lattice.Label;
  */
 public final class DefaultCharter implements Charter {
 
-  private static final String THIS_CHARTER = "this charter";
-
-  /**
-   * Where a charter is in its one irreversible transition.
-   *
-   * <p>Every portal a charter constitutes shares this one reference, so sealing does not walk them
-   * and install anything -- it changes the state of the domain they all belong to, and they are all
-   * in force from that instant.
-   */
-  sealed interface State {
-    /** Authority may be constituted, and none of it may be exercised. */
-    record Configuring() implements State {}
-
-    /** Authority may be exercised, and none of it may be constituted. */
-    record Active(Configuration configuration, Engine engine) implements State {}
-  }
-
-  /** What a declaration produced: the charter it leaves behind, and the portal it hands back. */
   private final Axes axes;
 
   // Written only while this charter is being configured, which is single-threaded by contract: an
@@ -77,8 +59,8 @@ public final class DefaultCharter implements Charter {
   private final List<QuerySpec<?, ?>> queries = new ArrayList<>();
   private AccessContextProvider currentAccess = AccessContextProvider.none();
   private java.util.function.BiPredicate<Label, AccessContext> mayErase = (label, context) -> false;
-  private final java.util.concurrent.atomic.AtomicReference<State> lifecycle =
-      new java.util.concurrent.atomic.AtomicReference<>(new State.Configuring());
+  private final Lifecycle lifecycle = new Lifecycle();
+  private final Portals portals = new Portals(lifecycle);
 
   /**
    * The questions this charter asks about every value it holds.
@@ -110,81 +92,34 @@ public final class DefaultCharter implements Charter {
    */
   public void seal(Storage storage) {
     Objects.requireNonNull(storage, "a charter is sealed to a storage");
-    State current = lifecycle.get();
-    if (!(current instanceof State.Configuring)) {
-      throw new IllegalStateException("this charter is already sealed");
-    }
-    Configuration configuration =
-        new Configuration(
-            types, sources, sinkReads, sinks, derivations, queries, currentAccess, mayErase);
-    Engine engine = new Engine(axes, configuration, storage);
-    // One write, and every portal this charter constituted is in force. It is also the only moment
-    // any of this crosses a thread, which is why the snapshot above is taken first.
-    if (!lifecycle.compareAndSet(current, new State.Active(configuration, engine))) {
-      throw new IllegalStateException("this charter was sealed while it was being sealed");
-    }
+    lifecycle.seal(axes, this::declared, storage);
   }
 
   /** Whether this charter has been brought into force. */
   public boolean sealed() {
-    return lifecycle.get() instanceof State.Active;
+    return lifecycle.sealed();
   }
 
-  /**
-   * Refuses anything further once this charter is in force.
-   *
-   * <p>A security invariant rather than an ergonomic one: an authority graph that can still grow is
-   * not one anybody can reason about. Writing a charter is single-threaded by contract, so this is
-   * a state check rather than a transition -- there is nothing to race with, because nothing else
-   * is declaring and the only thread that could seal is this one.
-   */
-  private void stillWriting() {
-    if (!(lifecycle.get() instanceof State.Configuring)) {
-      throw new IllegalStateException(
-          "nothing further can be declared: this charter has been sealed, and an authority graph"
-              + " that can still grow is not one anybody can reason about");
-    }
-  }
-
-  /** The engine a portal reaches through, or a refusal saying why it cannot. */
-  static Engine engineOf(
-      java.util.concurrent.atomic.AtomicReference<State> lifecycle, String what) {
-    return switch (lifecycle.get()) {
-      case State.Active active -> active.engine();
-      case State.Configuring _ ->
-          throw new IllegalStateException(
-              what
-                  + " cannot be exercised before its charter is sealed. Authority is constituted"
-                  + " while a charter is being written and comes into force when it is sealed;"
-                  + " this one was asked to act before that happened.");
-    };
-  }
-
-  java.util.concurrent.atomic.AtomicReference<State> lifecycle() {
+  Lifecycle lifecycle() {
     return lifecycle;
   }
 
-  /**
-   * What has been declared, from wherever it currently lives.
-   *
-   * <p>While writing, that is the fields themselves, read on the thread that is writing them. Once
-   * sealed it is the snapshot, read through the atomic that published it -- which is what makes
-   * reporting safe from a request thread.
-   */
+  /** What has been declared, from wherever it currently lives. */
   private Configuration configuration() {
-    return switch (lifecycle.get()) {
-      case State.Active active -> active.configuration();
-      case State.Configuring _ ->
-          new Configuration(
-              types, sources, sinkReads, sinks, derivations, queries, currentAccess, mayErase);
-    };
+    return lifecycle.configuration(this::declared);
+  }
+
+  /** The fields as they stand, copied, which is what sealing publishes. */
+  private Configuration declared() {
+    return new Configuration(
+        types, sources, sinkReads, sinks, derivations, queries, currentAccess, mayErase);
   }
 
   /** Somewhere values may go. Registered once; referenced by name forever after. */
   @Override
   public DefaultCharter sink(SinkSpec sink) {
     Objects.requireNonNull(sink, "a sink must not be null");
-    stillWriting();
+    lifecycle.stillWriting();
     sinks.add(sink);
     return this;
   }
@@ -254,24 +189,12 @@ public final class DefaultCharter implements Charter {
     Objects.requireNonNull(name, "a source needs a name");
     Objects.requireNonNull(type, "a source needs to know what it accepts");
     Objects.requireNonNull(labelling, "a source needs to say how it labels what arrives");
-    stillWriting();
+    lifecycle.stillWriting();
     if (sources.putIfAbsent(name, type) != null) {
       throw new IllegalStateException("two sources are registered as '" + name + "'");
     }
     recording(type);
-    var ref = lifecycle();
-    String what = "source '" + name + "'";
-    return new Occlude<T>() {
-      @Override
-      public Occluded<T> occlude(T value) {
-        return engineOf(ref, what).occludeVia(name, type, labelling, value);
-      }
-
-      @Override
-      public String toString() {
-        return what;
-      }
-    };
+    return portals.source(name, type, labelling);
   }
 
   /**
@@ -305,11 +228,11 @@ public final class DefaultCharter implements Charter {
     for (OccludedType<?> type : reads) {
       names.add(type.name());
     }
-    stillWriting();
+    lifecycle.stillWriting();
     recording(reads);
     sinks.add(Sinks.varying(name, ceiling));
     sinkReads.put(name, java.util.Collections.unmodifiableSet(names));
-    return new Door(name, java.util.Collections.unmodifiableSet(names), lifecycle());
+    return portals.sink(name, java.util.Collections.unmodifiableSet(names));
   }
 
   /** The same, for a ceiling that does not depend on who is asking. */
@@ -317,44 +240,6 @@ public final class DefaultCharter implements Charter {
   public final Sink sink(String name, Ceiling ceiling, OccludedType<?>... reads) {
     Objects.requireNonNull(ceiling, "a sink needs a ceiling");
     return sink(name, context -> ceiling, reads);
-  }
-
-  /** The implementation of a sink: a name, what it reads, and what it is attached to. */
-  private record Door(
-      String name,
-      java.util.Set<String> reads,
-      java.util.concurrent.atomic.AtomicReference<State> lifecycle)
-      implements Sink {
-
-    @Override
-    public <T> Reveal<T> reading(OccludedType<T> type) {
-      Objects.requireNonNull(type, "a reader needs to say what comes out of it");
-      if (!reads.contains(type.name())) {
-        throw new IllegalStateException(
-            ("'%s' does not read %s. It was declared to read %s, and a reader cannot add to that"
-                    + " list.")
-                .formatted(name, type.name(), reads));
-      }
-      String door = name;
-      var lifecycle = lifecycle();
-      String what = "'" + door + "' reading " + type.name();
-      return new Reveal<>() {
-        @Override
-        public OccludedType<T> type() {
-          return type;
-        }
-
-        @Override
-        public Revealed<T> reveal(Occluded<T> occluded) {
-          return engineOf(lifecycle, what).revealVia(occluded, type, door);
-        }
-
-        @Override
-        public String toString() {
-          return what;
-        }
-      };
-    }
   }
 
   /**
@@ -382,10 +267,7 @@ public final class DefaultCharter implements Charter {
             Optional.ofNullable(function.apply(input.type().rawClass().cast(values.getFirst()))),
         false,
         customizer,
-        (spec, ref) ->
-            (Derivation<I, O>)
-                parent ->
-                    engineOf(ref, "\'" + spec.name() + "\'").deriveVia(spec, List.of(parent)));
+        portals::<I, O>derivation);
   }
 
   /**
@@ -408,10 +290,7 @@ public final class DefaultCharter implements Charter {
             function.apply(input.type().rawClass().cast(values.getFirst()), context),
         false,
         customizer,
-        (spec, ref) ->
-            (Derivation<I, O>)
-                parent ->
-                    engineOf(ref, "\'" + spec.name() + "\'").deriveVia(spec, List.of(parent)));
+        portals::<I, O>derivation);
   }
 
   /**
@@ -438,10 +317,7 @@ public final class DefaultCharter implements Charter {
                 function.apply(values.stream().map(v -> input.type().rawClass().cast(v)).toList())),
         true,
         customizer,
-        (spec, ref) ->
-            (Fold<I, O>)
-                parents ->
-                    engineOf(ref, "\'" + spec.name() + "\'").deriveVia(spec, List.copyOf(parents)));
+        portals::<I, O>fold);
   }
 
   /**
@@ -458,9 +334,7 @@ public final class DefaultCharter implements Charter {
       java.util.function.BiFunction<List<Object>, AccessContext, Optional<O>> function,
       boolean fold,
       java.util.function.Consumer<DerivationConfig> customizer,
-      java.util.function.BiFunction<
-              DerivationSpec<O>, java.util.concurrent.atomic.AtomicReference<State>, C>
-          capability) {
+      Function<DerivationSpec<O>, C> capability) {
     Objects.requireNonNull(name, "a derivation needs a name");
     Objects.requireNonNull(customizer, "a derivation needs to say what it may read");
     DerivationConfig settings = new DerivationConfig();
@@ -482,13 +356,13 @@ public final class DefaultCharter implements Charter {
             settings.relabel(),
             settings.availableTo(),
             fold);
-    stillWriting();
+    lifecycle.stillWriting();
     OccludedType<?>[] declared = new OccludedType<?>[inputTypes.size() + 1];
     inputTypes.toArray(declared);
     declared[inputTypes.size()] = outputType;
     recording(declared);
     derivations.add(spec);
-    return capability.apply(spec, lifecycle());
+    return capability.apply(spec);
   }
 
   List<DerivationSpec<?>> derivations() {
@@ -521,7 +395,7 @@ public final class DefaultCharter implements Charter {
   @Override
   public DefaultCharter currentAccess(AccessContextProvider currentAccess) {
     Objects.requireNonNull(currentAccess, "an access source must not be null");
-    stillWriting();
+    lifecycle.stillWriting();
     this.currentAccess = currentAccess;
     return this;
   }
@@ -555,7 +429,7 @@ public final class DefaultCharter implements Charter {
   @Override
   public DefaultCharter mayErase(java.util.function.BiPredicate<Label, AccessContext> mayErase) {
     Objects.requireNonNull(mayErase, "an erasure policy must not be null");
-    stillWriting();
+    lifecycle.stillWriting();
     this.mayErase = mayErase;
     return this;
   }
@@ -600,22 +474,10 @@ public final class DefaultCharter implements Charter {
     }
     QuerySpec<I, Q> spec =
         new QuerySpec<>(name, input, asking, settings.ceiling(), settings.availableTo());
-    stillWriting();
+    lifecycle.stillWriting();
     recording(input);
     queries.add(spec);
-    var ref = lifecycle();
-    String what = "query '" + name + "'";
-    return new Query<I, Q>() {
-      @Override
-      public Answer ask(Occluded<I> about, Q against) {
-        return engineOf(ref, what).askVia(spec, about, against);
-      }
-
-      @Override
-      public String toString() {
-        return what;
-      }
-    };
+    return portals.query(spec);
   }
 
   /** What a query still needs said about it before it becomes a capability. */
@@ -655,7 +517,7 @@ public final class DefaultCharter implements Charter {
 
   /** The same, for an identifier that arrived without its type. */
   public Label label(String id) {
-    return engineOf(lifecycle, THIS_CHARTER).label(id);
+    return lifecycle.operations().gate().label(id);
   }
 
   /** Where a value came from. */
@@ -665,7 +527,7 @@ public final class DefaultCharter implements Charter {
 
   /** The same, for an identifier that arrived without its type. */
   public Lineage lineage(String id) {
-    return engineOf(lifecycle, THIS_CHARTER).lineage(id);
+    return lifecycle.operations().gate().lineage(id);
   }
 
   /** Whether this charter is holding a value at all. */
@@ -675,7 +537,7 @@ public final class DefaultCharter implements Charter {
 
   /** The same, for an identifier that arrived without its type. */
   public boolean holds(String id) {
-    return engineOf(lifecycle, THIS_CHARTER).holds(id);
+    return lifecycle.operations().gate().holds(id);
   }
 
   /**
@@ -685,6 +547,6 @@ public final class DefaultCharter implements Charter {
    * portal, which makes it the last authority here that is checked rather than held.
    */
   public int erase(Occluded<?> root) {
-    return engineOf(lifecycle, THIS_CHARTER).erase(root);
+    return lifecycle.operations().erasing().erase(root);
   }
 }

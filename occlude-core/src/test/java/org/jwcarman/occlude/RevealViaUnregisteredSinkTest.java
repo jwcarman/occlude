@@ -23,16 +23,16 @@ import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Label;
 
 /**
- * A sink name {@link Engine} is asked for but never registered.
+ * A sink name {@link Revealing} is asked for but never registered.
  *
  * <p>Nothing in the public surface can produce this: a {@link Reveal} is minted by {@link
- * DefaultCharter#sink} closed over a name that was just added to the same map {@code Engine}
+ * DefaultCharter#sink} closed over a name that was just added to the same map {@code Revealing}
  * checks, so every {@code to} a real caller can supply is already a key in it. The check still
- * exists because {@link Engine#revealVia} is a general-purpose method with one caller today and no
+ * exists because {@link Revealing#reveal} is a general-purpose method with one caller today and no
  * promise of staying that way, so this reaches it directly, the one time in this suite {@code
- * Engine} is not driven through a portal.
+ * Revealing} is not driven through a portal.
  */
-@DisplayName("Engine.revealVia asked for a sink nobody registered")
+@DisplayName("Revealing asked for a sink nobody registered")
 class RevealViaUnregisteredSinkTest {
 
   private static final OccludedType<String> STRING_TYPE = OccludedType.of(String.class);
@@ -46,19 +46,16 @@ class RevealViaUnregisteredSinkTest {
     charter.seal(new MemoryStorage());
     Occluded<String> held = source.occlude("hello");
 
-    Engine engine = engineOf(charter);
-    Revealed<String> result = engine.revealVia(held, STRING_TYPE, "nobody-registered-this");
+    Revealed<String> result =
+        charter
+            .lifecycle()
+            .operations()
+            .revealing()
+            .reveal(held, STRING_TYPE, "nobody-registered-this");
 
     assertThat(result)
         .isInstanceOfSatisfying(
             Revealed.Denied.class,
             denied -> assertThat(denied.reason()).isEqualTo(Revealed.Reason.NO_SUCH_SINK));
-  }
-
-  private static Engine engineOf(DefaultCharter charter) {
-    if (charter.lifecycle().get() instanceof DefaultCharter.State.Active active) {
-      return active.engine();
-    }
-    throw new IllegalStateException("charter was not sealed");
   }
 }

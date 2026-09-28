@@ -22,7 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@link MemoryStorage} on its own, beneath the policy {@link Engine} layers over it -- the SPI
+ * {@link MemoryStorage} on its own, beneath the policy {@link Gate} layers over it -- the SPI
  * contract itself, rather than what a charter does with it.
  */
 @DisplayName("MemoryStorage on its own")
