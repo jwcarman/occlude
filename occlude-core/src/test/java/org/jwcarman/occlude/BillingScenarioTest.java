@@ -1325,7 +1325,7 @@ class BillingScenarioTest {
                       "anything"))
           .isInstanceOf(IllegalStateException.class);
 
-      assertThat(watchedConfig.holds("anything")).isFalse();
+      assertThat(kept.contains("anything")).isFalse();
       assertThat(kept.everything()).isEmpty();
     }
 

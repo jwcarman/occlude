@@ -58,6 +58,8 @@ class WritingAtAnothersLabelTest {
 
   private final AtomicReference<AccessContext> edge = new AtomicReference<>(AccessContext.empty());
 
+  private final MemoryStorage storage = new MemoryStorage();
+
   private final DefaultCharter config =
       new DefaultCharter(TENANT, INTEGRITY).currentAccess(edge::get);
 
@@ -85,7 +87,7 @@ class WritingAtAnothersLabelTest {
           .reading(NOTE_TYPE);
 
   {
-    config.seal(new MemoryStorage());
+    config.seal(storage);
   }
 
   // read `.tenant()` off the stored label is re-expressed against Label.toString(), which is
@@ -113,7 +115,7 @@ class WritingAtAnothersLabelTest {
 
     Occluded<Note> mine = notes.occlude(new Note("our own note"));
 
-    assertThat(config.holds(mine.id())).isTrue();
+    assertThat(storage.contains(mine.id())).isTrue();
     assertThat(reporting.reveal(mine).granted()).contains(new Note("our own note"));
   }
 }

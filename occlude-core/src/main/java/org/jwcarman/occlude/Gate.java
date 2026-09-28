@@ -151,10 +151,6 @@ final class Gate {
     return metadataOf(id).lineage();
   }
 
-  boolean holds(String id) {
-    return storage.contains(id);
-  }
-
   private StoredMetadata metadataOf(String id) {
     return storage.metadata(id).orElseThrow(() -> new IllegalArgumentException(NOT_HOLDING + id));
   }

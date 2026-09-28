@@ -532,16 +532,6 @@ public final class DefaultCharter implements Charter {
     return lifecycle.operations().gate().lineage(id);
   }
 
-  /** Whether this charter is holding a value at all. */
-  public boolean holds(Occluded<?> occluded) {
-    return holds(occluded.id());
-  }
-
-  /** The same, for an identifier that arrived without its type. */
-  public boolean holds(String id) {
-    return lifecycle.operations().gate().holds(id);
-  }
-
   /**
    * Forgets a value and everything derived from it.
    *

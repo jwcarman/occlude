@@ -407,8 +407,8 @@ class JdbcCharterTest {
     edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
     assertThat(store.erase(card)).isEqualTo(2);
 
-    assertThat(store.holds(card.id())).isFalse();
-    assertThat(store.holds(last4.id())).isFalse();
+    assertThat(storage.contains(card.id())).isFalse();
+    assertThat(storage.contains(last4.id())).isFalse();
     assertThat(storage.missingValues()).isEmpty();
     assertThat(storage.firstBrokenEntry()).isEmpty();
   }
@@ -452,8 +452,8 @@ class JdbcCharterTest {
 
     // The whole transaction rolled back: the values are still here, so nothing is missing and the
     // verifier reports no tampering. Written separately, these two assertions both failed.
-    assertThat(store.holds(card)).isTrue();
-    assertThat(store.holds(last4)).isTrue();
+    assertThat(storage.contains(card.id())).isTrue();
+    assertThat(storage.contains(last4.id())).isTrue();
     assertThat(storage.missingValues()).isEmpty();
     assertThat(storage.firstBrokenEntry()).isEmpty();
   }
@@ -733,7 +733,7 @@ class JdbcCharterTest {
   void survives_a_restart() {
     Occluded<Card> card = card();
 
-    assertThat(store.holds(card)).isTrue();
+    assertThat(storage.contains(card.id())).isTrue();
     assertThat(store.label(card).says(DATA, DataClass.CARDHOLDER)).isTrue();
   }
 
@@ -776,8 +776,8 @@ class JdbcCharterTest {
     int removed = store.erase(card);
 
     assertThat(removed).isEqualTo(2);
-    assertThat(store.holds(card)).isFalse();
-    assertThat(store.holds(last4)).isFalse();
+    assertThat(storage.contains(card.id())).isFalse();
+    assertThat(storage.contains(last4.id())).isFalse();
   }
 
   @Test
@@ -789,7 +789,7 @@ class JdbcCharterTest {
 
     edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
     assertThat(store.erase(last4)).isEqualTo(1);
-    assertThat(store.holds(card)).isTrue();
+    assertThat(storage.contains(card.id())).isTrue();
   }
 
   @Test
@@ -1014,7 +1014,7 @@ class JdbcCharterTest {
 
     assertThat(Assertions.catchThrowable(() -> store.erase(card)))
         .isInstanceOf(AccessDeniedException.class);
-    assertThat(store.holds(card)).isTrue();
+    assertThat(storage.contains(card.id())).isTrue();
   }
 
   private AuditRecord aQueryLine(String value) {

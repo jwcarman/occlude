@@ -78,7 +78,8 @@ class ErasingAcrossTenantsTest {
             RECORD_TYPE,
             ctx -> Label.of(TENANT, "globex").with(LEVEL, Level.HIGH));
 
-    config.seal(new MemoryStorage());
+    MemoryStorage storage = new MemoryStorage();
+    config.seal(storage);
 
     Occluded<Record> globexRecord = globexRecords.occlude(new Record("globex's records"));
 
@@ -86,7 +87,7 @@ class ErasingAcrossTenantsTest {
 
     assertThat(catchThrowable(() -> config.erase(globexRecord)))
         .isInstanceOf(AccessDeniedException.class);
-    assertThat(config.holds(globexRecord.id())).isTrue();
+    assertThat(storage.contains(globexRecord.id())).isTrue();
   }
 
   /**
@@ -137,8 +138,8 @@ class ErasingAcrossTenantsTest {
     int removed = config.erase(root);
 
     assertThat(removed).isEqualTo(2);
-    assertThat(config.holds(root)).isFalse();
-    assertThat(config.holds(child)).isFalse();
+    assertThat(storage.contains(root.id())).isFalse();
+    assertThat(storage.contains(child.id())).isFalse();
     assertThat(storage.audit(AuditRecord.Operation.ERASE))
         .hasSize(2)
         .allSatisfy(line -> assertThat(line.outcome()).isEqualTo(AuditRecord.Outcome.ALLOWED));
@@ -185,7 +186,7 @@ class ErasingAcrossTenantsTest {
     int removed = config.erase(root);
 
     assertThat(removed).isEqualTo(4);
-    assertThat(config.holds(combined)).isFalse();
+    assertThat(storage.contains(combined.id())).isFalse();
     assertThat(storage.audit(AuditRecord.Operation.ERASE)).hasSize(4);
   }
 
@@ -208,6 +209,6 @@ class ErasingAcrossTenantsTest {
     Occluded<Record> root = records.occlude(new Record("root"));
 
     assertThatThrownBy(() -> config.erase(root)).isInstanceOf(AccessDeniedException.class);
-    assertThat(config.holds(root)).isTrue();
+    assertThat(storage.contains(root.id())).isTrue();
   }
 }

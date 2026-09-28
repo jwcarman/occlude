@@ -191,6 +191,8 @@ class DefaultCharterInternalsTest {
   @DisplayName("what it reports about itself")
   class WhatItReportsAboutItself {
 
+    private final MemoryStorage storage = new MemoryStorage();
+
     private final DefaultCharter charter = new DefaultCharter(TENANT);
 
     private final Occlude<String> source =
@@ -211,7 +213,7 @@ class DefaultCharterInternalsTest {
           STRING_TYPE,
           String::toUpperCase,
           d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
-      charter.seal(new MemoryStorage());
+      charter.seal(storage);
     }
 
     @Test
@@ -269,7 +271,7 @@ class DefaultCharterInternalsTest {
       Occluded<String> held = source.occlude("hello");
 
       assertThatThrownBy(() -> charter.erase(held)).isInstanceOf(AccessDeniedException.class);
-      assertThat(charter.holds(held)).isTrue();
+      assertThat(storage.contains(held.id())).isTrue();
     }
   }
 

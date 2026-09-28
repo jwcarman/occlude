@@ -124,7 +124,7 @@ class RequiredAxisTest {
 
     assertThatThrownBy(() -> watched.occlude(orphan)).isInstanceOf(AccessDeniedException.class);
 
-    assertThat(own.holds("nothing")).isFalse();
+    assertThat(storage.contains("nothing")).isFalse();
     assertThat(kept.everything()).isEmpty();
     assertThat(storage.audit(AuditRecord.Operation.CONCEAL))
         .isNotEmpty()
