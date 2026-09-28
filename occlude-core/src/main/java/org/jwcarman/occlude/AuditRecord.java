@@ -15,6 +15,8 @@
  */
 package org.jwcarman.occlude;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -74,7 +76,14 @@ public record AuditRecord(
 
   public AuditRecord {
     Objects.requireNonNull(operation, "an audit record needs an operation");
-    context = Map.copyOf(context);
+    // In the order given, as AccessContext keeps it: Map.copyOf would reorder who asked by run.
+    Map<String, String> copy = new LinkedHashMap<>();
+    context.forEach(
+        (name, said) ->
+            copy.put(
+                Objects.requireNonNull(name, "a context attribute needs a name"),
+                Objects.requireNonNull(said, "context attribute '" + name + "' needs a value")));
+    context = Collections.unmodifiableMap(copy);
   }
 
   /**

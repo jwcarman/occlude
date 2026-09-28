@@ -15,7 +15,10 @@
  */
 package org.jwcarman.occlude;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -36,8 +39,19 @@ public record AccessContext(Map<String, String> attributes) {
 
   private static final AccessContext EMPTY = new AccessContext(Map.of());
 
+  /**
+   * Copied, in the order given. {@code Map.copyOf} would scramble it -- its iteration order is
+   * randomized per JVM -- and this is what an audit line records, so a trail would name the same
+   * caller differently from one run to the next.
+   */
   public AccessContext {
-    attributes = Map.copyOf(attributes);
+    Map<String, String> copy = new LinkedHashMap<>();
+    attributes.forEach(
+        (key, value) ->
+            copy.put(
+                Objects.requireNonNull(key, "an attribute needs a name"),
+                Objects.requireNonNull(value, "attribute '" + key + "' needs a value")));
+    attributes = Collections.unmodifiableMap(copy);
   }
 
   /** Nobody in particular: the right answer for machine-to-machine work. */

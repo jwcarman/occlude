@@ -16,14 +16,28 @@
 package org.jwcarman.occlude;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("An access context")
 class AccessContextTest {
+
+  /** Six keys in an order no hash would produce by accident, so a reordering cannot pass. */
+  private static Map<String, String> ordered() {
+    Map<String, String> ordered = new LinkedHashMap<>();
+    ordered.put("tenant", "acme");
+    ordered.put("role", "compliance");
+    ordered.put("user", "jwcarman");
+    ordered.put("clearance", "cardholder");
+    ordered.put("region", "us-east");
+    ordered.put("approver", "yes");
+    return ordered;
+  }
 
   @Test
   @DisplayName("holds nobody in particular when empty")
@@ -89,5 +103,36 @@ class AccessContextTest {
 
     assertThat(context.get("tenant")).contains("acme");
     assertThat(context.get("clearance")).isEmpty();
+  }
+
+  /**
+   * An access context is what an audit line records, so its attributes are read back in the order
+   * the edge wrote them rather than in whatever order a hash happens to produce this run.
+   */
+  @Test
+  @DisplayName("keeps its attributes in the order it was given them")
+  void keeps_its_attributes_in_the_order_it_was_given_them() {
+    AccessContext context = AccessContext.of(ordered());
+
+    assertThat(context.attributes().keySet())
+        .containsExactly("tenant", "role", "user", "clearance", "region", "approver");
+  }
+
+  @Test
+  @DisplayName("cannot be changed through the map it hands out")
+  void cannot_be_changed_through_the_map_it_hands_out() {
+    Map<String, String> attributes = AccessContext.of(ordered()).attributes();
+
+    assertThatThrownBy(() -> attributes.put("tenant", "globex"))
+        .isInstanceOf(UnsupportedOperationException.class);
+  }
+
+  @Test
+  @DisplayName("refuses a null attribute value")
+  void refuses_a_null_attribute_value() {
+    Map<String, String> withNull = new HashMap<>();
+    withNull.put("tenant", null);
+
+    assertThatThrownBy(() -> AccessContext.of(withNull)).isInstanceOf(NullPointerException.class);
   }
 }

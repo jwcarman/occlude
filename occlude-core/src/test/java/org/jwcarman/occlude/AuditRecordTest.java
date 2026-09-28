@@ -17,6 +17,7 @@ package org.jwcarman.occlude;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +26,18 @@ import org.junit.jupiter.api.Test;
 /** One line of the record, readable on its own rather than only through a store's audit trail. */
 @DisplayName("An audit record")
 class AuditRecordTest {
+
+  /** Six keys in an order no hash would produce by accident, so a reordering cannot pass. */
+  private static Map<String, String> ordered() {
+    Map<String, String> ordered = new LinkedHashMap<>();
+    ordered.put("tenant", "acme");
+    ordered.put("role", "compliance");
+    ordered.put("user", "jwcarman");
+    ordered.put("clearance", "cardholder");
+    ordered.put("region", "us-east");
+    ordered.put("approver", "yes");
+    return ordered;
+  }
 
   private AuditRecord allowed(Map<String, String> context) {
     return new AuditRecord(
@@ -52,5 +65,19 @@ class AuditRecordTest {
     AuditRecord entry = allowed(Map.of());
 
     assertThat(entry.toString()).doesNotContain("by {");
+  }
+
+  /** A line names who asked the way the edge said it, not in a hash order that varies by run. */
+  @Test
+  @DisplayName("says who asked in the order the context was given")
+  void says_who_asked_in_the_order_the_context_was_given() {
+    AuditRecord entry = allowed(ordered());
+
+    assertThat(entry.context().keySet())
+        .containsExactly("tenant", "role", "user", "clearance", "region", "approver");
+    assertThat(entry.toString())
+        .contains(
+            "by {tenant=acme, role=compliance, user=jwcarman, clearance=cardholder,"
+                + " region=us-east, approver=yes}");
   }
 }
