@@ -71,6 +71,17 @@
         <version>11.0.25</version>
       </dependency>
 
+      <!-- Again here, because this module imports spring-boot-dependencies itself and its own
+           imports win over the parent's: without it, Jackson falls back to Boot's 3.1.5. See the
+           jackson.version property in occlude-parent for the CVEs. -->
+      <dependency>
+        <groupId>tools.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
       <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-dependencies</artifactId>
