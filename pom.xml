@@ -83,6 +83,10 @@
          jackson-databind below 3.1.6. Boot 4.1.1 manages 3.1.5; drop this once it manages a fixed
          version. -->
     <jackson.version>3.1.7</jackson.version>
+    <!-- Used by occlude-example's Tomcat pins, the only module that serves HTTP. It does not steer
+         Spring Boot's BOM: an imported BOM resolves its own tomcat.version, which is why the example
+         declares each Tomcat artifact rather than setting this and hoping. -->
+    <tomcat.version>11.0.26</tomcat.version>
     <postgresql.version>42.7.13</postgresql.version>
     <testcontainers.version>2.0.5</testcontainers.version>
 

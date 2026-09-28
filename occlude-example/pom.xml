@@ -51,24 +51,25 @@
            security library shipping a demo on a known-vulnerable server is still its own
            argument. Remove when Boot catches up.
 
-           Declared rather than set through the tomcat.version property: an imported BOM resolves
-           its own properties, so the property form would be silently inert now that this module
-           imports spring-boot-dependencies instead of inheriting it. First declaration wins in
+           Declared rather than left to Boot's tomcat.version property: an imported BOM resolves
+           its own properties, so overriding it would be silently inert now that this module
+           imports spring-boot-dependencies instead of inheriting it. The version comes from
+           occlude-parent's own tomcat.version, one line to bump. First declaration wins in
            dependencyManagement, which is why these sit above the import. -->
       <dependency>
         <groupId>org.apache.tomcat.embed</groupId>
         <artifactId>tomcat-embed-core</artifactId>
-        <version>11.0.26</version>
+        <version>${tomcat.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.tomcat.embed</groupId>
         <artifactId>tomcat-embed-el</artifactId>
-        <version>11.0.26</version>
+        <version>${tomcat.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.tomcat.embed</groupId>
         <artifactId>tomcat-embed-websocket</artifactId>
-        <version>11.0.26</version>
+        <version>${tomcat.version}</version>
       </dependency>
 
       <!-- Again here, because this module imports spring-boot-dependencies itself and its own
