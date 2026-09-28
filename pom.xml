@@ -21,16 +21,16 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>org.jwcarman.loch</groupId>
-  <artifactId>loch-parent</artifactId>
+  <groupId>org.jwcarman.occlude</groupId>
+  <artifactId>occlude-parent</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
-  <name>Loch</name>
+  <name>Occlude</name>
   <description>A governed claim check for Java: a token travels instead of the payload, and
-    redeeming it is decided against the value's label, the destination's ceiling, and an identity
+    redeeming it is decided against the value's label, the sink's ceiling, and an identity
     the holder of the token does not control.</description>
-  <url>https://github.com/jwcarman/loch</url>
+  <url>https://github.com/jwcarman/occlude</url>
   <inceptionYear>2026</inceptionYear>
 
   <developers>
@@ -50,19 +50,19 @@
   </licenses>
 
   <scm>
-    <url>https://github.com/jwcarman/loch</url>
-    <connection>scm:git:git@github.com:jwcarman/loch.git</connection>
-    <developerConnection>scm:git:git@github.com:jwcarman/loch.git</developerConnection>
+    <url>https://github.com/jwcarman/occlude</url>
+    <connection>scm:git:git@github.com:jwcarman/occlude.git</connection>
+    <developerConnection>scm:git:git@github.com:jwcarman/occlude.git</developerConnection>
   </scm>
 
   <modules>
-    <module>loch-bom</module>
-    <module>loch-api</module>
-    <module>loch-core</module>
-    <module>loch-jdbc</module>
-    <module>loch-spring-boot-autoconfigure</module>
-    <module>loch-spring-boot-starter</module>
-    <module>loch-example</module>
+    <module>occlude-bom</module>
+    <module>occlude-api</module>
+    <module>occlude-core</module>
+    <module>occlude-jdbc</module>
+    <module>occlude-spring-boot-autoconfigure</module>
+    <module>occlude-spring-boot-starter</module>
+    <module>occlude-example</module>
   </modules>
 
   <properties>
@@ -92,13 +92,13 @@
 
     <sonar.organization>jwcarman</sonar.organization>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-    <sonar.projectKey>jwcarman_loch</sonar.projectKey>
+    <sonar.projectKey>jwcarman_occlude</sonar.projectKey>
 
     <!-- The example is a demonstration of the library rather than part of it. Analysing it reports
          on how a sample application is written, which is nobody's quality gate. -->
-    <sonar.exclusions>loch-example/**</sonar.exclusions>
+    <sonar.exclusions>occlude-example/**</sonar.exclusions>
 
-    <sonar.coverage.exclusions>loch-example/**</sonar.coverage.exclusions>
+    <sonar.coverage.exclusions>occlude-example/**</sonar.coverage.exclusions>
 
     <!-- Each module's own report, and no aggregator. A module's number is then about the tests
          that module has, which is the thing worth holding it to. The cost is that coverage does

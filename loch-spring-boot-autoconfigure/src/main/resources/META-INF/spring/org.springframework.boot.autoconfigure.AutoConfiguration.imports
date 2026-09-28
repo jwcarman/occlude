@@ -1,3 +1,0 @@
-org.jwcarman.loch.spring.CharterAutoConfiguration
-org.jwcarman.loch.spring.JdbcCharterAutoConfiguration
-org.jwcarman.loch.spring.CharterEndpointAutoConfiguration

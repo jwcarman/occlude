@@ -1,11 +1,11 @@
-# Contributing to Loch
+# Contributing to Occlude
 
-Thanks for your interest in contributing to Loch! We welcome pull requests, issues, and feedback
+Thanks for your interest in contributing to Occlude! We welcome pull requests, issues, and feedback
 from the community.
 
 ## Before you start
 
-Loch is a security library, so two things are worth knowing up front.
+Occlude is a security library, so two things are worth knowing up front.
 
 **If you have found a way to read a value you should not have been able to read, that is not an
 issue — it is a vulnerability.** Please follow [SECURITY.md](SECURITY.md) and report it privately

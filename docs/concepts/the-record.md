@@ -45,4 +45,4 @@ value row could delete its CONCEAL line too; the chain is what makes that visibl
 Detecting it requires an anchor kept somewhere the writer cannot reach — a periodic digest
 published elsewhere. This is a property of hash chains, not an oversight.
 
-See [What Loch Does Not Do](../limits.md).
+See [What Occlude Does Not Do](../limits.md).

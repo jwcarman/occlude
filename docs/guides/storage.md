@@ -1,7 +1,7 @@
 # Storage
 
-Postgres. `loch-jdbc` contains **no cryptography and no compression of its own** — it depends on
-`loch-core` and the codec *contract*, and applies whatever pipeline you hand it.
+Postgres. `occlude-jdbc` contains **no cryptography and no compression of its own** — it depends on
+`occlude-core` and the codec *contract*, and applies whatever pipeline you hand it.
 
 ```java
 JdbcStorage storage = new JdbcStorageConfig()
@@ -51,10 +51,10 @@ naming a root nobody supplies is reported as broken rather than crashing the ver
 
 | column | stored |
 |---|---|
-| `loch_value.payload` | through your pipeline |
-| `loch_value.label` | through your pipeline — a label can name a tenant |
-| `loch_audit.label`, `detail`, `context` | through your pipeline |
-| `loch_audit.operation`, `outcome`, `reason`, `value_id` | in the clear |
+| `occlude_value.payload` | through your pipeline |
+| `occlude_value.label` | through your pipeline — a label can name a tenant |
+| `occlude_audit.label`, `detail`, `context` | through your pipeline |
+| `occlude_audit.operation`, `outcome`, `reason`, `value_id` | in the clear |
 
 The clear columns are the ones that name rules rather than values, so the trail stays queryable. An
 audit nobody can query is a tape backup.

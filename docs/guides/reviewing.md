@@ -15,7 +15,7 @@ charter manifest, as {tenant=acme}
   unconstrained label (bottom)
     {}
 
-  destinations (3)
+  sinks (3)
     support-ui         accepts up to {tenant=acme, integrity<=ENDORSED, sensitivity<=ORDINARY}
     quarantined-llm    accepts up to {tenant=acme, integrity=any, sensitivity<=PERSONAL}
     payment-processor  accepts up to {tenant=acme, integrity<=ENDORSED, sensitivity<=CARDHOLDER}

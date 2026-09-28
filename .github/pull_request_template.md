@@ -50,7 +50,7 @@ Fixes #(issue number)
 - [ ] No new compiler warnings introduced
 - [ ] No `@SuppressWarnings` annotations added
 
-## What this changes about what Loch permits
+## What this changes about what Occlude permits
 
 <!-- Leave this empty only if the answer to all of it is "nothing". -->
 

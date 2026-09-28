@@ -4,8 +4,8 @@ Add the starter and declare your axes. That is the whole of the wiring.
 
 ```xml
 <dependency>
-  <groupId>org.jwcarman.loch</groupId>
-  <artifactId>loch-spring-boot-starter</artifactId>
+  <groupId>org.jwcarman.occlude</groupId>
+  <artifactId>occlude-spring-boot-starter</artifactId>
   <version>0.1.0-SNAPSHOT</version>
 </dependency>
 ```
@@ -42,11 +42,11 @@ Declare them in a `@Bean` method and hand them to whatever needs them:
 ```java
 @Bean
 DisputeService disputeService(Charter charter, Invoices invoices) {
-  Conceal<Mail> customerMail = charter.source("customer-mail", MAIL,
+  Occlude<Mail> customerMail = charter.source("customer-mail", MAIL,
       ctx -> label(ctx, UNENDORSED, PERSONAL));
 
   Reveal<Invoice> paymentProcessor = charter
-      .destination("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE)
+      .sink("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE)
       .reading(INVOICE);
 
   return new DisputeService(customerMail, paymentProcessor);
@@ -72,7 +72,7 @@ can influence it.
 
 ## Storage
 
-Contribute a `Storage` bean, or put `loch-jdbc` on the classpath and give it a `DataSource`, a
+Contribute a `Storage` bean, or put `occlude-jdbc` on the classpath and give it a `DataSource`, a
 `CodecFactory` and a `StorageCodec`. See [Storage](storage.md).
 
 If an application declares a charter and nothing supplies storage, startup fails with a message
@@ -93,10 +93,10 @@ management:
 
 ```
 /actuator/charter                      everything, and what to ask next
-/actuator/charter/types                every surrogate type this charter mentions
+/actuator/charter/types                every occluded type this charter mentions
 /actuator/charter/types/{name}         everything declared about values of that type
 /actuator/charter/sources/{name}       one door in
-/actuator/charter/destinations/{name}  one door out
+/actuator/charter/sinks/{name}  one door out
 /actuator/charter/derivations/{name}   one way of making a value from another
 /actuator/charter/findings             what is provably unreachable
 ```
@@ -106,7 +106,7 @@ The drill-down by type is the one to reach for. *"What can happen to an invoice?
 ```json
 {
   "type": "invoice",
-  "concealedBy": [],
+  "occludedBy": [],
   "revealedAt": [ { "name": "support-ui",         "reads": ["invoice"] },
                   { "name": "payment-processor",  "reads": ["invoice"] } ],
   "madeBy":     [ { "name": "mail.confirmedInvoice", "detail": "mail -> invoice",
@@ -117,7 +117,7 @@ The drill-down by type is the one to reach for. *"What can happen to an invoice?
 }
 ```
 
-An invoice is never concealed directly — it can only be *made*, by one operation that weakens a
+An invoice is never occluded directly — it can only be *made*, by one operation that weakens a
 label.
 
 ### Findings are proofs
@@ -127,7 +127,7 @@ revealed anywhere, a door reading a type nothing can produce, a derivation whose
 reads. These are facts about a graph, not heuristics — and the middle one is usually a rename that
 went half-applied, which without this surfaces as a refusal at request time rather than at startup.
 
-It deliberately proves nothing about *labels*. A source's label and a destination's ceiling are
+It deliberately proves nothing about *labels*. A source's label and a sink's ceiling are
 both functions of the access, so "can an unendorsed value reach the vendor model" has no general
 answer — only one per caller. Render a manifest for that caller and read the ceilings.
 
@@ -141,7 +141,7 @@ It is still a map of your security posture. Protect it as you would `/actuator/b
 ## Logging the manifest at startup
 
 ```yaml
-loch:
+occlude:
   log-manifest: true
 ```
 

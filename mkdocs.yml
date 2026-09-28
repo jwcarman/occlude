@@ -14,11 +14,11 @@
 # limitations under the License.
 #
 
-site_name: Loch
+site_name: Occlude
 site_description: Opaque references to sensitive values, for Java.
-site_url: https://jwcarman.github.io/loch/
-repo_url: https://github.com/jwcarman/loch
-repo_name: jwcarman/loch
+site_url: https://jwcarman.github.io/occlude/
+repo_url: https://github.com/jwcarman/occlude
+repo_name: jwcarman/occlude
 edit_uri: edit/main/docs/
 
 docs_dir: docs
@@ -81,6 +81,6 @@ nav:
       - Storage: guides/storage.md
       - Reviewing a Charter: guides/reviewing.md
   - Reference:
-      - What Loch Does Not Do: limits.md
-      - Security Policy: https://github.com/jwcarman/loch/blob/main/SECURITY.md
-      - Changelog: https://github.com/jwcarman/loch/blob/main/CHANGELOG.md
+      - What Occlude Does Not Do: limits.md
+      - Security Policy: https://github.com/jwcarman/occlude/blob/main/SECURITY.md
+      - Changelog: https://github.com/jwcarman/occlude/blob/main/CHANGELOG.md

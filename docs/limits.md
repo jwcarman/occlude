@@ -1,4 +1,4 @@
-# What Loch Does Not Do
+# What Occlude Does Not Do
 
 Knowing what a security library declines to promise is how you find out whether it fits. None of
 what follows is a bug; each is a documented boundary, and several have tests that pin the boundary
@@ -6,13 +6,13 @@ in place.
 
 ## It decides disclosure, not action
 
-Loch answers *may this value be seen here*. It does not answer *should this happen*.
+Occlude answers *may this value be seen here*. It does not answer *should this happen*.
 
-A model that can name a surrogate can ask a tool to act on it, and if the ceiling admits the value,
-loch says yes — correctly. Whether a refund of that size, to that account, at that moment, should
+A model that can name an occluded reference can ask a tool to act on it, and if the ceiling admits the value,
+occlude says yes — correctly. Whether a refund of that size, to that account, at that moment, should
 occur is an authorisation question, and the amount is not a labelled value at all.
 
-Pair loch with whatever authorises actions in your system. The two are different mechanisms
+Pair occlude with whatever authorises actions in your system. The two are different mechanisms
 answering different questions, and a system needs both.
 
 ## It cannot stop code that legitimately revealed a value
@@ -54,7 +54,7 @@ away. It does still distinguish an identifier that exists from one that does not
 
 ## No transaction participation
 
-Storage opens its own connection. A `conceal` inside an `@Transactional` method **will not roll
+Storage opens its own connection. An `occlude` inside an `@Transactional` method **will not roll
 back with it**. This is the largest missing feature, and it is a correctness surprise rather than a
 philosophical position.
 

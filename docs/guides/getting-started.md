@@ -33,25 +33,25 @@ DefaultCharter charter =
 ```
 
 `currentAccess` is how identity reaches the gate without being threaded through every call.
-A `ThreadLocal`, a `ScopedValue`, Spring's holders — loch has no opinion.
+A `ThreadLocal`, a `ScopedValue`, Spring's holders — occlude has no opinion.
 
 ## 3. Declare the doors
 
 ```java
-static final SurrogateType<Mail> MAIL = SurrogateType.of("mail", Mail.class);
+static final OccludedType<Mail> MAIL = OccludedType.of("mail", Mail.class);
 
-Conceal<Mail> customerMail = charter.source("customer-mail", MAIL,
+Occlude<Mail> customerMail = charter.source("customer-mail", MAIL,
     ctx -> Label.of(TENANT, ctx.get("tenant").orElseThrow())
                 .with(INTEGRITY, UNENDORSED)
                 .with(SENSITIVITY, PERSONAL));
 
-Reveal<Mail> quarantinedLlm = charter.destination("quarantined-llm",
+Reveal<Mail> quarantinedLlm = charter.sink("quarantined-llm",
     ctx -> Ceiling.of(TENANT, Constraint.any())
                   .with(INTEGRITY, Constraint.any())
                   .with(SENSITIVITY, Constraint.atMost(PERSONAL)),
     MAIL).reading(MAIL);
 
-Reveal<Mail> vendorLlm = charter.destination("vendor-llm",
+Reveal<Mail> vendorLlm = charter.sink("vendor-llm",
     ctx -> Ceiling.of(TENANT, Constraint.any())
                   .with(INTEGRITY, Constraint.atMost(ENDORSED))
                   .with(SENSITIVITY, Constraint.atMost(ORDINARY)),
@@ -72,7 +72,7 @@ constituted.
 ## 5. Use it
 
 ```java
-Surrogate<Mail> held = customerMail.conceal(incoming);
+Occluded<Mail> held = customerMail.occlude(incoming);
 
 vendorLlm.reveal(held);        // Denied — PERSONAL is above ORDINARY, and it is UNENDORSED
 quarantinedLlm.reveal(held);   // Allowed
@@ -91,4 +91,4 @@ that reads the tenant cannot be rendered without one.
 
 - Durable, encrypted storage: [Storage](storage.md)
 - Wiring it in an application: [Spring Boot](spring-boot.md)
-- The boundaries: [What Loch Does Not Do](../limits.md)
+- The boundaries: [What Occlude Does Not Do](../limits.md)

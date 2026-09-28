@@ -11,4 +11,4 @@ Nothing has been released yet. The public API is still moving, and identifiers, 
 digests have all changed more than once — a database written by one commit is not necessarily
 readable by the next. Migrations begin at the first release, not before.
 
-[Unreleased]: https://github.com/jwcarman/loch/commits/main
+[Unreleased]: https://github.com/jwcarman/occlude/commits/main

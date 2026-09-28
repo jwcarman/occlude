@@ -1,15 +1,15 @@
-# Loch
+# Occlude
 
-[![CI](https://github.com/jwcarman/loch/actions/workflows/maven.yml/badge.svg)](https://github.com/jwcarman/loch/actions/workflows/maven.yml)
+[![CI](https://github.com/jwcarman/occlude/actions/workflows/maven.yml/badge.svg)](https://github.com/jwcarman/occlude/actions/workflows/maven.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Java](https://img.shields.io/badge/dynamic/xml?url=https://raw.githubusercontent.com/jwcarman/loch/main/pom.xml&query=//*[local-name()='maven.compiler.release']/text()&label=Java&color=orange)](https://openjdk.org/)
+[![Java](https://img.shields.io/badge/dynamic/xml?url=https://raw.githubusercontent.com/jwcarman/occlude/main/pom.xml&query=//*[local-name()='maven.compiler.release']/text()&label=Java&color=orange)](https://openjdk.org/)
 
-[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_loch&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=jwcarman_loch)
-[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_loch&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=jwcarman_loch)
-[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_loch&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=jwcarman_loch)
-[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_loch&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=jwcarman_loch)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_loch&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=jwcarman_loch)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_loch&metric=coverage)](https://sonarcloud.io/summary/new_code?id=jwcarman_loch)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_occlude&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=jwcarman_occlude)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_occlude&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=jwcarman_occlude)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_occlude&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=jwcarman_occlude)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_occlude&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=jwcarman_occlude)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_occlude&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=jwcarman_occlude)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=jwcarman_occlude&metric=coverage)](https://sonarcloud.io/summary/new_code?id=jwcarman_occlude)
 
 **Opaque references to sensitive values, for Java.**
 
@@ -17,14 +17,14 @@ Some values should not simply become text: personal and regulated data, credenti
 input from outside. Once such a value is a `String` in your application, nothing can tell you where
 it went — a log line, an event, a prompt.
 
-Loch takes custody of the value and hands back a **surrogate**. A surrogate travels anywhere,
+Occlude takes custody of the value and hands back an **occluded reference**. It travels anywhere,
 because holding one is not permission to read it. Turning it back into a value is the one checked
 operation, and it always names where the value is going.
 
 ```java
-Surrogate<Mail> mail = customerMail.conceal(incoming);   // the real thing stays here
+Occluded<Mail> mail = customerMail.occlude(incoming);   // the real thing stays here
 
-vendorLlm.reveal(mail);        // Denied  — above that destination's ceiling
+vendorLlm.reveal(mail);        // Denied  — above that sink's ceiling
 quarantinedLlm.reveal(mail);   // Allowed
 ```
 
@@ -35,15 +35,15 @@ answered by reading its constructor parameters.
 
 ## Read the docs
 
-The [documentation site](https://jwcarman.github.io/loch/) is the manual: concepts, guides, and
-[what Loch does not do](https://jwcarman.github.io/loch/limits/) — which is the page to read first
+The [documentation site](https://jwcarman.github.io/occlude/) is the manual: concepts, guides, and
+[what Occlude does not do](https://jwcarman.github.io/occlude/limits/) — which is the page to read first
 if you are deciding whether it fits. This README is the front door.
 
 ---
 
 ## The vocabulary
 
-An application declares **axes**: the questions it asks about every value it holds. Loch ships no
+An application declares **axes**: the questions it asks about every value it holds. Occlude ships no
 mandatory scheme. In US government nomenclature CONFIDENTIAL sits *below* SECRET; in the common
 corporate convention it sits near the top. No regulated organisation will abandon its mandated
 scheme because a library has opinions.
@@ -79,11 +79,11 @@ A **charter** is where an application constitutes its authority. Each declaratio
 one object able to perform that operation.
 
 ```java
-Conceal<Mail> customerMail =
+Occlude<Mail> customerMail =
     charter.source("customer-mail", MAIL, ctx -> label(ctx, UNENDORSED, PERSONAL));
 
 Reveal<Invoice> paymentProcessor =
-    charter.destination("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE)
+    charter.sink("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE)
            .reading(INVOICE);
 
 Derivation<Invoice, Last4> cardLast4 =
@@ -101,23 +101,23 @@ Query<Mail, String> mailMentions =
 
 | portal | what holding it lets you do |
 |---|---|
-| `Conceal<T>` | hand over a real value, leave with a surrogate |
-| `Reveal<T>` | turn a surrogate back into a value, at one declared destination |
+| `Occlude<T>` | hand over a real value, leave with an occluded reference |
+| `Reveal<T>` | turn an occluded reference back into a value, at one declared sink |
 | `Derivation<I,O>` | make one value from another |
 | `Fold<I,O>` | make one value from many |
 | `Query<I,Q>` | ask one question of a value without the value leaving |
 
-**`Conceal` takes no label argument.** The door carries its own, decided when it was declared, so
+**`Occlude` takes no label argument.** The door carries its own, decided when it was declared, so
 code holding it writes at that label and no other. A service handed the door for customer-submitted
 disputes cannot create cardholder data — not "is refused at runtime", but cannot express the
 operation. Writing at another tenant's label is less refused than unsayable.
 
-**There is no reveal without a destination.** No overload omits it. You cannot obtain plaintext "in
+**There is no reveal without a sink.** No overload omits it. You cannot obtain plaintext "in
 general", only plaintext for somewhere, and that somewhere is what the ceiling hangs off and what
 the audit records.
 
-A `Surrogate` prints as its identifier and nothing else, and carries no runtime type — knowing that
-a surrogate is a card token rather than a display name is itself a disclosure.
+An `Occluded` prints as its identifier and nothing else, and carries no runtime type — knowing that
+an occluded reference is a card token rather than a display name is itself a disclosure.
 
 ## Deriving
 
@@ -166,7 +166,7 @@ charter.currentAccess(() -> AccessContext.of(Map.of(
     "principal", SecurityContextHolder.getContext().getAuthentication().getName())));
 ```
 
-A `ThreadLocal`, a `ScopedValue`, Spring's holders — Loch has no opinion about how your request
+A `ThreadLocal`, a `ScopedValue`, Spring's holders — Occlude has no opinion about how your request
 scope works. Nothing a caller passes influences a label or a ceiling: if a call site could override
 what the edge established, any code holding a portal could name itself whichever tenant it liked,
 which is not a policy system but a formality.
@@ -214,12 +214,12 @@ that the value digests cover — so nothing decides what gets destroyed that a s
 protect. Descendants go regardless of their own labels, which is what erasure means: a value
 derived from two customers dies with either of them.
 
-The audit outlives what it describes. `loch_audit` has no foreign key into `loch_value` and nothing
+The audit outlives what it describes. `occlude_audit` has no foreign key into `occlude_value` and nothing
 cascades into it: the record that you erased somebody has to survive erasing them.
 
 ## Storage
 
-Postgres. `loch-jdbc` contains **no cryptography and no compression of its own** — you compose the
+Postgres. `occlude-jdbc` contains **no cryptography and no compression of its own** — you compose the
 pipeline and it applies what it is handed:
 
 ```java
@@ -233,7 +233,7 @@ JdbcStorage storage = new JdbcStorageConfig()
     .storage(axes);
 ```
 
-So it depends on `loch-core` and the codec *contract*, and nothing else. Jackson or fory or
+So it depends on `occlude-core` and the codec *contract*, and nothing else. Jackson or fory or
 protobuf; gzip or zstd or lz4; envelope encryption or your own KMS.
 
 **Compression before encryption**, always: ciphertext does not compress, so the other order costs

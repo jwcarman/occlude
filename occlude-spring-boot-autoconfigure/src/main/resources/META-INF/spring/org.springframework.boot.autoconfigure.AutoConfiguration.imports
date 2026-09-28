@@ -1,0 +1,3 @@
+org.jwcarman.occlude.spring.CharterAutoConfiguration
+org.jwcarman.occlude.spring.JdbcCharterAutoConfiguration
+org.jwcarman.occlude.spring.CharterEndpointAutoConfiguration

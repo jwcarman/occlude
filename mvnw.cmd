@@ -147,7 +147,7 @@ if ($distributionSha256Sum) {
 }
 
 # unzip and move
-Expand-Archive "$TMP_DOWNLOAD_DIR/$distributionUrlName" -DestinationPath "$TMP_DOWNLOAD_DIR" | Out-Null
+Expand-Archive "$TMP_DOWNLOAD_DIR/$distributionUrlName" -SinkPath "$TMP_DOWNLOAD_DIR" | Out-Null
 
 # Find the actual extracted directory name (handles snapshots where filename != directory name)
 $actualDistributionDir = ""
@@ -176,7 +176,7 @@ if (!$actualDistributionDir) {
 Write-Verbose "Found extracted Maven distribution directory: $actualDistributionDir"
 Rename-Item -Path "$TMP_DOWNLOAD_DIR/$actualDistributionDir" -NewName $MAVEN_HOME_NAME | Out-Null
 try {
-  Move-Item -Path "$TMP_DOWNLOAD_DIR/$MAVEN_HOME_NAME" -Destination $MAVEN_HOME_PARENT | Out-Null
+  Move-Item -Path "$TMP_DOWNLOAD_DIR/$MAVEN_HOME_NAME" -Sink $MAVEN_HOME_PARENT | Out-Null
 } catch {
   if (! (Test-Path -Path "$MAVEN_HOME" -PathType Container)) {
     Write-Error "fail to move MAVEN_HOME"

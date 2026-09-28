@@ -3,7 +3,7 @@
 An **axis** is a question an application asks about every value it holds. A **label** is one
 value's answers.
 
-Loch ships no mandatory vocabulary. In US government nomenclature CONFIDENTIAL sits *below* SECRET;
+Occlude ships no mandatory vocabulary. In US government nomenclature CONFIDENTIAL sits *below* SECRET;
 in the common corporate convention it sits near the top. No regulated organisation will abandon its
 mandated scheme because a library has opinions, so you declare your own.
 
@@ -102,7 +102,7 @@ everyone**, which is the opposite of what you wanted.
 Axis.matching("tenant").required()
 ```
 
-A required axis must be answered. Concealing a value whose label leaves one unanswered is refused,
+A required axis must be answered. Occluding a value whose label leaves one unanswered is refused,
 a declassification that drops one is refused, and a stored label missing one is refused wherever
 it is read back — so marking an axis required on a system that has been writing without it makes
 those rows *unreadable* rather than universally readable.

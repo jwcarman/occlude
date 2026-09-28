@@ -23,7 +23,7 @@ body:
       description: Detailed steps to reproduce the behavior
       placeholder: |
         1. Declare axes / a charter like...
-        2. Conceal a value at...
+        2. Occlude a value at...
         3. Reveal it at... and observe...
     validations:
       required: true
@@ -50,7 +50,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Loch Version
+      label: Occlude Version
       description: Which version are you using?
       placeholder: e.g., 0.1.0
     validations:

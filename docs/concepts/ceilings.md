@@ -40,7 +40,7 @@ Say `any()` when you mean it. Breadth is a decision worth writing down.
 A door's ceiling is a function of the access, not a constant:
 
 ```java
-charter.destination(
+charter.sink(
     "support-ui",
     ctx -> Ceiling.of(TENANT, Constraint.atMost(ctx.get("tenant").orElseThrow()))
                .with(SENSITIVITY, Constraint.atMost(ORDINARY)),
@@ -64,6 +64,6 @@ and always consulted.
 ## Ceilings are not authority to act
 
 A ceiling answers *may this value be seen here*. It does not answer *should this happen*. A
-capability to refund a card is not a statement about disclosure, and loch has nothing to say about
+capability to refund a card is not a statement about disclosure, and occlude has nothing to say about
 the amount. Pair it with whatever authorises actions in your system — see
-[What Loch Does Not Do](../limits.md).
+[What Occlude Does Not Do](../limits.md).

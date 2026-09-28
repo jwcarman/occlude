@@ -5,8 +5,8 @@ one object able to perform that operation — a **portal**.
 
 | portal | what holding it lets you do |
 |---|---|
-| `Conceal<T>` | hand over a real value, leave with a surrogate |
-| `Reveal<T>` | turn a surrogate back into a value, at one declared destination |
+| `Occlude<T>` | hand over a real value, leave with an occluded reference |
+| `Reveal<T>` | turn an occluded reference back into a value, at one declared sink |
 | `Derivation<I,O>` | make one value from another |
 | `Fold<I,O>` | make one value from many |
 | `Query<I,Q>` | ask one question of a value without the value leaving |
@@ -33,13 +33,13 @@ public final class ChargeCard {
 }
 ```
 
-## Conceal takes no label
+## Occlude takes no label
 
 ```java
-Conceal<Mail> customerMail =
+Occlude<Mail> customerMail =
     charter.source("customer-mail", MAIL, ctx -> label(ctx, UNENDORSED, PERSONAL));
 
-Surrogate<Mail> held = customerMail.conceal(incoming);   // no label argument
+Occluded<Mail> held = customerMail.occlude(incoming);   // no label argument
 ```
 
 The door carries its own label, decided once when it was declared, so code holding it writes at
@@ -51,23 +51,23 @@ The label may still depend on who is acting: a door fixes what is a property of 
 what arrives there, how far it is trusted, how sensitive it is — and reads the tenant from ambient
 context. So it is not quite a constant, but nothing a caller passes influences it.
 
-!!! note "Concealing is the axiom"
-    Concealing is where data enters, and at that moment there is no earlier label to check against.
-    Monotone join makes it a *theorem* that derivation cannot weaken a label; concealing is the
+!!! note "Occluding is the axiom"
+    Occluding is where data enters, and at that moment there is no earlier label to check against.
+    Monotone join makes it a *theorem* that derivation cannot weaken a label; occluding is the
     axiom that theorem rests on. Declaring doors makes those axioms enumerable, which is all
     anything can do.
 
-## There is no reveal without a destination
+## There is no reveal without a sink
 
 ```java
 Reveal<Invoice> paymentProcessor =
-    charter.destination("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE)
+    charter.sink("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE)
            .reading(INVOICE);
 
 Revealed<Invoice> out = paymentProcessor.reveal(held);
 ```
 
-No overload omits the destination. You cannot obtain plaintext "in general", only plaintext for
+No overload omits the sink. You cannot obtain plaintext "in general", only plaintext for
 somewhere — and that somewhere is what the ceiling hangs off and what the audit records.
 
 `Revealed<T>` is a sealed result rather than an exception: being turned away while reading is an
@@ -80,10 +80,10 @@ switch (out) {
 }
 ```
 
-## Surrogates disclose nothing
+## Occluded references disclose nothing
 
-A `Surrogate<T>` prints as its identifier and nothing else, and carries no runtime type. Knowing
-that a surrogate is a card token rather than a display name is itself a disclosure, so a refusal
+An `Occluded<T>` prints as its identifier and nothing else, and carries no runtime type. Knowing
+that an occluded reference is a card token rather than a display name is itself a disclosure, so a refusal
 will not tell you either — the ceiling is checked before the type, and a caller who may not see the
 value is not told what kind of value it is.
 

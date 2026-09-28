@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-We aim to support the latest stable release of Loch and provide critical security patches as
+We aim to support the latest stable release of Occlude and provide critical security patches as
 needed.
 
 | Version | Supported |
@@ -12,12 +12,12 @@ needed.
 
 ## What counts as a vulnerability here
 
-Loch exists to keep values from being disclosed, so a bug in it is often a security bug. The
+Occlude exists to keep values from being disclosed, so a bug in it is often a security bug. The
 following are vulnerabilities and are worth reporting privately:
 
 - **Reading above a ceiling.** Any way to obtain plaintext that the declared ceiling should have
   refused, including through a derivation, a fold, a query or an erasure.
-- **Forging a label.** Any way to make a value carry a label it was not concealed or derived at,
+- **Forging a label.** Any way to make a value carry a label it was not occluded or derived at,
   or to weaken one without going through a declared lowering.
 - **Obtaining a portal you were not handed.** Any lookup by name, reflection route, escaped
   reference, or use of a portal before its charter was sealed or after it should have been shut.
@@ -35,7 +35,7 @@ Some limits are known, documented, and not vulnerabilities:
 - **The query oracle.** A question answers one bit, and enough questions read a value a piece at a
   time. Nothing counts them; what limits the exposure is the ceiling.
 - **Existence.** A refusal distinguishes an identifier that exists from one that does not.
-- **What application code does with plaintext.** Loch decides who may see a value. It cannot stop
+- **What application code does with plaintext.** Occlude decides who may see a value. It cannot stop
   code that legitimately revealed one from writing it somewhere else.
 
 ## Reporting a Vulnerability
@@ -44,7 +44,7 @@ Some limits are known, documented, and not vulnerabilities:
 discussions.**
 
 Instead, please report via:
-- **GitHub Security Advisories**: https://github.com/jwcarman/loch/security/advisories/new (preferred)
+- **GitHub Security Advisories**: https://github.com/jwcarman/occlude/security/advisories/new (preferred)
 - **Direct contact**: @jwcarman on GitHub
 
 Include the following information:

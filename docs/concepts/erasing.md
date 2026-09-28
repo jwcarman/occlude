@@ -3,7 +3,7 @@
 "Erase this customer" is a reachability question, which is why lineage is kept.
 
 ```java
-int removed = charter.erase(surrogate);
+int removed = charter.erase(occluded);
 ```
 
 Erasing a value takes everything ever derived from it, however deeply. Descendants go regardless of
@@ -36,7 +36,7 @@ data?"* is **none, structurally**.
 
 ## What survives
 
-The audit outlives what it describes. `loch_audit` has no foreign key into `loch_value` and nothing
+The audit outlives what it describes. `occlude_audit` has no foreign key into `occlude_value` and nothing
 cascades into it: the record that you erased somebody has to survive erasing them, or the system
 cannot prove it did the thing it was legally required to do.
 
