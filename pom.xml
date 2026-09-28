@@ -85,6 +85,8 @@
     <license.owner>James Carman</license.owner>
 
     <jacoco.version>0.8.15</jacoco.version>
+    <!-- Also written out in .github/workflows/maven.yml, which must invoke this plugin by its
+         full coordinates rather than the sonar: prefix. Bump both together. -->
     <sonar.plugin.version>5.7.0.6970</sonar.plugin.version>
 
     <!-- Set by the jacoco prepare-agent execution in the ci profile, and empty otherwise so that
@@ -210,8 +212,9 @@
         </configuration>
       </plugin>
 
-      <!-- Declared so that `sonar:sonar` resolves. The goal only runs in CI, where a token
-           exists; the plugin has to be findable either way. -->
+      <!-- Declared so that `sonar:sonar` resolves when run from this pom alone. CI runs the whole
+           reactor, where the prefix cannot resolve (see the workflow), so it names the plugin in
+           full. The goal only runs in CI, where a token exists. -->
       <plugin>
         <groupId>org.sonarsource.scanner.maven</groupId>
         <artifactId>sonar-maven-plugin</artifactId>
