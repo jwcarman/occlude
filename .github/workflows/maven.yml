@@ -67,13 +67,7 @@ jobs:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       run: |
         if [ -n "$SONAR_TOKEN" ]; then
-          # Fully qualified, NOT sonar:sonar. Maven resolves a goal prefix against the first
-          # project in the reactor, which is occlude-bom -- and occlude-bom deliberately has no
-          # parent, so it inherits none of the root's plugins and the prefix cannot be found.
-          # The version must match sonar.plugin.version in the root pom; nothing checks that.
-          mvn -Pci -B verify \
-            org.sonarsource.scanner.maven:sonar-maven-plugin:5.7.0.6970:sonar \
-            -Dsonar.qualitygate.wait=true
+          mvn -Pci -B verify sonar:sonar -Dsonar.qualitygate.wait=true
         else
           mvn -Pci -B verify
         fi
