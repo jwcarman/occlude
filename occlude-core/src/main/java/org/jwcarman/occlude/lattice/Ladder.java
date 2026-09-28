@@ -16,6 +16,7 @@
 package org.jwcarman.occlude.lattice;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -40,11 +41,12 @@ final class Ladder implements Order {
     this.bottom = byName.values().iterator().next();
   }
 
-  static <E extends Enum<E>> Ladder of(String axis, E[] leastConstrainedFirst) {
+  static <E extends Enum<E>> Ladder of(String axis, List<E> leastConstrainedFirst) {
     Map<Enum<?>, Integer> ranks = new LinkedHashMap<>();
     Map<String, Enum<?>> byName = new LinkedHashMap<>();
-    for (int rung = 0; rung < leastConstrainedFirst.length; rung++) {
-      E constant = Objects.requireNonNull(leastConstrainedFirst[rung], "a rung must not be null");
+    for (int rung = 0; rung < leastConstrainedFirst.size(); rung++) {
+      E constant =
+          Objects.requireNonNull(leastConstrainedFirst.get(rung), "a rung must not be null");
       if (ranks.put(constant, rung) != null) {
         throw new IllegalArgumentException(
             constant + " appears twice in '" + axis + "', so combining it would depend on order");

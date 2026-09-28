@@ -50,6 +50,7 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.ResolvableType;
 
 /**
  * Wiring, which is the part that fails quietly.
@@ -263,12 +264,23 @@ class CharterAutoConfigurationTest {
               assertThat(context).hasNotFailed();
               assertThat(context.getBean(Charter.class).sealed()).isTrue();
 
-              Occluded<String> held = context.getBean(Occlude.class).occlude("a note");
+              Occlude<String> notes =
+                  context
+                      .<Occlude<String>>getBeanProvider(
+                          ResolvableType.forClassWithGenerics(Occlude.class, String.class))
+                      .getObject();
+              Reveal<String> reporting =
+                  context
+                      .<Reveal<String>>getBeanProvider(
+                          ResolvableType.forClassWithGenerics(Reveal.class, String.class))
+                      .getObject();
+
+              Occluded<String> held = notes.occlude("a note");
 
               // The value coming back out is the evidence. A portal that refuses at request time
               // is exactly what a charter that was never sealed produces, and it is what this
               // test exists to catch.
-              assertThat(context.getBean(Reveal.class).reveal(held).granted()).contains("a note");
+              assertThat(reporting.reveal(held).granted()).contains("a note");
             });
   }
 

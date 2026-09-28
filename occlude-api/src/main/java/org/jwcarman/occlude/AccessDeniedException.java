@@ -28,6 +28,8 @@ package org.jwcarman.occlude;
  */
 public class AccessDeniedException extends RuntimeException {
 
+  private static final long serialVersionUID = 1L;
+
   private final String reason;
 
   public AccessDeniedException(String reason, String detail) {

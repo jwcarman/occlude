@@ -82,7 +82,6 @@ public final class DefaultCharter implements Charter {
   }
 
   /** The same, for an application naming its axes inline rather than handing over a schema. */
-  @SafeVarargs
   public DefaultCharter(Axis<?>... axes) {
     this(Axes.of(axes));
   }
@@ -212,8 +211,7 @@ public final class DefaultCharter implements Charter {
    *
    * @param reads every type this sink will hand over, and no others
    */
-  @SafeVarargs
-  public final Sink sink(
+  public Sink sink(
       String name, Function<AccessContext, Ceiling> ceiling, OccludedType<?>... reads) {
     Objects.requireNonNull(name, "a sink needs a name");
     Objects.requireNonNull(ceiling, "a sink needs a ceiling");
@@ -238,8 +236,7 @@ public final class DefaultCharter implements Charter {
   }
 
   /** The same, for a ceiling that does not depend on who is asking. */
-  @SafeVarargs
-  public final Sink sink(String name, Ceiling ceiling, OccludedType<?>... reads) {
+  public Sink sink(String name, Ceiling ceiling, OccludedType<?>... reads) {
     Objects.requireNonNull(ceiling, "a sink needs a ceiling");
     return sink(name, context -> ceiling, reads);
   }

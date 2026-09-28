@@ -36,7 +36,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.logging.Logger;
@@ -131,8 +130,13 @@ class JdbcCharterTest {
   private Reveal<List<Card>> cardListVendor;
   private Reveal<List<Last4>> last4ListProcessor;
 
-  /** Standing in for the edge. A caller is not allowed to say who it is. */
-  private final AtomicReference<AccessContext> edge = new AtomicReference<>(AccessContext.empty());
+  /**
+   * Standing in for the edge. A caller is not allowed to say who it is.
+   *
+   * <p>Per thread, as a real edge is: the concurrent tests act as different callers at once, and a
+   * shared holder let one thread's identity overwrite another's mid-call.
+   */
+  private final ThreadLocal<AccessContext> edge = ThreadLocal.withInitial(AccessContext::empty);
 
   private AccessContext acme() {
     edge.set(AccessContext.of("tenant", "acme"));
@@ -502,28 +506,30 @@ class JdbcCharterTest {
     for (int round = 0; round < rounds; round++) {
       work.add(
           () -> {
-            acme();
             Occluded<Card> card = card();
-            Thread deriving =
-                new Thread(
-                    () -> {
-                      acme();
-                      try {
-                        cardLast4.derive(card);
-                      } catch (RuntimeException _) {
-                        // The parent went first. That is a legitimate outcome of the race.
-                      }
-                    });
-            Thread erasing =
-                new Thread(
-                    () -> {
-                      edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
-                      store.erase(card);
-                    });
-            deriving.start();
-            erasing.start();
-            deriving.join();
-            erasing.join();
+            Callable<Void> deriving =
+                () -> {
+                  acme();
+                  try {
+                    cardLast4.derive(card);
+                  } catch (IllegalArgumentException _) {
+                    // The parent went first. That is a legitimate outcome of the race.
+                  }
+                  return null;
+                };
+            Callable<Void> erasing =
+                () -> {
+                  edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
+                  store.erase(card);
+                  return null;
+                };
+            // Through futures rather than bare threads, so a failure on either side fails the
+            // test instead of printing a stack trace and passing.
+            try (ExecutorService pair = Executors.newFixedThreadPool(2)) {
+              for (Future<Void> done : pair.invokeAll(List.of(deriving, erasing))) {
+                done.get();
+              }
+            }
             return null;
           });
     }

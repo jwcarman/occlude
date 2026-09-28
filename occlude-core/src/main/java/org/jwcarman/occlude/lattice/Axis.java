@@ -15,6 +15,8 @@
  */
 package org.jwcarman.occlude.lattice;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -65,7 +67,13 @@ public final class Axis<T> {
     if (leastConstrainedFirst == null || leastConstrainedFirst.length == 0) {
       throw new IllegalArgumentException("'" + name + "' needs at least one rung");
     }
-    return new Axis<>(name, Ladder.of(name, leastConstrainedFirst), false);
+    // Copied element by element: handing the generic array itself onward is what makes a varargs
+    // method unsafe, and javac cannot see that the callee only reads it.
+    List<E> rungs = new ArrayList<>(leastConstrainedFirst.length);
+    for (E rung : leastConstrainedFirst) {
+      rungs.add(rung);
+    }
+    return new Axis<>(name, Ladder.of(name, rungs), false);
   }
 
   /**

@@ -23,6 +23,8 @@ package org.jwcarman.occlude;
  */
 public class DerivationRefusedException extends AccessDeniedException {
 
+  private static final long serialVersionUID = 1L;
+
   public DerivationRefusedException(Derived.Reason reason, String detail) {
     super(reason.name(), detail);
   }
