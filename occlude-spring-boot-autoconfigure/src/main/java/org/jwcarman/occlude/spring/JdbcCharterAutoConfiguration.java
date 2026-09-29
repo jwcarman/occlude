@@ -162,22 +162,22 @@ public class JdbcCharterAutoConfiguration {
         @Qualifier(CharterAutoConfiguration.STORAGE) JdbcStorage storage) {
       return storage.integrity();
     }
-  }
 
-  /**
-   * A signing algorithm by name, and a message listing the choices rather than a bare enum error.
-   */
-  private static MacAlgorithm macNamed(String name) {
-    return Arrays.stream(MacAlgorithm.values())
-        .filter(algorithm -> algorithm.name().equals(name))
-        .findFirst()
-        .orElseThrow(
-            () ->
-                new IllegalStateException(
-                    "occlude.roots.mac is '"
-                        + name
-                        + "'; it must be one of "
-                        + Arrays.toString(MacAlgorithm.values())));
+    /**
+     * A signing algorithm by name, and a message listing the choices rather than a bare enum error.
+     */
+    private static MacAlgorithm macNamed(String name) {
+      return Arrays.stream(MacAlgorithm.values())
+          .filter(algorithm -> algorithm.name().equals(name))
+          .findFirst()
+          .orElseThrow(
+              () ->
+                  new IllegalStateException(
+                      "occlude.roots.mac is '"
+                          + name
+                          + "'; it must be one of "
+                          + Arrays.toString(MacAlgorithm.values())));
+    }
   }
 
   /** Base64, and a message naming which entry was not, rather than a bare decoder exception. */
