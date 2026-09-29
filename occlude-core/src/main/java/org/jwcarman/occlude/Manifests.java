@@ -15,12 +15,17 @@
  */
 package org.jwcarman.occlude;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -39,6 +44,24 @@ final class Manifests {
 
   private static final String NO_WRITER = "no-writer";
   private static final String NO_READER = "no-reader";
+  private static final String NOT_A_PLAIN_VALUE = "not-a-plain-value";
+
+  /** Values that cannot carry anything anywhere: immutable, and holding nothing but themselves. */
+  private static final Set<Class<?>> PLAIN =
+      Set.of(
+          String.class,
+          Boolean.class,
+          Character.class,
+          Byte.class,
+          Short.class,
+          Integer.class,
+          Long.class,
+          Float.class,
+          Double.class,
+          Void.class,
+          BigInteger.class,
+          BigDecimal.class,
+          UUID.class);
 
   private Manifests() {}
 
@@ -129,7 +152,10 @@ final class Manifests {
             query ->
                 new Manifest.Entry(
                     query.name(),
-                    "asks about " + query.inputType().name(),
+                    "asks about "
+                        + query.inputType().name()
+                        + ", given a "
+                        + query.against().getName(),
                     false,
                     List.of(query.inputType().name()),
                     null))
@@ -158,6 +184,7 @@ final class Manifests {
     unproducedSinkReadFindings(configuration, produced, findings);
     derivationFindings(configuration, produced, read, findings);
     unproducedQueryFindings(configuration, produced, findings);
+    notAPlainValueFindings(configuration, findings);
     return findings;
   }
 
@@ -272,6 +299,50 @@ final class Manifests {
                     .formatted(query.inputType().name())));
       }
     }
+  }
+
+  /**
+   * A question asked with something that could carry the value away.
+   *
+   * <p>A question is one bit only if nothing else leaves. Its function is handed the plaintext and
+   * whatever it is asked with, so asking with a {@code Consumer}, a {@code StringBuilder} or a list
+   * is handing the function somewhere to put the value -- and the answer is still recorded as a
+   * question. Not refused, because only whoever wrote the function knows what it does; listed,
+   * because that is exactly what a review has to look at.
+   */
+  private static void notAPlainValueFindings(
+      Declarations configuration, List<Manifest.Finding> findings) {
+    for (QuerySpec<?, ?> query : configuration.queries()) {
+      if (!plain(query.against(), new HashSet<>())) {
+        findings.add(
+            new Manifest.Finding(
+                NOT_A_PLAIN_VALUE,
+                query.name(),
+                ("is asked with a %s, which is not a plain value: its function could hand the"
+                        + " value it reads to whatever that can reach")
+                    .formatted(query.against().getName())));
+      }
+    }
+  }
+
+  /**
+   * Immutable and self-contained: a primitive or its box, a string, an exact number, an id, an
+   * enum, a {@code java.time} value, or a record made only of those.
+   */
+  private static boolean plain(Class<?> type, Set<Class<?>> visiting) {
+    if (type.isPrimitive() || type.isEnum() || PLAIN.contains(type)) {
+      return true;
+    }
+    if (type.getPackageName().equals("java.time")) {
+      return true;
+    }
+    if (type.isRecord()) {
+      // A record already being looked at is taken as plain here; its other components decide.
+      return !visiting.add(type)
+          || Arrays.stream(type.getRecordComponents())
+              .allMatch(component -> plain(component.getType(), visiting));
+    }
+    return false;
   }
 
   /** Whether any sink reads this type, or a type reachable from it by deriving. */

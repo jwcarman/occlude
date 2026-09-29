@@ -45,7 +45,8 @@ class SpecDefaultsTest {
   @DisplayName("a query says it did not decide, rather than throwing")
   void a_query_says_it_did_not_decide() {
     QuerySpec<String, String> spec =
-        new QuerySpec<>("unconfigured", STRING_TYPE, (v, q, ctx) -> true, null, ctx -> true);
+        new QuerySpec<>(
+            "unconfigured", STRING_TYPE, String.class, (v, q, ctx) -> true, null, ctx -> true);
 
     assertThat(spec.ceilingFor(AccessContext.empty())).isNull();
   }

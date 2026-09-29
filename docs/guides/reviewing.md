@@ -26,7 +26,7 @@ charter manifest, as {tenant=acme}
     mail.confirmedInvoice  mail -> invoice    << WEAKENS LABELS
 
   questions (1)
-    mail.mentions  asks about mail
+    mail.mentions  asks about mail, given a java.lang.String
     (each answer is one bit and the asker chooses the question, so enough questions
      read the value; a ceiling is what limits who may ask at all)
 
@@ -55,6 +55,14 @@ confirm it was deliberate.
 
 **Questions.** A question looks like the safe way to use a value because it never hands one over.
 Enough of them read it anyway. Ask whether the asker is a person or a loop.
+
+**What a question is asked with.** The manifest shows it: `given a java.lang.String`. A question is
+one bit only if its argument cannot carry anything, because the function is handed the value *and*
+the argument. Asked with a `Consumer`, a `StringBuilder` or a list, it can put the value there and
+still be recorded as a question. Anything that is not a plain value — a primitive or its box, a
+string, an exact number, a `UUID`, an enum, a `java.time` value, or a record of those — is listed
+as a `not-a-plain-value` finding. It is not refused, because only whoever wrote the function knows
+what it does; it is listed because that is exactly where a review has to look.
 
 **Doors that read a type nothing produces, or produce a type nothing reads.** A door nobody can
 reach is dead authority; it is also the shape a mistake takes when a rename went half-applied.

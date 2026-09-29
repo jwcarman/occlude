@@ -33,10 +33,15 @@ package org.jwcarman.occlude;
  * because it turns repetition into binary search. Declaring the first kind and not the second is
  * worth more than any budget.
  *
+ * <p>One bit only if nothing else leaves. The function is handed the value and whatever it is asked
+ * against, so asking against something that can hold or pass things on -- a {@code Consumer}, a
+ * {@code StringBuilder}, a list -- gives it somewhere to put the value. Ask against plain values;
+ * the manifest lists any question that is not, as a {@code not-a-plain-value} finding.
+ *
  * <p>Declared during configuration, and obtainable only by being handed one.
  *
  * @param <I> the type of value this can be asked about
- * @param <Q> what the question is asked against
+ * @param <Q> what the question is asked against: a plain value, part of what a review reads
  */
 public interface Query<I, Q> {
 

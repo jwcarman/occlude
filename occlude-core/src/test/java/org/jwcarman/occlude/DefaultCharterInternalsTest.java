@@ -19,10 +19,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
+import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -485,6 +488,63 @@ class DefaultCharterInternalsTest {
     }
 
     /**
+     * A question is one bit only if its argument cannot carry anything. Handed a consumer, its
+     * function can pass the value on and still be recorded as a question.
+     */
+    @Test
+    @DisplayName("a question asked with something that could carry the value away")
+    void a_question_asked_with_something_that_could_carry_the_value() {
+      DefaultCharter charter = new DefaultCharter(TENANT);
+      charter.query(
+          "exfiltrate",
+          STRING_TYPE,
+          StringBuilder.class,
+          (v, sink, ctx) -> sink.append(v) != null,
+          d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
+      charter.query(
+          "carries-a-list",
+          STRING_TYPE,
+          Carrier.class,
+          (v, q, ctx) -> true,
+          d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
+
+      assertThat(charter.manifest().findings("not-a-plain-value"))
+          .extracting(Manifest.Finding::about)
+          .containsExactly("exfiltrate", "carries-a-list");
+    }
+
+    /** Anything immutable and self-contained is a plain value, however it is put together. */
+    @Test
+    @DisplayName("nothing for a question asked with plain values")
+    void nothing_for_plain_values() {
+      DefaultCharter charter = new DefaultCharter(TENANT);
+      Ceiling anything = Ceiling.of(TENANT, Constraint.any());
+      charter.query(
+          "text", STRING_TYPE, String.class, (v, q, ctx) -> true, d -> d.accepting(anything));
+      charter.query(
+          "number", STRING_TYPE, int.class, (v, q, ctx) -> true, d -> d.accepting(anything));
+      charter.query(
+          "moment", STRING_TYPE, Instant.class, (v, q, ctx) -> true, d -> d.accepting(anything));
+      charter.query(
+          "choice", STRING_TYPE, Choice.class, (v, q, ctx) -> true, d -> d.accepting(anything));
+      charter.query(
+          "range", STRING_TYPE, Range.class, (v, q, ctx) -> true, d -> d.accepting(anything));
+      charter.query(
+          "composite",
+          STRING_TYPE,
+          Composite.class,
+          (v, q, ctx) -> true,
+          d -> d.accepting(anything));
+
+      charter.query(
+          "chain", STRING_TYPE, Chain.class, (v, q, ctx) -> true, d -> d.accepting(anything));
+
+      assertThat(charter.manifest().findings("not-a-plain-value")).isEmpty();
+      assertThat(charter.manifest().questions())
+          .anySatisfy(entry -> assertThat(entry.detail()).contains("given a java.time.Instant"));
+    }
+
+    /**
      * A derivation cycle that reaches no sink: the reachability walk must not loop forever
      * revisiting the types it already ruled out.
      */
@@ -513,4 +573,17 @@ class DefaultCharterInternalsTest {
 
     record Wrapped(String value) {}
   }
+
+  enum Choice {
+    YES,
+    NO
+  }
+
+  record Range(BigDecimal low, BigDecimal high, UUID id) {}
+
+  record Composite(Range range, Choice choice, long count) {}
+
+  record Carrier(List<String> into) {}
+
+  record Chain(String label, Chain next) {}
 }

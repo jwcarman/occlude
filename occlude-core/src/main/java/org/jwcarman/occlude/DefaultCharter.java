@@ -335,6 +335,7 @@ public final class DefaultCharter implements Charter {
       Query.Asking<I, Q> asking,
       Consumer<QueryConfig> customizer) {
     Objects.requireNonNull(name, "a question needs a name");
+    Objects.requireNonNull(against, "a question says what it is asked with");
     Objects.requireNonNull(customizer, "a question needs to say what it may read");
     QueryConfig settings = new QueryConfig();
     customizer.accept(settings);
@@ -346,7 +347,7 @@ public final class DefaultCharter implements Charter {
               + " it may look at, saying any() on the axes it is deliberately broad about");
     }
     QuerySpec<I, Q> spec =
-        new QuerySpec<>(name, input, asking, settings.ceiling(), settings.availableTo());
+        new QuerySpec<>(name, input, against, asking, settings.ceiling(), settings.availableTo());
     declaring(() -> declarations.query(spec));
     return portals.query(spec);
   }

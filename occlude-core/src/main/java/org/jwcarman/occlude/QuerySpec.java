@@ -23,6 +23,7 @@ import org.jwcarman.occlude.lattice.Ceiling;
 record QuerySpec<I, Q>(
     String name,
     OccludedType<I> inputType,
+    Class<Q> against,
     Query.Asking<I, Q> asking,
     Function<AccessContext, Ceiling> ceiling,
     Predicate<AccessContext> availableTo) {
