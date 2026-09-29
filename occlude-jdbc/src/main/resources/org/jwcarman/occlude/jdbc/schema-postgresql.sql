@@ -55,7 +55,10 @@ CREATE TABLE IF NOT EXISTS occlude_lineage (
   child_id   TEXT    NOT NULL,
   parent_id  TEXT    NOT NULL,
   position   INTEGER NOT NULL,
-  PRIMARY KEY (child_id, parent_id),
+  -- Keyed by position, not by parent: a fold may take the same value twice, and the lineage it
+  -- signed names it twice. Keyed by parent, the second row was dropped and every read of the fold
+  -- refused it as tampered -- a false alarm the library raised against itself.
+  PRIMARY KEY (child_id, position),
   FOREIGN KEY (child_id) REFERENCES occlude_value (value_id) ON DELETE CASCADE
 );
 

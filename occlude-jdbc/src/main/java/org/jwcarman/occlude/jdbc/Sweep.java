@@ -24,7 +24,10 @@ import java.util.List;
  * field decrypted and is not what was signed for it, or is not a frame this store writes at all.
  * <b>Unreadable</b> is a fact about the keys at hand: the field would not decrypt, which is what a
  * destroyed key looks like and also what a damaged ciphertext looks like. Only whoever manages the
- * keys can tell which, so the sweep does not guess.
+ * keys can tell which, so the sweep does not guess -- and somebody corrupting a field on purpose
+ * can choose to land in the second list rather than the first. Unreadable fields must be reconciled
+ * against the keys actually destroyed; any others are as suspect as altered ones. A read of one is
+ * refused either way.
  *
  * @param alteredValues ids of values whose payload or label is not what was signed for them
  * @param unreadableValues ids of values whose payload or label would not decrypt
@@ -44,7 +47,10 @@ public record Sweep(
     unreadableLines = List.copyOf(unreadableLines);
   }
 
-  /** Whether nothing was altered. Unreadable fields are not counted: see the class notes. */
+  /**
+   * Whether nothing was <i>provably</i> altered. Not the same as untouched: unreadable fields are
+   * not counted, for the reasons in the class notes.
+   */
   public boolean intact() {
     return alteredValues.isEmpty() && alteredLines.isEmpty();
   }

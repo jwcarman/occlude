@@ -34,11 +34,14 @@ import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.occlude.AccessContext;
 import org.jwcarman.occlude.DefaultCharter;
 import org.jwcarman.occlude.Derivation;
+import org.jwcarman.occlude.Erasure;
+import org.jwcarman.occlude.Fold;
 import org.jwcarman.occlude.Occlude;
 import org.jwcarman.occlude.Occluded;
 import org.jwcarman.occlude.OccludedType;
 import org.jwcarman.occlude.Reveal;
 import org.jwcarman.occlude.StorageIntegrityException;
+import org.jwcarman.occlude.StorageUnreadableException;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
@@ -83,6 +86,8 @@ class TamperingTest {
   private Derivation<Note, Note> shout;
   private Reveal<Note> noteDesk;
   private Reveal<Memo> memoDesk;
+  private Fold<Note, Note> join;
+  private Erasure erasure;
 
   @BeforeEach
   void setUp() throws SQLException {
@@ -114,6 +119,14 @@ class TamperingTest {
             note -> new Note(note.text().toUpperCase()),
             d -> d.accepting(anything));
     noteDesk = charter.sink("note-desk", anything, NOTE).reading(NOTE);
+    join =
+        charter.fold(
+            "join",
+            NOTE,
+            NOTE,
+            all -> new Note(all.stream().map(Note::text).reduce("", String::concat)),
+            d -> d.accepting(anything));
+    erasure = charter.erasure("erasure", (label, ctx) -> true);
     memoDesk = charter.sink("memo-desk", anything, MEMO).reading(MEMO);
     charter.bind(storage, () -> AccessContext.of("tenant", "acme"));
   }
@@ -126,6 +139,40 @@ class TamperingTest {
       }
       statement.executeUpdate();
     }
+  }
+
+  private List<String> linesFor(String id) throws SQLException {
+    List<String> lines = new ArrayList<>();
+    try (Connection connection = dataSource.getConnection();
+        var statement =
+            connection.prepareStatement(
+                "SELECT operation, outcome, reason FROM occlude_audit WHERE value_id = ?"
+                    + " ORDER BY entry_id")) {
+      statement.setString(1, id);
+      try (ResultSet rows = statement.executeQuery()) {
+        while (rows.next()) {
+          lines.add(
+              rows.getString("operation")
+                  + " "
+                  + rows.getString("outcome")
+                  + (rows.getString("reason") == null ? "" : " " + rows.getString("reason")));
+        }
+      }
+    }
+    return lines;
+  }
+
+  /** Flips one bit of a stored ciphertext, the way a damaged disk or a careless edit would. */
+  private void flipABit(String column, String id) throws SQLException {
+    execute(
+        "UPDATE occlude_value SET "
+            + column
+            + " = set_byte("
+            + column
+            + ", 40, get_byte("
+            + column
+            + ", 40) # 1) WHERE value_id = ?",
+        id);
   }
 
   private List<String> reasonsRecorded() throws SQLException {
@@ -304,6 +351,139 @@ class TamperingTest {
         note.id());
 
     assertThat(storage.sweep().alteredValues()).containsExactly(note.id());
+  }
+
+  // ------------------------------------------------------------------ what the re-review found
+
+  /** A root rewritten to one nobody supplies must be a finding, never a crashed report. */
+  @Test
+  @DisplayName("reports a value whose root was rewritten, rather than failing the whole sweep")
+  void reports_a_rewritten_root() throws SQLException {
+    Occluded<Note> note = notes.occlude(new Note("hello"));
+    notes.occlude(new Note("untouched"));
+
+    execute("UPDATE occlude_value SET root_id = 'nobody' WHERE value_id = ?", note.id());
+
+    assertThat(storage.sweep().alteredValues()).containsExactly(note.id());
+    assertThatThrownBy(() -> noteDesk.reveal(note)).isInstanceOf(StorageIntegrityException.class);
+    assertThat(linesFor(note.id())).contains("REVEAL REFUSED NOT_AS_SIGNED");
+  }
+
+  @Test
+  @DisplayName("reports a line whose root was rewritten, rather than failing the whole sweep")
+  void reports_a_line_with_a_rewritten_root() throws SQLException {
+    Occluded<Note> note = notes.occlude(new Note("hello"));
+
+    execute("UPDATE occlude_audit SET root_id = 'nobody' WHERE value_id = ?", note.id());
+
+    assertThat(storage.sweep().alteredLines()).hasSize(1);
+  }
+
+  /** Folding a value with itself is legitimate, and must read back as what it is. */
+  @Test
+  @DisplayName("reads back a fold over the same value twice, and reports nothing about it")
+  void reads_back_a_fold_over_a_repeated_parent() {
+    Occluded<Note> note = notes.occlude(new Note("ab"));
+
+    Occluded<Note> twice = join.fold(List.of(note, note)).orThrow();
+
+    assertThat(noteDesk.reveal(twice).granted()).contains(new Note("abab"));
+    assertThat(storage.metadata(twice.id()).orElseThrow().lineage().parents())
+        .containsExactly(note.id(), note.id());
+    assertThat(storage.brokenValues()).isEmpty();
+    assertThat(storage.sweep().intact()).isTrue();
+  }
+
+  /** A forged lineage row must not let a lawful erasure take an unrelated value with it. */
+  @Test
+  @DisplayName("refuses an erasure that a forged lineage row would widen, and records why")
+  void refuses_an_erasure_widened_by_a_forged_parent() throws SQLException {
+    Occluded<Note> parent = notes.occlude(new Note("parent"));
+    Occluded<Note> unrelated = notes.occlude(new Note("unrelated"));
+
+    execute(
+        "INSERT INTO occlude_lineage (child_id, parent_id, position) VALUES (?, ?, 0)",
+        unrelated.id(),
+        parent.id());
+
+    assertThatThrownBy(() -> erasure.erase(parent)).isInstanceOf(StorageIntegrityException.class);
+    assertThat(storage.contains(unrelated.id())).isTrue();
+    assertThat(storage.contains(parent.id())).isTrue();
+    assertThat(linesFor(parent.id())).contains("ERASE REFUSED NOT_AS_SIGNED");
+  }
+
+  /** A value hanging off a parent that is not there is not what was signed, and blocks erasure. */
+  @Test
+  @DisplayName("refuses an erasure reaching a value whose parent is missing")
+  void refuses_an_erasure_reaching_an_orphan() throws SQLException {
+    Occluded<Note> note = notes.occlude(new Note("hello"));
+    Occluded<Note> shouted = shout.derive(note).orThrow();
+
+    // The child the erasure will reach now also claims a parent that is not there.
+    execute(
+        "INSERT INTO occlude_lineage (child_id, parent_id, position) VALUES (?, 'occ_missing', 1)",
+        shouted.id());
+
+    assertThatThrownBy(() -> erasure.erase(note)).isInstanceOf(StorageIntegrityException.class);
+    assertThat(storage.contains(note.id())).isTrue();
+    assertThat(storage.contains(shouted.id())).isTrue();
+  }
+
+  @Test
+  @DisplayName("refuses an erasure reaching a value it cannot verify")
+  void refuses_an_erasure_reaching_an_unverifiable_value() throws SQLException {
+    Occluded<Note> note = notes.occlude(new Note("hello"));
+    Occluded<Note> shouted = shout.derive(note).orThrow();
+
+    execute("UPDATE occlude_value SET mac = 'HmacMD5' WHERE value_id = ?", shouted.id());
+
+    assertThatThrownBy(() -> erasure.erase(note)).isInstanceOf(StorageIntegrityException.class);
+    assertThat(storage.contains(shouted.id())).isTrue();
+  }
+
+  /** A damaged ciphertext cannot be proved altered, but a read of it must still be recorded. */
+  @Test
+  @DisplayName("records a read that would not decrypt, and sweeps it as unreadable")
+  void records_a_read_that_would_not_decrypt() throws SQLException {
+    Occluded<Note> note = notes.occlude(new Note("hello"));
+
+    flipABit("payload", note.id());
+
+    assertThatThrownBy(() -> noteDesk.reveal(note)).isInstanceOf(StorageUnreadableException.class);
+    assertThat(linesFor(note.id())).contains("REVEAL REFUSED UNREADABLE");
+    Sweep sweep = storage.sweep();
+    assertThat(sweep.unreadableValues()).containsExactly(note.id());
+    assertThat(sweep.alteredValues()).isEmpty();
+  }
+
+  /** One unreadable field must not hide a provably altered one beside it. */
+  @Test
+  @DisplayName("checks a value's label even when its payload will not decrypt")
+  void checks_the_label_even_when_the_payload_is_unreadable() throws SQLException {
+    Occluded<Note> mine = notes.occlude(new Note("mine"));
+
+    flipABit("payload", mine.id());
+    execute(
+        "UPDATE occlude_value SET label_commitment = '\\x00'::bytea WHERE value_id = ?", mine.id());
+
+    assertThat(storage.sweep().alteredValues()).containsExactly(mine.id());
+  }
+
+  /** A reveal that never happened must not be counted as one that did. */
+  @Test
+  @DisplayName("writes no allowed line for a reveal that tampering stopped")
+  void writes_no_allowed_line_for_a_stopped_reveal() throws SQLException {
+    Occluded<Note> note = notes.occlude(new Note("hello"));
+    Occluded<Note> other = notes.occlude(new Note("other"));
+
+    execute(
+        "UPDATE occlude_value SET payload = (SELECT payload FROM occlude_value WHERE value_id = ?)"
+            + " WHERE value_id = ?",
+        other.id(),
+        note.id());
+
+    assertThatThrownBy(() -> noteDesk.reveal(note)).isInstanceOf(StorageIntegrityException.class);
+    assertThat(linesFor(note.id())).doesNotContain("REVEAL ALLOWED");
   }
 
   @Test

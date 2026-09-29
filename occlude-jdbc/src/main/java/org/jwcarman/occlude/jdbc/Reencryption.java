@@ -90,8 +90,10 @@ final class Reencryption {
             connection.prepareStatement(
                 """
                 SELECT value_id, value_type, derivation, payload, label, payload_commitment,
-                       label_commitment, root_id, mac
-                  FROM occlude_value WHERE value_id > ? ORDER BY value_id LIMIT ? FOR UPDATE
+                       label_commitment, root_id, mac,
+                       (SELECT array_agg(parent_id ORDER BY position) FROM occlude_lineage l
+                         WHERE l.child_id = v.value_id) AS parents
+                  FROM occlude_value v WHERE value_id > ? ORDER BY value_id LIMIT ? FOR UPDATE
                 """);
         PreparedStatement update =
             connection.prepareStatement(
@@ -102,8 +104,7 @@ final class Reencryption {
         while (rows.next()) {
           last = rows.getString(Columns.VALUE_ID);
           update.setBytes(1, fields.encrypt(fields.payloadOf(rows)));
-          update.setBytes(
-              2, fields.encrypt(fields.labelPlaintextOf(rows, Fields.parentsOf(connection, last))));
+          update.setBytes(2, fields.encrypt(fields.labelPlaintextOf(rows, Fields.parentsIn(rows))));
           update.setString(3, last);
           update.addBatch();
           rewritten++;

@@ -53,6 +53,9 @@ final class Trail {
   /** The reason a line gives when what a store holds turned out not to be what it signed. */
   static final String NOT_AS_SIGNED = "NOT_AS_SIGNED";
 
+  /** The reason a line gives when a store could not read back what it holds. */
+  static final String UNREADABLE = "UNREADABLE";
+
   /**
    * Reads from storage, and records it if what came back was not what was signed.
    *
@@ -70,16 +73,38 @@ final class Trail {
     try {
       return read.get();
     } catch (StorageIntegrityException e) {
+      throw recorded(e, NOT_AS_SIGNED, operation, value, target, context);
+    } catch (StorageUnreadableException e) {
+      throw recorded(e, UNREADABLE, operation, value, target, context);
+    }
+  }
+
+  /**
+   * Writes the refusal a failed read deserves, and hands back what failed.
+   *
+   * <p>The finding is what matters. A record that could not be written -- the store is down -- is
+   * attached to it rather than thrown in its place, so the caller still learns what was found.
+   */
+  private <E extends RuntimeException> E recorded(
+      E failure,
+      String reason,
+      AuditRecord.Operation operation,
+      String value,
+      String target,
+      AccessContext context) {
+    try {
       audit(
           operation,
           value,
           target,
           AuditRecord.Outcome.REFUSED,
-          Why.of(NOT_AS_SIGNED, e.getMessage()),
+          Why.of(reason, failure.getMessage()),
           null,
           context);
-      throw e;
+    } catch (RuntimeException unrecorded) {
+      failure.addSuppressed(unrecorded);
     }
+    return failure;
   }
 
   /**

@@ -86,14 +86,19 @@ it is a separate pass:
 
 ```java
 Sweep sweep = storage.sweep();
-sweep.intact();            // nothing altered
+sweep.intact();            // nothing provably altered
 sweep.alteredValues();     // decrypted, but not what was signed: proof of tampering
 sweep.unreadableValues();  // would not decrypt with the keys at hand
 ```
 
 *Unreadable* is what a destroyed key looks like, and also what a damaged ciphertext looks like; only
 whoever manages the keys can tell which, so the sweep reports it apart from *altered* rather than
-guessing.
+guessing. Somebody corrupting a field on purpose can choose which list it lands in, so reconcile
+unreadable fields against the keys you actually destroyed and treat the rest as suspect. Reads of
+either are refused, and recorded with reason `NOT_AS_SIGNED` or `UNREADABLE`.
+
+Erasure checks every value it would reach against its digest before destroying anything, so a
+lineage row forged into the table cannot widen an erasure to take an unrelated value with it.
 
 ## Anchoring
 

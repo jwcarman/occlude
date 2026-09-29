@@ -91,6 +91,16 @@ An adversarial review of phase 2 found, and these fix:
 - Constant-time comparisons in the verifiers; separate domain tags for value and line commitments;
   erase lines carry the root's label; `StoredValue` no longer prints its value.
 
+A second review of those fixes found, and these fix: a sweep or read of a row naming a root nobody
+supplies crashed rather than reporting it (now altered, and recorded); a fold over the same value
+twice was stored with one lineage row but signed with two, so every read refused it (lineage is now
+keyed by position); erasure trusted the lineage it walked, so a forged row could widen it (every
+value it would reach is checked against its digest first, which needs no key); reads that would not
+decrypt went unrecorded (now `StorageUnreadableException`, recorded as `UNREADABLE`); a stopped
+reveal left an allowed line behind (the line is written only once the value is in hand); a record
+that could not be written replaced the finding (it is attached as suppressed); and parents are read
+in the same query as the row.
+
 Still open: re-signing under a new root (a root, unlike a key, cannot yet be retired).
 
 ## Also phase 2

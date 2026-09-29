@@ -17,21 +17,28 @@
 package org.jwcarman.occlude.jdbc;
 
 import java.security.MessageDigest;
+import java.sql.Array;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import org.jwcarman.codec.Codec;
+import org.jwcarman.codec.CodecException;
 import org.jwcarman.codec.CodecFactory;
 import org.jwcarman.codec.TypeRef;
+import org.jwcarman.codec.versioned.VersionedFormatException;
 import org.jwcarman.occlude.Lineage;
 import org.jwcarman.occlude.StorageIntegrityException;
+import org.jwcarman.occlude.StorageUnreadableException;
 import org.jwcarman.occlude.StoredMetadata;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Label;
@@ -108,7 +115,10 @@ final class Fields {
    * the caller read from the same place and is about to act on.
    */
   byte[] labelPlaintextOf(ResultSet rows, List<String> parents) throws SQLException {
-    byte[] plaintext = storageCodec.decode(rows.getBytes(Columns.LABEL));
+    byte[] plaintext =
+        opened(
+            rows.getBytes(Columns.LABEL),
+            "the label stored for " + rows.getString(Columns.VALUE_ID));
     List<byte[]> facts =
         Signer.labelFacts(
             rows.getString(Columns.VALUE_TYPE), rows.getString(Columns.DERIVATION), parents);
@@ -118,7 +128,10 @@ final class Fields {
 
   /** A row's payload, decrypted and checked against what was signed for it. */
   byte[] payloadOf(ResultSet rows) throws SQLException {
-    byte[] plaintext = storageCodec.decode(rows.getBytes(Columns.PAYLOAD));
+    byte[] plaintext =
+        opened(
+            rows.getBytes(Columns.PAYLOAD),
+            "the payload stored for " + rows.getString(Columns.VALUE_ID));
     List<byte[]> facts = Signer.payloadFacts(rows.getString(Columns.VALUE_TYPE));
     faithful(rows, Signer.PAYLOAD, facts, plaintext, rows.getBytes(Columns.PAYLOAD_COMMITMENT));
     return plaintext;
@@ -129,10 +142,10 @@ final class Fields {
       throws SQLException {
     String id = rows.getString(Columns.VALUE_ID);
     MacAlgorithm algorithm = MacAlgorithm.named(rows.getString(Columns.MAC));
+    String root = rows.getString(Columns.ROOT_ID);
     if (algorithm == null
-        || !MessageDigest.isEqual(
-            signer.valueCommitment(
-                rows.getString(Columns.ROOT_ID), algorithm, id, field, facts, plaintext),
+        || !matches(
+            () -> signer.valueCommitment(root, algorithm, id, field, facts, plaintext),
             committed)) {
       throw new StorageIntegrityException(
           "the " + field + " stored for " + id + " is not what was signed for it");
@@ -144,9 +157,98 @@ final class Fields {
     return plaintext == null ? null : storageCodec.encode(plaintext);
   }
 
-  /** Back out of the pipeline, keeping an absent field absent. */
-  byte[] decrypted(byte[] ciphertext) {
-    return ciphertext == null ? null : storageCodec.decode(ciphertext);
+  /**
+   * Out of the pipeline, or a refusal that says which kind.
+   *
+   * <p>Bytes that are not a frame this store writes are somebody else's, so that is tampering. A
+   * frame that will not decrypt is only unreadable: a destroyed key looks exactly like a damaged
+   * ciphertext, and only whoever manages the keys can tell them apart.
+   */
+  byte[] opened(byte[] ciphertext, String what) {
+    try {
+      return storageCodec.decode(ciphertext);
+    } catch (VersionedFormatException _) {
+      throw new StorageIntegrityException(what + " is not a frame this store writes");
+    } catch (CodecException e) {
+      throw new StorageUnreadableException(what + " would not decrypt with the keys at hand", e);
+    }
+  }
+
+  /** The same, keeping an absent field absent. */
+  byte[] openedIfPresent(byte[] ciphertext, String what) {
+    return ciphertext == null ? null : opened(ciphertext, what);
+  }
+
+  /**
+   * Whether a commitment recomputes to what is stored.
+   *
+   * <p>False, never an exception, when it cannot be recomputed at all -- a root nobody supplies, or
+   * one too short to trust -- because that is a finding about the row, and letting it throw turned
+   * one rewritten root_id into a sweep that reported nothing for the whole store.
+   */
+  private static boolean matches(Supplier<byte[]> commitment, byte[] committed) {
+    try {
+      return MessageDigest.isEqual(commitment.get(), committed);
+    } catch (IllegalStateException _) {
+      return false;
+    }
+  }
+
+  /**
+   * The parent ids a row came with, from the correlated {@code parents} column every metadata query
+   * selects -- one round trip, where reading them separately was one more per row.
+   */
+  static List<String> parentsIn(ResultSet rows) throws SQLException {
+    Array parents = rows.getArray(PARENTS);
+    if (parents == null) {
+      return List.of();
+    }
+    return Arrays.stream((Object[]) parents.getArray()).map(String.class::cast).toList();
+  }
+
+  /** The column holding a row's parent ids, in order. */
+  static final String PARENTS = "parents";
+
+  /** Selects a value row's parent ids, in order, as {@link #PARENTS}; the row must be aliased v. */
+  static final String PARENTS_OF_V =
+      "(SELECT array_agg(parent_id ORDER BY position) FROM occlude_lineage l"
+          + " WHERE l.child_id = v.value_id) AS "
+          + PARENTS;
+
+  /**
+   * Refuses unless a row's digest still agrees with what it commits to and with its parents'
+   * digests.
+   *
+   * <p>For erasure, which must not trust the lineage it walks: a forged lineage row would let an
+   * erasure of one value take an unrelated one with it, and record that as lawful. The digest
+   * covers the parents, so a row given a parent it never had fails here. Needs the root and never a
+   * key, so erasing what a destroyed key protected is not blocked by it.
+   */
+  void requireSigned(ResultSet rows) throws SQLException {
+    String id = rows.getString(Columns.VALUE_ID);
+    Array stored = rows.getArray("parent_digests");
+    List<byte[]> parents =
+        stored == null
+            ? List.of()
+            : Arrays.stream((Object[]) stored.getArray()).map(byte[].class::cast).toList();
+    Optional<byte[]> computed =
+        parents.stream().anyMatch(Objects::isNull)
+            ? Optional.empty()
+            : signer.digestIfSigned(
+                rows.getString(Columns.ROOT_ID),
+                rows.getString(Columns.MAC),
+                id,
+                rows.getString(Columns.VALUE_TYPE),
+                new Signer.ValueCommitments(
+                    rows.getBytes(Columns.PAYLOAD_COMMITMENT),
+                    rows.getBytes(Columns.LABEL_COMMITMENT)),
+                rows.getString(Columns.DERIVATION),
+                parents);
+    if (computed.isEmpty()
+        || !MessageDigest.isEqual(computed.get(), rows.getBytes(Columns.DIGEST))) {
+      throw new StorageIntegrityException(
+          id + " is not what was signed for it, so nothing that reaches it may be erased");
+    }
   }
 
   /** A line's protected fields, decrypted and checked against the commitment signed for them. */
@@ -180,20 +282,19 @@ final class Fields {
    * @throws StorageIntegrityException if they are not what was signed for that line
    */
   Line lineOf(ResultSet rows) throws SQLException {
-    byte[] detail = decrypted(rows.getBytes(Columns.DETAIL));
-    byte[] label = decrypted(rows.getBytes(Columns.LABEL));
-    byte[] context = storageCodec.decode(rows.getBytes(Columns.CONTEXT));
+    String what = "line " + rows.getLong(Columns.ENTRY_ID) + " of the trail";
+    byte[] detail = openedIfPresent(rows.getBytes(Columns.DETAIL), what);
+    byte[] label = openedIfPresent(rows.getBytes(Columns.LABEL), what);
+    byte[] context = opened(rows.getBytes(Columns.CONTEXT), what);
     MacAlgorithm algorithm = MacAlgorithm.named(rows.getString(Columns.MAC));
+    String root = rows.getString(Columns.ROOT_ID);
+    byte[] previous = rows.getBytes("previous");
+    Instant recordedAt = rows.getTimestamp("recorded_at").toInstant();
     if (algorithm == null
-        || !MessageDigest.isEqual(
-            signer.lineCommitment(
-                rows.getString(Columns.ROOT_ID),
-                algorithm,
-                rows.getBytes("previous"),
-                rows.getTimestamp("recorded_at").toInstant(),
-                detail,
-                label,
-                context),
+        || !matches(
+            () ->
+                signer.lineCommitment(
+                    root, algorithm, previous, recordedAt, detail, label, context),
             rows.getBytes(Columns.COMMITMENT))) {
       throw new StorageIntegrityException(
           "line " + rows.getLong(Columns.ENTRY_ID) + " of the trail is not what was signed for it");
@@ -202,11 +303,11 @@ final class Fields {
   }
 
   /** One row's type, checked label and lineage. */
-  StoredMetadata metadataOf(Connection connection, ResultSet rows) throws SQLException {
+  StoredMetadata metadataOf(ResultSet rows) throws SQLException {
     String derivation = rows.getString(Columns.DERIVATION);
     // Read for every value, fresh ones included: a lineage row added to a value that has none would
     // otherwise go unchecked, and it decides what an erasure of its "parent" takes with it.
-    List<String> parents = parentsOf(connection, rows.getString(Columns.VALUE_ID));
+    List<String> parents = parentsIn(rows);
     Label label = labelOf(rows, parents);
     Lineage lineage =
         derivation == null ? Lineage.occluded() : Lineage.derivedFrom(parents, derivation);

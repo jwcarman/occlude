@@ -101,16 +101,18 @@ public final class JdbcStorage implements Storage {
       """;
 
   private static final String SELECT_METADATA =
-      "SELECT value_id, value_type, label, label_commitment, derivation, root_id, mac"
-          + " FROM occlude_value WHERE value_id = ?";
+      "SELECT value_id, value_type, label, label_commitment, derivation, root_id, mac, "
+          + Fields.PARENTS_OF_V
+          + " FROM occlude_value v WHERE value_id = ?";
 
   private static final String SELECT_PAYLOAD =
       "SELECT value_id, value_type, payload, payload_commitment, root_id, mac"
           + " FROM occlude_value WHERE value_id = ?";
 
   private static final String SELECT_METADATA_MANY =
-      "SELECT value_id, value_type, label, label_commitment, derivation, root_id, mac"
-          + " FROM occlude_value WHERE value_id = ANY (?)";
+      "SELECT value_id, value_type, label, label_commitment, derivation, root_id, mac, "
+          + Fields.PARENTS_OF_V
+          + " FROM occlude_value v WHERE value_id = ANY (?)";
 
   private static final String SELECT_PAYLOAD_MANY =
       "SELECT value_id, value_type, payload, payload_commitment, root_id, mac"
@@ -119,7 +121,29 @@ public final class JdbcStorage implements Storage {
   private static final String INSERT_PARENT =
       """
       INSERT INTO occlude_lineage (child_id, parent_id, position) VALUES (?, ?, ?)
-      ON CONFLICT (child_id, parent_id) DO NOTHING
+      """;
+
+  /**
+   * Every value an erasure of the given one would reach, with what its digest is checked against.
+   *
+   * <p>The same walk the delete makes, taken first and checked, because the walk follows the
+   * lineage table and a row forged into it would otherwise decide what the erasure destroys.
+   */
+  private static final String SELECT_REACHABLE =
+      """
+      WITH RECURSIVE reachable (value_id) AS (
+        SELECT CAST(? AS TEXT)
+        UNION
+        SELECT lineage.child_id
+          FROM occlude_lineage lineage
+          JOIN reachable ON lineage.parent_id = reachable.value_id
+      )
+      SELECT v.value_id, v.value_type, v.payload_commitment, v.label_commitment, v.derivation,
+             v.digest, v.root_id, v.mac,
+             (SELECT array_agg(p.digest ORDER BY l.position)
+                FROM occlude_lineage l LEFT JOIN occlude_value p ON p.value_id = l.parent_id
+               WHERE l.child_id = v.value_id) AS parent_digests
+        FROM occlude_value v WHERE v.value_id IN (SELECT value_id FROM reachable)
       """;
 
   /**
@@ -365,7 +389,7 @@ public final class JdbcStorage implements Storage {
         PreparedStatement statement = connection.prepareStatement(SELECT_METADATA)) {
       statement.setString(1, id);
       try (ResultSet rows = statement.executeQuery()) {
-        return rows.next() ? Optional.of(fields.metadataOf(connection, rows)) : Optional.empty();
+        return rows.next() ? Optional.of(fields.metadataOf(rows)) : Optional.empty();
       }
     } catch (SQLException e) {
       throw new IllegalStateException("could not read " + id, e);
@@ -383,7 +407,7 @@ public final class JdbcStorage implements Storage {
       Map<String, StoredMetadata> found = new LinkedHashMap<>();
       try (ResultSet rows = statement.executeQuery()) {
         while (rows.next()) {
-          found.put(rows.getString(Columns.VALUE_ID), fields.metadataOf(connection, rows));
+          found.put(rows.getString(Columns.VALUE_ID), fields.metadataOf(rows));
         }
       }
       return found;
@@ -448,6 +472,17 @@ public final class JdbcStorage implements Storage {
         "could not erase " + root,
         connection -> {
           Transactions.lockLineageExclusively(connection);
+          // Before anything is destroyed, and under the same lock: every value the walk reaches
+          // must still agree with its own digest, which covers its parents. One that does not was
+          // given a parent it never had, and the whole erasure is refused rather than widened.
+          try (PreparedStatement statement = connection.prepareStatement(SELECT_REACHABLE)) {
+            statement.setString(1, root);
+            try (ResultSet rows = statement.executeQuery()) {
+              while (rows.next()) {
+                fields.requireSigned(rows);
+              }
+            }
+          }
           List<String> removed = new ArrayList<>();
           // RETURNING, so the identities come back from the same statement that destroys them.
           // Selecting them first would be a second snapshot and a window to disagree with.

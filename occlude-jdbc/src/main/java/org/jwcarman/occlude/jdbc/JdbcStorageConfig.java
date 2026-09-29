@@ -123,6 +123,10 @@ public final class JdbcStorageConfig {
    * takes effect for what comes next without invalidating everything already stored. The same shape
    * the payload codec uses for its keys, and the id is signed as well, so two stores sharing a
    * secret still produce different digests.
+   *
+   * <p>Make the lookup a closed set: the ids you have issued, and nothing else. It is asked for
+   * whatever root id a stored row names, and anyone who can write the tables chooses that name -- a
+   * lookup that fetched any name it was given from a secret manager would fetch on their say-so.
    */
   public JdbcStorageConfig rootedIn(String id, Function<String, byte[]> roots) {
     this.rootId = Objects.requireNonNull(id, "a root needs a name");

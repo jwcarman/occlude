@@ -99,20 +99,30 @@ final class Erasing {
     // afterwards, a crash between the deletes and the lines leaves values destroyed that the
     // trail never says were destroyed, the chain still verifies, and erasing again finds nothing
     // to erase -- a permanent tamper alarm for something nobody did.
+    //
+    // Read through the trail too: a store checks what an erasure would reach before destroying
+    // it, and one that finds the lineage was forged refuses, which is worth a line of its own.
     List<String> removed =
-        storage.erase(
+        trail.reading(
+            AuditRecord.Operation.ERASE,
             root.id(),
-            id ->
-                trail.entry(
-                    AuditRecord.Operation.ERASE,
-                    id,
+            erasure.name(),
+            asking,
+            () ->
+                storage.erase(
                     root.id(),
-                    AuditRecord.Outcome.ALLOWED,
-                    Why.of("erased"),
-                    // The root's label, on the root's own line: whose data this erasure was about.
-                    // A descendant's label is not in hand, and guessing it would be worse.
-                    id.equals(root.id()) ? entry.label() : null,
-                    asking));
+                    id ->
+                        trail.entry(
+                            AuditRecord.Operation.ERASE,
+                            id,
+                            root.id(),
+                            AuditRecord.Outcome.ALLOWED,
+                            Why.of("erased"),
+                            // The root's label, on the root's own line: whose data this erasure
+                            // was about. A descendant's label is not in hand, and guessing it
+                            // would be worse.
+                            id.equals(root.id()) ? entry.label() : null,
+                            asking)));
     return new Erased.Removed(removed.size());
   }
 }

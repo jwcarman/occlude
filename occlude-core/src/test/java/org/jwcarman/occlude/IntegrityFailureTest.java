@@ -47,6 +47,8 @@ class IntegrityFailureTest {
     private final MemoryStorage delegate = new MemoryStorage();
     private boolean metadataAltered;
     private boolean valuesAltered;
+    private boolean appendsFail;
+    private boolean valuesUnreadable;
 
     @Override
     public void put(String id, StoredValue value, AuditRecord entry) {
@@ -55,6 +57,9 @@ class IntegrityFailureTest {
 
     @Override
     public void append(AuditRecord entry) {
+      if (appendsFail) {
+        throw new IllegalStateException("the trail is unavailable");
+      }
       delegate.append(entry);
     }
 
@@ -68,6 +73,10 @@ class IntegrityFailureTest {
 
     @Override
     public <T> Optional<T> value(String id, TypeRef<T> type) {
+      if (valuesUnreadable) {
+        throw new StorageUnreadableException(
+            "the payload stored for " + id + " would not decrypt", null);
+      }
       if (valuesAltered) {
         throw new StorageIntegrityException("the payload stored for " + id + " is not as signed");
       }
@@ -159,6 +168,35 @@ class IntegrityFailureTest {
 
     assertThatThrownBy(() -> inspector.inspect(held)).isInstanceOf(StorageIntegrityException.class);
     assertRecorded(AuditRecord.Operation.INSPECT);
+  }
+
+  /** The finding is what matters; a record that could not be written must not replace it. */
+  @Test
+  @DisplayName("keeps the finding when the record of it cannot be written")
+  void keeps_the_finding_when_the_record_fails() {
+    storage.valuesAltered = true;
+    storage.appendsFail = true;
+
+    assertThatThrownBy(() -> mentions.ask(held, "hell"))
+        .isInstanceOf(StorageIntegrityException.class)
+        .satisfies(
+            thrown ->
+                assertThat(thrown.getSuppressed())
+                    .singleElement()
+                    .satisfies(
+                        suppressed ->
+                            assertThat(suppressed).hasMessage("the trail is unavailable")));
+  }
+
+  /** Unreadable is its own finding, recorded as such. */
+  @Test
+  @DisplayName("a read that will not decrypt is recorded as unreadable")
+  void an_unreadable_read_is_recorded() {
+    storage.valuesUnreadable = true;
+
+    assertThatThrownBy(() -> desk.reveal(held)).isInstanceOf(StorageUnreadableException.class);
+    assertThat(storage.delegate.audit(AuditRecord.Operation.REVEAL))
+        .anySatisfy(line -> assertThat(line.reason()).contains("UNREADABLE"));
   }
 
   @Test

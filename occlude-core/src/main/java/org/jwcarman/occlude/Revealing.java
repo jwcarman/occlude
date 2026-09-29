@@ -15,6 +15,7 @@
  */
 package org.jwcarman.occlude;
 
+import java.util.Optional;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Label;
 
@@ -23,7 +24,9 @@ import org.jwcarman.occlude.lattice.Label;
  *
  * <p>The order below is the contract: a value not held, then a ceiling that cannot be evaluated,
  * then the ceiling itself -- and <b>only then</b> the type. A reader who may not see a value must
- * not learn what kind of value it is. Audit, then decode.
+ * not learn what kind of value it is. Then the value is read, and only once it is in hand is the
+ * reveal recorded as allowed and handed over: a read that the store refuses is recorded as the
+ * refusal it is, never as an allowed reveal that did not happen.
  */
 final class Revealing {
 
@@ -100,6 +103,26 @@ final class Revealing {
           entry.label(),
           context);
     }
+    // The type was confirmed against what the store wrote, so this decodes a verified fact.
+    Optional<T> value =
+        trail.reading(
+            AuditRecord.Operation.REVEAL,
+            held.id(),
+            to,
+            context,
+            () -> storage.value(held.id(), expected.type()));
+    if (value.isEmpty()) {
+      // Erased between the metadata and the value.
+      return denied(
+          Revealed.Reason.NO_SUCH_VALUE,
+          Gate.NOT_HOLDING + held.id(),
+          null,
+          held.id(),
+          to,
+          entry.label(),
+          context);
+    }
+    // Recorded before it is handed over, and only once it is in hand.
     trail.audit(
         AuditRecord.Operation.REVEAL,
         held.id(),
@@ -108,18 +131,7 @@ final class Revealing {
         Why.nothing(),
         entry.label(),
         context);
-    // The type was confirmed against what the store wrote, so this decodes a verified fact.
-    return trail
-        .reading(
-            AuditRecord.Operation.REVEAL,
-            held.id(),
-            to,
-            context,
-            () -> storage.value(held.id(), expected.type()))
-        .<Revealed<T>>map(Revealed.Allowed::new)
-        .orElseGet(
-            () ->
-                new Revealed.Denied<>(Revealed.Reason.NO_SUCH_VALUE, Gate.NOT_HOLDING + held.id()));
+    return new Revealed.Allowed<>(value.get());
   }
 
   private <T> Revealed<T> denied(

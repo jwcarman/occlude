@@ -33,9 +33,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import javax.sql.DataSource;
-import org.jwcarman.codec.CodecException;
-import org.jwcarman.codec.versioned.VersionedFormatException;
 import org.jwcarman.occlude.StorageIntegrityException;
+import org.jwcarman.occlude.StorageUnreadableException;
 
 /**
  * Whether what a store holds still agrees with what it signed: the trail, the value graph, and the
@@ -71,19 +70,19 @@ final class Verification {
               connection.prepareStatement(
                   """
                   SELECT value_id, value_type, derivation, payload, label, payload_commitment,
-                         label_commitment, root_id, mac
-                    FROM occlude_value ORDER BY value_id
+                         label_commitment, root_id, mac,
+                         (SELECT array_agg(parent_id ORDER BY position) FROM occlude_lineage l
+                           WHERE l.child_id = v.value_id) AS parents
+                    FROM occlude_value v ORDER BY value_id
                   """);
           ResultSet rows = statement.executeQuery()) {
         while (rows.next()) {
-          String id = rows.getString(Columns.VALUE_ID);
-          Finding finding =
-              check(
-                  () -> {
-                    fields.payloadOf(rows);
-                    fields.labelPlaintextOf(rows, Fields.parentsOf(connection, id));
-                  });
-          finding.file(id, alteredValues, unreadableValues);
+          // Each field on its own: an unreadable payload must not hide an altered label beside it.
+          Finding payload = check(() -> fields.payloadOf(rows));
+          Finding label = check(() -> fields.labelPlaintextOf(rows, Fields.parentsIn(rows)));
+          payload
+              .worst(label)
+              .file(rows.getString(Columns.VALUE_ID), alteredValues, unreadableValues);
         }
       }
       try (PreparedStatement statement =
@@ -111,11 +110,16 @@ final class Verification {
     void run() throws SQLException;
   }
 
-  /** What checking one row found. */
+  /** What checking one row found, most serious last. */
   private enum Finding {
     FAITHFUL,
-    ALTERED,
-    UNREADABLE;
+    UNREADABLE,
+    ALTERED;
+
+    /** The more serious of two findings about one row. */
+    Finding worst(Finding other) {
+      return compareTo(other) >= 0 ? this : other;
+    }
 
     <K> void file(K key, List<K> altered, List<K> unreadable) {
       if (this == ALTERED) {
@@ -127,19 +131,17 @@ final class Verification {
   }
 
   /**
-   * Whether a row's fields are what was signed for them.
-   *
-   * <p>Altered when they decrypt and fail their commitment, or are not a frame this store writes.
-   * Unreadable when they will not decrypt -- which a destroyed key and a damaged ciphertext both
-   * look like -- or were written by a pipeline newer than this one.
+   * Whether a row's fields are what was signed for them, as the store itself judged it: altered
+   * when they fail their commitment or are not a frame it writes, unreadable when they will not
+   * decrypt with the keys at hand.
    */
   private static Finding check(RowCheck check) throws SQLException {
     try {
       check.run();
       return Finding.FAITHFUL;
-    } catch (StorageIntegrityException | VersionedFormatException _) {
+    } catch (StorageIntegrityException _) {
       return Finding.ALTERED;
-    } catch (CodecException _) {
+    } catch (StorageUnreadableException _) {
       return Finding.UNREADABLE;
     }
   }
