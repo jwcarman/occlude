@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.crypto.DataKeyProvider;
 import org.jwcarman.codec.crypto.JceDataKeyProvider;
 import org.jwcarman.occlude.Charter;
+import org.jwcarman.occlude.jdbc.AuditTrail;
 import org.jwcarman.occlude.jdbc.JdbcStorage;
 import org.jwcarman.occlude.jdbc.StorageIntegrity;
 import org.jwcarman.occlude.lattice.Axes;
@@ -152,6 +153,37 @@ class JdbcCharterAutoConfigurationTest {
     @Bean
     Object snoop(Storage storage) {
       return storage;
+    }
+  }
+
+  /** The trail discloses every label and identity, so it is asked for by name or not at all. */
+  @Test
+  @DisplayName("offers the audit trail by name, and to nothing that asks for it by type")
+  void offers_the_trail_only_by_name() {
+    runner
+        .withUserConfiguration(AnApplication.class)
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              assertThat(context.getBean(JdbcCharterAutoConfiguration.AUDIT_TRAIL))
+                  .isInstanceOf(AuditTrail.class);
+            });
+    runner
+        .withUserConfiguration(AnApplication.class, ATrailSnoop.class)
+        .run(
+            context ->
+                assertThat(context)
+                    .getFailure()
+                    .hasRootCauseInstanceOf(NoSuchBeanDefinitionException.class)
+                    .hasStackTraceContaining(AuditTrail.class.getName()));
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class ATrailSnoop {
+
+    @Bean
+    Object snoop(AuditTrail trail) {
+      return trail;
     }
   }
 

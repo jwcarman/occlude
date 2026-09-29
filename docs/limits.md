@@ -72,8 +72,8 @@ alert on.
 
 *Who* asked is not. The access context is whatever the application put in it — a tenant, an
 email address, a token — so it is encrypted like a label, and counting per caller means decrypting
-it. There is no API for reading the trail back yet; until there is, keep a per-caller count where
-the caller is known, at the edge.
+it: `storage.trail()` reads lines back decrypted and checked, for an investigation. For alerting in
+real time, keep a per-caller count where the caller is known, at the edge.
 
 If the asker is a loop rather than a person, put the limit where the loop is.
 

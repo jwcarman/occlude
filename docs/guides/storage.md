@@ -186,6 +186,20 @@ report.unreadable();   // something would not decrypt with the keys at hand
 report.head();         // write it down somewhere this database cannot reach
 ```
 
+To investigate, read the trail back. Every line is decrypted — its label, who was asking — and
+checked against its digest and commitment before it is returned:
+
+```java
+AuditTrail trail = storage.trail();
+trail.about(held.id());                  // what happened to one value
+trail.between(yesterday, today);         // a window of time
+trail.after(lastSeen, 500);              // the whole trail, a page at a time
+```
+
+It discloses every label and identity in the record, so it is an authority to hand to
+investigation code and nothing else; the Spring starter registers it as `occludeAuditTrail`, by name
+only. Whether lines are missing is a question about the whole chain, which `check()` answers.
+
 In Spring Boot, `occlude.integrity.interval` runs that check on a schedule — see
 [Spring Boot](spring-boot.md#observability). See also [The Record](../concepts/the-record.md).
 

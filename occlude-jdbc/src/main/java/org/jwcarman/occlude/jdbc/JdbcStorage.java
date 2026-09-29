@@ -166,6 +166,7 @@ public final class JdbcStorage implements Storage {
   private final Verification verification;
   private final Reencryption reencryption;
   private final Resigning resigning;
+  private final AuditTrail trail;
 
   private JdbcStorage(
       DataSource dataSource,
@@ -182,6 +183,7 @@ public final class JdbcStorage implements Storage {
     this.verification = new Verification(dataSource, signer, fields);
     this.reencryption = new Reencryption(transactions, fields);
     this.resigning = new Resigning(transactions, signer, fields);
+    this.trail = new AuditTrail(dataSource, signer, fields);
   }
 
   /** Creates the tables if they are not there. */
@@ -508,6 +510,16 @@ public final class JdbcStorage implements Storage {
     } catch (IOException e) {
       throw new IllegalStateException("could not read " + resource, e);
     }
+  }
+
+  /**
+   * The trail, read back and checked, for whoever investigates.
+   *
+   * <p>An authority in its own right: it discloses every line's label and who was asking, across
+   * every value. Hand it to investigation code and nothing else.
+   */
+  public AuditTrail trail() {
+    return trail;
   }
 
   /**

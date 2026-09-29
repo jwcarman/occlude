@@ -86,8 +86,11 @@ Storage storage() {
 }
 ```
 
-What operating the JDBC store needs -- `sweep()`, `reencrypt()`, the trail's `head()` for anchoring
--- is published as a `StorageIntegrity` bean, which reads no value. Operations code takes that.
+What operating the JDBC store needs -- `sweep()`, `reencrypt()`, `resign()`, the trail's `head()` for
+anchoring -- is published as a `StorageIntegrity` bean, which reads no value. Operations code takes
+that. The trail read back for an investigation, `AuditTrail`, discloses every label and identity, so
+it is registered like the store: ask for it with
+`@Qualifier(JdbcCharterAutoConfiguration.AUDIT_TRAIL)`.
 
 ```yaml
 occlude:

@@ -16,6 +16,7 @@
 
 package org.jwcarman.occlude.jdbc;
 
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.Array;
 import java.sql.Connection;
@@ -81,6 +82,16 @@ final class Fields {
   /** A map of strings -- a label, an access context -- as the plaintext that is committed to. */
   byte[] serialisedMap(Map<String, String> map) {
     return stringMaps.encode(map);
+  }
+
+  /** A map serialised by {@link #serialisedMap}, back. */
+  Map<String, String> mapOf(byte[] serialised) {
+    return stringMaps.decode(serialised);
+  }
+
+  /** Text a line stored as UTF-8. */
+  static String text(byte[] utf8) {
+    return new String(utf8, StandardCharsets.UTF_8);
   }
 
   /** Through the pipeline. */

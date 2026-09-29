@@ -28,6 +28,7 @@ import org.jwcarman.codec.crypto.DataKeyProvider;
 import org.jwcarman.codec.crypto.JceDataKeyProvider;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.occlude.Charter;
+import org.jwcarman.occlude.jdbc.AuditTrail;
 import org.jwcarman.occlude.jdbc.JdbcStorage;
 import org.jwcarman.occlude.jdbc.JdbcStorageConfig;
 import org.jwcarman.occlude.jdbc.MacAlgorithm;
@@ -70,6 +71,9 @@ import tools.jackson.databind.json.JsonMapper;
     afterName = "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration")
 @ConditionalOnClass({JdbcStorage.class, DataSource.class})
 public class JdbcCharterAutoConfiguration {
+
+  /** The name the audit trail is registered, and found, under. */
+  public static final String AUDIT_TRAIL = "occludeAuditTrail";
 
   /** How values are serialised, before they are encrypted. */
   @Bean
@@ -163,6 +167,20 @@ public class JdbcCharterAutoConfiguration {
     public StorageIntegrity storageIntegrity(
         @Qualifier(CharterAutoConfiguration.STORAGE) JdbcStorage storage) {
       return storage.integrity();
+    }
+
+    /**
+     * The trail read back, for investigation code.
+     *
+     * <p>Registered like the store: by name, and no candidate for injection by type. It discloses
+     * every line's label and who was asking, across every value -- an authority to be asked for
+     * deliberately, with {@code @Qualifier(JdbcCharterAutoConfiguration.AUDIT_TRAIL)}, never one a
+     * bean acquires by naming a type in its constructor.
+     */
+    @Bean(name = AUDIT_TRAIL, defaultCandidate = false)
+    public AuditTrail occludeAuditTrail(
+        @Qualifier(CharterAutoConfiguration.STORAGE) JdbcStorage storage) {
+      return storage.trail();
     }
 
     /**
