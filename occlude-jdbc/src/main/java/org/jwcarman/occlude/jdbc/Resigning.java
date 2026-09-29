@@ -305,8 +305,7 @@ final class Resigning {
     if (first == null) {
       return 0;
     }
-    byte[] before = digestBefore(connection, first);
-    Chain chain = new Chain(before, before);
+    Walk walk = new Walk(digestBefore(connection, first));
     int resigned = 0;
     long from = first;
     try (PreparedStatement select = connection.prepareStatement(LINES);
@@ -319,7 +318,7 @@ final class Resigning {
           while (rows.next()) {
             read++;
             from = rows.getLong(Columns.ENTRY_ID) + 1;
-            chain = resignLine(rows, update, chain);
+            resignLine(rows, update, walk);
             resigned++;
           }
         }
@@ -331,26 +330,22 @@ final class Resigning {
   }
 
   /**
-   * Where the chain stood before the line being re-signed: as it was, and as it now is.
-   *
-   * <p>A class rather than a record: it is carried from line to line and never compared, and a
-   * record's generated equality would compare its arrays by identity.
+   * The chain as the walk moves along it: where it stood before the line being re-signed, as it was
+   * and as it now is. Advanced once per line, so the next line is checked against its old
+   * predecessor and signed after its new one.
    */
-  private static final class Chain {
-    private final byte[] was;
-    private final byte[] now;
+  private static final class Walk {
+    private byte[] was;
+    private byte[] now;
 
-    private Chain(byte[] was, byte[] now) {
-      this.was = was;
-      this.now = now;
+    private Walk(byte[] before) {
+      this.was = before;
+      this.now = before;
     }
 
-    byte[] was() {
-      return was;
-    }
-
-    byte[] now() {
-      return now;
+    private void advance(byte[] stored, byte[] resigned) {
+      this.was = stored;
+      this.now = resigned;
     }
   }
 
@@ -379,8 +374,7 @@ final class Resigning {
     }
   }
 
-  private Chain resignLine(ResultSet rows, PreparedStatement update, Chain chain)
-      throws SQLException {
+  private void resignLine(ResultSet rows, PreparedStatement update, Walk walk) throws SQLException {
     long entry = rows.getLong(Columns.ENTRY_ID);
     byte[] previous = rows.getBytes("previous");
     Instant recordedAt = rows.getTimestamp("recorded_at").toInstant();
@@ -393,7 +387,7 @@ final class Resigning {
             rows.getString("reason"));
     byte[] storedDigest = rows.getBytes(Columns.DIGEST);
     Optional<byte[]> expected =
-        Arrays.equals(previous, chain.was())
+        Arrays.equals(previous, walk.was)
             ? signer.lineDigestIfSigned(
                 rows.getString(Columns.ROOT_ID),
                 rows.getString(Columns.MAC),
@@ -413,21 +407,20 @@ final class Resigning {
         signer.lineCommitment(
             signer.rootId(),
             signer.mac(),
-            chain.now(),
+            walk.now,
             recordedAt,
             line.detail(),
             line.label(),
             line.context());
     byte[] digest =
-        signer.lineDigest(
-            signer.rootId(), signer.mac(), chain.now(), recordedAt, facts, commitment);
-    update.setBytes(1, chain.now());
+        signer.lineDigest(signer.rootId(), signer.mac(), walk.now, recordedAt, facts, commitment);
+    update.setBytes(1, walk.now);
     update.setBytes(2, commitment);
     update.setBytes(3, digest);
     update.setString(4, signer.rootId());
     update.setString(5, signer.mac().jcaName());
     update.setLong(6, entry);
     update.executeUpdate();
-    return new Chain(storedDigest, digest);
+    walk.advance(storedDigest, digest);
   }
 }

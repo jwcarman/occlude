@@ -154,8 +154,9 @@ class AuditTrailTest {
   @DisplayName("refuses a line whose clear-text facts somebody changed")
   void refuses_changed_facts() throws SQLException {
     execute("UPDATE occlude_audit SET outcome = 'ALLOWED' WHERE outcome = 'REFUSED'");
+    String id = held.id();
 
-    assertThatThrownBy(() -> trail.about(held.id()))
+    assertThatThrownBy(() -> trail.about(id))
         .isInstanceOf(StorageIntegrityException.class)
         .hasMessageContaining("of the trail");
   }
