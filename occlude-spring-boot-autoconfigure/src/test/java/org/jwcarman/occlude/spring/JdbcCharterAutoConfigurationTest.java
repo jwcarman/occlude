@@ -43,6 +43,7 @@ import org.springframework.boot.micrometer.observation.autoconfigure.Observation
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 import org.testcontainers.junit.jupiter.Container;
@@ -182,6 +183,22 @@ class JdbcCharterAutoConfigurationTest {
               assertThat(context).hasSingleBean(IntegrityMonitor.class);
               assertThat(context.getBean(IntegrityMonitor.class).isRunning()).isTrue();
             });
+  }
+
+  /**
+   * The store commits every act on its own. Handed Spring's transaction-aware proxy it would be
+   * given the application's transaction and commit it early, so it is given what the proxy wraps.
+   */
+  @Test
+  @DisplayName("builds the store on what a transaction-aware data source wraps, never the proxy")
+  void builds_the_store_outside_any_transaction() {
+    DataSource raw = new EmbeddedDatabaseBuilder().setType(EmbeddedDatabaseType.H2).build();
+
+    assertThat(
+            JdbcCharterAutoConfiguration.outsideAnyTransaction(
+                new TransactionAwareDataSourceProxy(new TransactionAwareDataSourceProxy(raw))))
+        .isSameAs(raw);
+    assertThat(JdbcCharterAutoConfiguration.outsideAnyTransaction(raw)).isSameAs(raw);
   }
 
   /**

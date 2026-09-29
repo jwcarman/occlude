@@ -53,6 +53,9 @@ final class Transactions {
   void inTransaction(String what, SqlWork work) {
     try (Connection connection = dataSource.getConnection()) {
       boolean autoCommit = connection.getAutoCommit();
+      if (!autoCommit) {
+        refuseSomebodyElsesTransaction(connection);
+      }
       int isolation = connection.getTransactionIsolation();
       connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
       connection.setAutoCommit(false);
@@ -75,6 +78,34 @@ final class Transactions {
     } catch (SQLException e) {
       throw new IllegalStateException(what, e);
     }
+  }
+
+  /**
+   * Refuses a connection handed over in the middle of somebody else's transaction.
+   *
+   * <p>Every act is its own transaction, committed before it returns: the record is evidence of
+   * what happened, and must not roll back with whatever the caller does next. A data source that
+   * hands out the connection of a transaction already open -- a transaction-aware proxy, a pool
+   * returning a connection its last user left mid-transaction -- would have this commit that
+   * transaction's work early. A pool configured with auto-commit off is ordinary, so off alone
+   * proves nothing; a transaction that has already written does, and is refused.
+   */
+  private static void refuseSomebodyElsesTransaction(Connection connection) throws SQLException {
+    try (PreparedStatement statement =
+            connection.prepareStatement("SELECT pg_current_xact_id_if_assigned() IS NOT NULL");
+        ResultSet rows = statement.executeQuery()) {
+      rows.next();
+      if (rows.getBoolean(1)) {
+        throw new IllegalStateException(
+            "the data source handed over a connection with somebody else's transaction in"
+                + " progress. occlude commits every act on its own, so it would have committed"
+                + " that work early; give it a plain DataSource, not one that hands out the"
+                + " current transaction's connection");
+      }
+    }
+    // Asking opened a transaction of its own, and nothing in it has written, so ending it undoes
+    // nothing -- and lets the isolation level be set for the act that follows.
+    connection.rollback();
   }
 
   /** The same, for a write that has something to report back. */

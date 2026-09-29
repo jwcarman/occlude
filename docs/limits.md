@@ -114,8 +114,10 @@ nothing in the application refers to. It is encrypted, harmless, and erasable. I
 must never keep one, record the reference in the same place as the rest of its work and erase what
 a rolled-back transaction left behind.
 
-Give the store a plain `DataSource`, as Spring Boot's is. One wrapped to hand out the connection of
-the transaction already open on the thread would have the store commit that transaction early.
+The store is never handed the caller's transaction by accident either. The Spring starter builds it
+on what a transaction-aware `DataSource` proxy wraps, never on the proxy; and a connection that
+arrives in the middle of a transaction that has already written is refused, loudly, rather than
+committed early.
 
 ## Every operation costs round trips, and the record is serial
 

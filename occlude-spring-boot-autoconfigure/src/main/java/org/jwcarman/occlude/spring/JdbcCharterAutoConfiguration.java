@@ -40,6 +40,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -142,7 +143,7 @@ public class JdbcCharterAutoConfiguration {
       }
       JdbcStorageConfig jdbc =
           new JdbcStorageConfig()
-              .dataSource(dataSource)
+              .dataSource(outsideAnyTransaction(dataSource))
               .codecs(codecs)
               .encryptedWith(keys)
               .rootedIn(roots.getCurrent(), secrets::get)
@@ -193,6 +194,21 @@ public class JdbcCharterAutoConfiguration {
                           + "'; it must be one of "
                           + Arrays.toString(MacAlgorithm.values())));
     }
+  }
+
+  /**
+   * The data source itself, never one that hands out the current transaction's connection.
+   *
+   * <p>Every act the store performs commits on its own, because the record must outlive whatever
+   * the application's transaction does next. Given Spring's transaction-aware proxy, the store
+   * would be handed the application's transaction instead, and commit its work early.
+   */
+  static DataSource outsideAnyTransaction(DataSource dataSource) {
+    DataSource unwrapped = dataSource;
+    while (unwrapped instanceof TransactionAwareDataSourceProxy proxy) {
+      unwrapped = proxy.getTargetDataSource();
+    }
+    return unwrapped;
   }
 
   /** Base64, and a message naming which entry was not, rather than a bare decoder exception. */
