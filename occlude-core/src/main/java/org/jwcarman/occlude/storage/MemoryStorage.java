@@ -42,7 +42,9 @@ import org.jwcarman.codec.TypeRef;
 public final class MemoryStorage implements Storage {
 
   /** Creates an empty store. */
-  public MemoryStorage() {}
+  public MemoryStorage() {
+    // Its collections start empty where they are declared.
+  }
 
   private final List<AuditRecord> audit = Collections.synchronizedList(new ArrayList<>());
 
