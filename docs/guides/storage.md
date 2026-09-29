@@ -42,11 +42,28 @@ otherwise, which made its record forgeable by anyone who could write its tables.
 each row, so rotating a root does not invalidate what was written under the last one — supply both
 and old rows still verify.
 
-**Rotating a root is not yet retiring one.** A new root signs what comes next; every row keeps the
-root it was signed under, and verifying it needs that root for as long as the row exists. Nothing
-re-signs old rows under a new root yet, so a root that has leaked leaves what it signed forgeable by
-whoever holds it: choose roots to be long-lived, keep them where the database cannot reach, and treat
-a leaked one as an incident to recover from by exporting and re-importing. Re-signing is planned.
+**Retiring a root is re-signing.** A new root signs what comes next, and every row keeps the root it
+was signed under until it is re-signed:
+
+```java
+JdbcStorage storage = new JdbcStorageConfig()
+    // ...
+    .rootedIn("prod-2027", id -> roots.get(id))   // the new root current, the old still supplied
+    .storage(axes);
+
+Resigned resigned = storage.resign();             // or storage.integrity().resign()
+publish(resigned.after());                        // anchors to the old head no longer hold
+```
+
+Once `resign()` returns nothing is signed under the old root, so drop it from the lookup and destroy
+it. Every value and line is checked under the root it was signed with before it is signed again, so
+something altered is refused rather than laundered, and one refusal leaves the whole store as it
+was: the run is a single transaction holding both locks, and every write waits for it. Two things to
+know before running it. Every stored field must decrypt, because what is signed is a commitment to
+the plaintext — a key you have destroyed stops the run, naming the row. And every anchor published
+before it stops holding, because the lines it names now carry new digests: keep `before` with the
+old anchors and publish `after`. The same run moves everything to a new signing algorithm when only
+`signedWith(...)` changed.
 
 **The secret is not in the database.** That is the whole point: an unkeyed chain catches a careless
 edit and nothing else, because whoever removed a line could recompute everything after it. A row

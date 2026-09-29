@@ -109,7 +109,14 @@ outage, unrecorded, like a database that is down); a manifest ran the applicatio
 holding the charter's lock (it now renders from a copy); and Spring's no-identity default went unsaid
 (it now logs a warning). It confirmed the package split made nothing public that was not already.
 
-Still open: re-signing under a new root (a root, unlike a key, cannot yet be retired). Deferred past 0.1: it rewrites the whole chain and invalidates every published anchor, and deserves its own design. The storage guide states the limitation.
+Re-signing under a new root landed afterwards as `JdbcStorage.resign()`. Both signed structures
+chain -- a value's digest covers its parents', a line's covers its predecessor's -- so re-signing a
+value re-signs everything derived from it, parents first, and re-signing a line re-signs every line
+after it. Each row is checked against its parents' and predecessor's digests as they were, under the
+root it was signed with, before it is signed again; the whole run is one transaction holding both
+locks, so one refusal leaves the store as it was and nothing is laundered. Ciphertext is untouched,
+so every field must decrypt for its commitment to be made again, and published anchors stop holding:
+the result carries the head before and after.
 
 ## Also phase 2
 

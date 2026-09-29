@@ -165,6 +165,7 @@ public final class JdbcStorage implements Storage {
   private final Fields fields;
   private final Verification verification;
   private final Reencryption reencryption;
+  private final Resigning resigning;
 
   private JdbcStorage(
       DataSource dataSource,
@@ -180,6 +181,7 @@ public final class JdbcStorage implements Storage {
     this.fields = new Fields(codecs, storageCodec, axes, signer);
     this.verification = new Verification(dataSource, signer, fields);
     this.reencryption = new Reencryption(transactions, fields);
+    this.resigning = new Resigning(transactions, signer, fields);
   }
 
   /** Creates the tables if they are not there. */
@@ -615,6 +617,28 @@ public final class JdbcStorage implements Storage {
    */
   public int reencrypt() {
     return reencryption.reencrypt();
+  }
+
+  /**
+   * Re-signs everything this store holds under its current root and MAC, which is what makes an old
+   * root retirable.
+   *
+   * <p>Make the new root current with {@link JdbcStorageConfig#rootedIn}, still supplying the old
+   * one, and run this; once it returns, nothing is signed under the old root and it can be dropped
+   * from the lookup and destroyed. Every value and line is checked under the root it was signed
+   * with before it is signed again, so something altered is refused rather than laundered -- and
+   * one refusal leaves the whole store as it was, because the run is a single transaction holding
+   * both locks, and every write waits for it.
+   *
+   * <p>What is signed is a commitment to the plaintext, so every stored field must decrypt: a key
+   * that has been destroyed stops the run, naming the row. Published anchors stop holding, because
+   * the lines they name now carry new digests; the result carries the head before and after, so the
+   * new one can be published beside the old.
+   *
+   * @return what was re-signed, and the head before and after
+   */
+  public Resigned resign() {
+    return resigning.resign();
   }
 
   /**

@@ -111,6 +111,16 @@ public final class StorageIntegrity {
   }
 
   /**
+   * Re-signs everything under the current root and MAC, which is what makes an old root retirable.
+   *
+   * @return what was re-signed, and the trail's head before and after
+   * @see JdbcStorage#resign()
+   */
+  public Resigned resign() {
+    return storage.resign();
+  }
+
+  /**
    * Re-encrypts everything under the current keys and pipeline, which is what makes a key
    * retirable.
    *
