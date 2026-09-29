@@ -183,6 +183,28 @@ class IntegrityMonitorTest {
     assertThat(messagesAt(Level.WARN)).anyMatch(message -> message.contains("could not decrypt 1"));
   }
 
+  /** The result is an observation whether or not anybody reads the log. */
+  @Test
+  @DisplayName("still records what it found with its log turned off")
+  void still_records_with_its_log_off() throws SQLException {
+    Level was = monitorLog.getLevel();
+    monitorLog.setLevel(Level.OFF);
+    try {
+      execute(
+          "UPDATE occlude_value SET payload = set_byte(payload, 40, get_byte(payload, 40) # 1)"
+              + " WHERE value_id = ?",
+          held.id());
+      monitor.check();
+      execute("UPDATE occlude_value SET value_type = 'forged' WHERE value_id = ?", held.id());
+      monitor.check();
+    } finally {
+      monitorLog.setLevel(was);
+    }
+
+    assertThat(results).containsExactly("unreadable", "altered");
+    assertThat(logged.list).isEmpty();
+  }
+
   @Test
   @DisplayName("records a run that could not finish as failed, and concludes nothing from it")
   void records_a_failed_run() {

@@ -107,7 +107,7 @@ public class IntegrityMonitor implements SmartLifecycle {
   }
 
   private static void logged(IntegrityReport report) {
-    if (!report.intact()) {
+    if (!report.intact() && log.isErrorEnabled()) {
       log.error(
           "occlude found its store altered: trail broken at line {}, {} value(s) not as signed, {}"
               + " missing, {} altered value(s), {} altered line(s). StorageIntegrity.check() names"
@@ -118,7 +118,7 @@ public class IntegrityMonitor implements SmartLifecycle {
           report.sweep().alteredValues().size(),
           report.sweep().alteredLines().size());
     }
-    if (report.unreadable()) {
+    if (report.unreadable() && log.isWarnEnabled()) {
       log.warn(
           "occlude could not decrypt {} value(s) and {} line(s) with the keys at hand: reconcile"
               + " them against the keys you destroyed, and treat the rest as altered",

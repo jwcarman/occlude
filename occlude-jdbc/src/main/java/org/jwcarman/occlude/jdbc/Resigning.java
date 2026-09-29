@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jwcarman.occlude.storage.StorageIntegrityException;
@@ -228,7 +229,7 @@ final class Resigning {
     }
     byte[] storedDigest = rows.getBytes(Columns.DIGEST);
     Optional<byte[]> expected =
-        was.stream().anyMatch(digest -> digest == null)
+        was.stream().anyMatch(Objects::isNull)
             ? Optional.empty()
             : signer.digestIfSigned(
                 rows.getString(Columns.ROOT_ID),
@@ -310,9 +311,9 @@ final class Resigning {
     long from = first;
     try (PreparedStatement select = connection.prepareStatement(LINES);
         PreparedStatement update = connection.prepareStatement(UPDATE_LINE)) {
+      select.setInt(2, PAGE);
       while (true) {
         select.setLong(1, from);
-        select.setInt(2, PAGE);
         int read = 0;
         try (ResultSet rows = select.executeQuery()) {
           while (rows.next()) {
@@ -329,8 +330,29 @@ final class Resigning {
     }
   }
 
-  /** Where the chain stood before the line being re-signed: as it was, and as it now is. */
-  private record Chain(byte[] was, byte[] now) {}
+  /**
+   * Where the chain stood before the line being re-signed: as it was, and as it now is.
+   *
+   * <p>A class rather than a record: it is carried from line to line and never compared, and a
+   * record's generated equality would compare its arrays by identity.
+   */
+  private static final class Chain {
+    private final byte[] was;
+    private final byte[] now;
+
+    private Chain(byte[] was, byte[] now) {
+      this.was = was;
+      this.now = now;
+    }
+
+    byte[] was() {
+      return was;
+    }
+
+    byte[] now() {
+      return now;
+    }
+  }
 
   private Long firstStaleLine(Connection connection) throws SQLException {
     try (PreparedStatement statement =

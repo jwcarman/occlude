@@ -58,7 +58,7 @@ final class Observing {
       AuditRecord.Operation operation,
       String portal,
       Supplier<R> work,
-      BiConsumer<OccludeObservationContext, R> settle) {
+      BiConsumer<OccludeObservationContext, ? super R> settle) {
     OccludeObservationContext context = new OccludeObservationContext(operation, portal);
     Observation observation =
         OccludeObservationDocumentation.OPERATION.observation(
@@ -87,10 +87,11 @@ final class Observing {
     }
   }
 
-  /** Nothing to add: an operation that returned is allowed unless its result says otherwise. */
-  static <R> void returned(OccludeObservationContext context, R result) {
-    // The context starts out allowed.
-  }
+  /**
+   * Nothing to add: an operation that returned is allowed, which is how the context starts out. For
+   * an operation whose result carries no refusal -- an occlude either returns or throws.
+   */
+  static final BiConsumer<OccludeObservationContext, Object> RETURNED = (context, result) -> {};
 
   static void revealed(OccludeObservationContext context, Revealed<?> result) {
     if (result instanceof Revealed.Denied<?> denied) {

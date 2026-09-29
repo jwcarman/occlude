@@ -46,7 +46,7 @@ final class SourcePortal<T> implements Occlude<T> {
             AuditRecord.Operation.CONCEAL,
             name,
             () -> operations.occluding().occlude(name, type, labelling, value),
-            Observing::returned);
+            Observing.RETURNED);
   }
 
   @Override

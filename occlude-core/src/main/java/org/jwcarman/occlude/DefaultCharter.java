@@ -46,6 +46,8 @@ import org.jwcarman.occlude.manifest.Manifest;
  */
 public final class DefaultCharter implements Charter {
 
+  private static final String A_SINK_NEEDS_A_CEILING = "a sink needs a ceiling";
+
   private final Axes axes;
   private final Declarations declarations = new Declarations();
   private final Operations operations = new Operations();
@@ -175,7 +177,7 @@ public final class DefaultCharter implements Charter {
   public Sink sink(
       String name, Function<AccessContext, Ceiling> ceiling, OccludedType<?>... reads) {
     Objects.requireNonNull(name, "a sink needs a name");
-    Objects.requireNonNull(ceiling, "a sink needs a ceiling");
+    Objects.requireNonNull(ceiling, A_SINK_NEEDS_A_CEILING);
     if (reads.length == 0) {
       throw new IllegalStateException(
           "'"
@@ -197,7 +199,7 @@ public final class DefaultCharter implements Charter {
   /** The same, for a ceiling that does not depend on who is asking. */
   @Override
   public Sink sink(String name, Ceiling ceiling, OccludedType<?>... reads) {
-    Objects.requireNonNull(ceiling, "a sink needs a ceiling");
+    Objects.requireNonNull(ceiling, A_SINK_NEEDS_A_CEILING);
     return sink(name, context -> ceiling, reads);
   }
 
@@ -210,7 +212,7 @@ public final class DefaultCharter implements Charter {
 
   @Override
   public <T> Reveal<T> reveal(String name, Ceiling ceiling, OccludedType<T> type) {
-    Objects.requireNonNull(ceiling, "a sink needs a ceiling");
+    Objects.requireNonNull(ceiling, A_SINK_NEEDS_A_CEILING);
     return reveal(name, context -> ceiling, type);
   }
 
