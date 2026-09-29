@@ -38,6 +38,10 @@ import org.jwcarman.codec.TypeRef;
  * charter sees every type that reaches a portal and refuses two of them wanting one name, so the
  * check does not depend on which you chose.
  *
+ * <p>A primitive is refused: declare {@code Integer}, not {@code int}. A stored value is an object,
+ * and the store checks each one against the class it was declared as, which no object is an
+ * instance of when that class is primitive.
+ *
  * <p>Holding one grants nothing -- it names a type, it does not open a door -- and a mismatched
  * pairing gains nothing either. A reader still only reaches names its sink declared and its store
  * recorded, so the worst a wrong pairing does is fail to decode something you could already read.
@@ -52,13 +56,17 @@ public record OccludedType<T>(String name, TypeRef<T> type) {
    * A type written down under this name.
    *
    * @param name what values of this type are written down as, never blank
-   * @param type how to decode one
+   * @param type how to decode one, never a primitive
    */
   public OccludedType {
     Objects.requireNonNull(name, "a type needs a name");
     Objects.requireNonNull(type, "a type needs to say how to decode one");
     if (name.isBlank()) {
       throw new IllegalArgumentException("a type's name cannot be blank");
+    }
+    if (type.rawClass().isPrimitive()) {
+      throw new IllegalArgumentException(
+          "'" + name + "' is declared as " + type.rawClass() + "; declare its wrapper instead");
     }
   }
 

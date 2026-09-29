@@ -59,6 +59,7 @@ import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.actuate.autoconfigure.endpoint.EndpointAutoConfiguration;
+import org.springframework.boot.actuate.endpoint.web.WebEndpointResponse;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.micrometer.observation.autoconfigure.ObservationAutoConfiguration;
@@ -360,21 +361,23 @@ class CharterAutoConfigurationTest {
               assertThat(entries(all, "sinks")).contains("reporting");
 
               // One section on its own.
-              assertThat(entries(endpoint.section("sources"), "sources")).contains("notes");
-              assertThat(endpoint.section("no-such-section")).isNull();
+              assertThat(entries(found(endpoint.section("sources")), "sources")).contains("notes");
+              assertThat(endpoint.section("no-such-section").getStatus())
+                  .isEqualTo(WebEndpointResponse.STATUS_NOT_FOUND);
 
               // Everything about the one type, and nothing about anything else.
-              Map<String, Object> note = endpoint.named("types", "note");
+              Map<String, Object> note = found(endpoint.named("types", "note"));
               assertThat(note).containsEntry("type", "note");
               assertThat(entries(note, "occludedBy")).contains("notes");
               assertThat(entries(note, "revealedAt")).contains("reporting");
 
               // One named declaration.
-              assertThat(endpoint.named("sources", "notes")).containsEntry("name", "notes");
-              assertThat(endpoint.named("sources", "no-such-door")).isNull();
+              assertThat(found(endpoint.named("sources", "notes"))).containsEntry("name", "notes");
+              assertThat(endpoint.named("sources", "no-such-door").getStatus())
+                  .isEqualTo(WebEndpointResponse.STATUS_NOT_FOUND);
 
               // A type nobody declared is answered, not refused.
-              Map<String, Object> nothing = endpoint.named("types", "no-such-type");
+              Map<String, Object> nothing = found(endpoint.named("types", "no-such-type"));
               assertThat(entries(nothing, "occludedBy")).isEmpty();
               assertThat(entries(nothing, "revealedAt")).isEmpty();
             });
@@ -406,17 +409,19 @@ class CharterAutoConfigurationTest {
           context -> {
             CharterEndpoint endpoint = context.getBean(CharterEndpoint.class);
 
-            assertThat(entries(endpoint.section("types"), "types"))
+            assertThat(entries(found(endpoint.section("types")), "types"))
                 .contains("note", "summary", "phantom");
-            assertThat(entries(endpoint.section("sinks"), "sinks"))
+            assertThat(entries(found(endpoint.section("sinks")), "sinks"))
                 .contains("reporting", "phantom-sink");
-            assertThat(entries(endpoint.section("derivations"), "derivations"))
+            assertThat(entries(found(endpoint.section("derivations")), "derivations"))
                 .contains("summarize");
-            assertThat(entries(endpoint.section("questions"), "questions")).contains("longer-than");
-            assertThat(entries(endpoint.section("erasures"), "erasures")).contains("compliance");
-            assertThat(entries(endpoint.section("inspections"), "inspections"))
+            assertThat(entries(found(endpoint.section("questions")), "questions"))
+                .contains("longer-than");
+            assertThat(entries(found(endpoint.section("erasures")), "erasures"))
+                .contains("compliance");
+            assertThat(entries(found(endpoint.section("inspections")), "inspections"))
                 .contains("support-desk");
-            assertThat(findingKinds(endpoint.section("findings"))).contains("no-writer");
+            assertThat(findingKinds(found(endpoint.section("findings")))).contains("no-writer");
           });
     }
 
@@ -427,18 +432,20 @@ class CharterAutoConfigurationTest {
           context -> {
             CharterEndpoint endpoint = context.getBean(CharterEndpoint.class);
 
-            assertThat(endpoint.named("sinks", "reporting")).containsEntry("name", "reporting");
-            assertThat(endpoint.named("derivations", "summarize"))
+            assertThat(found(endpoint.named("sinks", "reporting")))
+                .containsEntry("name", "reporting");
+            assertThat(found(endpoint.named("derivations", "summarize")))
                 .containsEntry("name", "summarize");
-            assertThat(endpoint.named("questions", "longer-than"))
+            assertThat(found(endpoint.named("questions", "longer-than")))
                 .containsEntry("name", "longer-than");
-            assertThat(endpoint.named("erasures", "compliance"))
+            assertThat(found(endpoint.named("erasures", "compliance")))
                 .containsEntry("name", "compliance");
-            assertThat(endpoint.named("inspections", "support-desk"))
+            assertThat(found(endpoint.named("inspections", "support-desk")))
                 .containsEntry("name", "support-desk");
 
             // A section this endpoint has never heard of, unlike an unmatched name within one.
-            assertThat(endpoint.named("no-such-section", "whatever")).isNull();
+            assertThat(endpoint.named("no-such-section", "whatever").getStatus())
+                .isEqualTo(WebEndpointResponse.STATUS_NOT_FOUND);
           });
     }
 
@@ -453,11 +460,11 @@ class CharterAutoConfigurationTest {
           context -> {
             CharterEndpoint endpoint = context.getBean(CharterEndpoint.class);
 
-            Map<String, Object> note = endpoint.named("types", "note");
+            Map<String, Object> note = found(endpoint.named("types", "note"));
             assertThat(entries(note, "readBy")).contains("summarize");
             assertThat(entries(note, "madeBy")).isEmpty();
 
-            Map<String, Object> summary = endpoint.named("types", "summary");
+            Map<String, Object> summary = found(endpoint.named("types", "summary"));
             assertThat(entries(summary, "madeBy")).contains("summarize");
             assertThat(entries(summary, "readBy")).isEmpty();
           });
@@ -471,7 +478,7 @@ class CharterAutoConfigurationTest {
           context -> {
             CharterEndpoint endpoint = context.getBean(CharterEndpoint.class);
 
-            Map<String, Object> phantom = endpoint.named("types", "phantom");
+            Map<String, Object> phantom = found(endpoint.named("types", "phantom"));
             assertThat(findingKinds(phantom)).contains("no-writer");
           });
     }
@@ -495,10 +502,15 @@ class CharterAutoConfigurationTest {
         .withUserConfiguration(AnApplication.class);
   }
 
-  @SuppressWarnings("unchecked")
   private static List<String> entries(Map<String, Object> report, String section) {
-    return ((List<Map<String, Object>>) report.get(section))
-        .stream().map(entry -> (String) entry.get("name")).toList();
+    List<?> entries = (List<?>) report.get(section);
+    return entries.stream().map(entry -> (String) ((Map<?, ?>) entry).get("name")).toList();
+  }
+
+  /** What an answer carried, having checked it was one. */
+  private static Map<String, Object> found(WebEndpointResponse<Map<String, Object>> response) {
+    assertThat(response.getStatus()).isEqualTo(WebEndpointResponse.STATUS_OK);
+    return response.getBody();
   }
 
   /** {@code findings} entries are shaped differently from every other section: no {@code name}. */

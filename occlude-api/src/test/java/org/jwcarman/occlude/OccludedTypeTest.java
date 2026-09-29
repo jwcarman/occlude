@@ -47,6 +47,15 @@ class OccludedTypeTest {
   }
 
   @Test
+  @DisplayName("refuses a primitive, naming the wrapper to declare instead")
+  void refuses_a_primitive() {
+    assertThatThrownBy(() -> OccludedType.of("count", int.class))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("'count'")
+        .hasMessageContaining("wrapper");
+  }
+
+  @Test
   @DisplayName("carries a generic container's TypeRef unchanged")
   void carries_a_generic_containers_type_ref() {
     TypeRef<List<String>> listOfStrings = TypeRef.listOf(TypeRef.of(String.class));

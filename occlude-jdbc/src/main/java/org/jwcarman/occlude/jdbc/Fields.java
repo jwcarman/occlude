@@ -62,7 +62,7 @@ final class Fields {
 
   private final Axes axes;
 
-  private final Map<String, Codec<?>> byType = new ConcurrentHashMap<>();
+  private final Map<String, Serialiser<?>> byType = new ConcurrentHashMap<>();
 
   private final Signer signer;
 
@@ -103,16 +103,35 @@ final class Fields {
     return storageCodec.encode(plaintext);
   }
 
-  @SuppressWarnings("unchecked")
+  /** A value as bytes, by the codec for the type it was declared as. */
   byte[] serialised(TypeRef<?> type, Object value) {
-    return ((Codec<Object>) serialiserFor(type)).encode(value);
+    return serialisedAs(type, value);
+  }
+
+  private <T> byte[] serialisedAs(TypeRef<T> type, Object value) {
+    return serialiserFor(type).encode(type.rawClass().cast(value));
   }
 
   /** How values of this type become bytes, before anything protects them. */
-  @SuppressWarnings("unchecked")
   <T> Codec<T> serialiserFor(TypeRef<T> type) {
-    return (Codec<T>)
-        byType.computeIfAbsent(type.getType().getTypeName(), name -> codecs.create(type));
+    return byType
+        .computeIfAbsent(
+            type.getType().getTypeName(),
+            name -> new Serialiser<>(type.rawClass(), codecs.create(type)))
+        .as(type.rawClass());
+  }
+
+  /**
+   * A cached codec and the class it was made for.
+   *
+   * <p>The cache holds codecs for every type, so what comes out of it is a codec of something. The
+   * class travels with it so taking one back out is a checked cast each way, not an unchecked one
+   * -- {@code OccludedType} refuses primitives, which no object is an instance of.
+   */
+  private record Serialiser<C>(Class<C> type, Codec<C> codec) {
+    <T> Codec<T> as(Class<T> wanted) {
+      return codec.xmap(wanted::cast, type::cast);
+    }
   }
 
   /**

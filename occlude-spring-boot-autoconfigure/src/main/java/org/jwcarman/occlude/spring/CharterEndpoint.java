@@ -25,9 +25,10 @@ import java.util.stream.StreamSupport;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.manifest.Manifest;
-import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 import org.springframework.boot.actuate.endpoint.annotation.Selector;
+import org.springframework.boot.actuate.endpoint.web.WebEndpointResponse;
+import org.springframework.boot.actuate.endpoint.web.annotation.WebEndpoint;
 
 /**
  * What this application's charter permits, explorable while it is running.
@@ -63,7 +64,7 @@ import org.springframework.boot.actuate.endpoint.annotation.Selector;
  * application's security posture, useful to somebody attacking it even though it discloses no data.
  * Treat it as you would {@code /actuator/beans}.
  */
-@Endpoint(id = "charter")
+@WebEndpoint(id = "charter")
 public class CharterEndpoint {
 
   private static final String TYPES = "types";
@@ -108,14 +109,14 @@ public class CharterEndpoint {
     return report;
   }
 
-  /** One section of it. */
-  // S1168 wants an empty map here. Null is Actuator's documented contract for a @ReadOperation:
-  // org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping
-  // maps a null return to HTTP 404. An empty map would answer a misspelled section with 200 and
-  // an empty body, which says the section exists and has nothing in it -- a worse answer.
-  @SuppressWarnings("java:S1168")
+  /**
+   * One section of it, or 404 for a section this endpoint does not have.
+   *
+   * <p>Not an empty map: that would answer a misspelled section with 200 and an empty body, which
+   * says the section exists and has nothing in it.
+   */
   @ReadOperation
-  public Map<String, Object> section(@Selector String section) {
+  public WebEndpointResponse<Map<String, Object>> section(@Selector String section) {
     Manifest manifest = charter.manifest();
     Map<String, Object> report = new LinkedHashMap<>();
     report.put("section", section);
@@ -129,10 +130,10 @@ public class CharterEndpoint {
       case INSPECTIONS -> report.put(INSPECTIONS, doors(manifest.inspections()));
       case FINDINGS -> report.put(FINDINGS, findings(manifest));
       default -> {
-        return null; // 404: this endpoint has no such section.
+        return notFound();
       }
     }
-    return report;
+    return new WebEndpointResponse<>(report);
   }
 
   /**
@@ -146,13 +147,9 @@ public class CharterEndpoint {
    * <p>A type nobody declared answers with empty lists rather than 404. That it is mentioned
    * nowhere is the answer, and a different fact from there being no such section.
    */
-  // S1168 wants an empty map here. Null is Actuator's documented contract for a @ReadOperation:
-  // a null return becomes HTTP 404. Both nulls below are that answer -- no such section, and no
-  // such declaration in a section that does exist. An empty map would turn a typo'd URL into a
-  // 200 with an empty body, which asserts the thing exists and is empty.
-  @SuppressWarnings("java:S1168")
   @ReadOperation
-  public Map<String, Object> named(@Selector String section, @Selector String name) {
+  public WebEndpointResponse<Map<String, Object>> named(
+      @Selector String section, @Selector String name) {
     Manifest manifest = charter.manifest();
     if (TYPES.equals(section)) {
       Manifest about = manifest.about(name);
@@ -168,7 +165,7 @@ public class CharterEndpoint {
           entries(about.derivations().stream().filter(e -> e.reads().contains(name)).toList()));
       report.put("askedAboutBy", entries(about.questions()));
       report.put(FINDINGS, findings(about));
-      return report;
+      return new WebEndpointResponse<>(report);
     }
     List<Manifest.Entry> in =
         switch (section) {
@@ -181,13 +178,23 @@ public class CharterEndpoint {
           default -> null;
         };
     if (in == null) {
-      return null;
+      return notFound();
     }
     return in.stream()
         .filter(entry -> entry.name().equals(name))
         .findFirst()
-        .map(CharterEndpoint::entry)
-        .orElse(null);
+        .map(entry -> new WebEndpointResponse<>(entry(entry)))
+        .orElseGet(CharterEndpoint::notFound);
+  }
+
+  /**
+   * No such section, or no such declaration in a section that does exist.
+   *
+   * <p>Not an empty map, for the reason {@link #section} gives: a typo'd URL must not answer 200
+   * with a body asserting the thing exists and is empty.
+   */
+  private static WebEndpointResponse<Map<String, Object>> notFound() {
+    return new WebEndpointResponse<>(WebEndpointResponse.STATUS_NOT_FOUND);
   }
 
   /** Every occluded type this charter mentions, and where it came up. */

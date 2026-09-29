@@ -86,7 +86,6 @@ import tools.jackson.databind.json.JsonMapper;
 class JdbcCharterTest {
 
   @Container
-  @SuppressWarnings("resource")
   static final PostgreSQLContainer POSTGRES =
       new PostgreSQLContainer("postgres:17-alpine")
           .withDatabaseName("store")
