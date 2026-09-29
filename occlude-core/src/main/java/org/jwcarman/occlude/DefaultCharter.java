@@ -126,14 +126,14 @@ public final class DefaultCharter implements Charter {
    * declaring thread wrote. Now a declaration either lands before binding, where the manifest sees
    * it, or is refused.
    */
-  private void declaring(Runnable record) {
+  private void declaring(Runnable recording) {
     synchronized (declarations) {
       if (operations.bound()) {
         throw new IllegalStateException(
             "nothing further can be declared: this charter has been bound, and an authority graph"
                 + " that can still grow is not one anybody can reason about");
       }
-      record.run();
+      recording.run();
     }
   }
 

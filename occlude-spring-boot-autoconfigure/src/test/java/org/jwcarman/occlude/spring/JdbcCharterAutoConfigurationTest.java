@@ -36,6 +36,7 @@ import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.storage.MemoryStorage;
 import org.jwcarman.occlude.storage.Storage;
 import org.postgresql.ds.PGSimpleDataSource;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -129,7 +130,7 @@ class JdbcCharterAutoConfigurationTest {
    * requests that all refuse.
    */
   @Test
-  @DisplayName("refuses to start without keys, and says how to supply them")
+  @DisplayName("refuses to start without keys")
   void refuses_to_start_without_keys() {
     new ApplicationContextRunner()
         .withConfiguration(
@@ -145,9 +146,8 @@ class JdbcCharterAutoConfigurationTest {
                 assertThat(context)
                     .hasFailed()
                     .getFailure()
-                    .rootCause()
-                    .hasMessageContaining("occlude.keys.current")
-                    .hasMessageContaining("DataKeyProvider"));
+                    .hasRootCauseInstanceOf(NoSuchBeanDefinitionException.class)
+                    .hasStackTraceContaining(DataKeyProvider.class.getName()));
   }
 
   /**

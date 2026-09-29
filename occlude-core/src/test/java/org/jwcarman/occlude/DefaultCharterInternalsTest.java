@@ -122,7 +122,7 @@ class DefaultCharterInternalsTest {
      */
     @Test
     @DisplayName("lists every declaration that won a race with binding, and refuses the rest")
-    void lists_every_declaration_that_won_the_race() throws Exception {
+    void lists_every_declaration_that_won_the_race() {
       DefaultCharter charter = new DefaultCharter(TENANT);
       List<String> declared = Collections.synchronizedList(new ArrayList<>());
       List<Throwable> unexpected = Collections.synchronizedList(new ArrayList<>());

@@ -31,7 +31,6 @@ import org.jwcarman.occlude.jdbc.JdbcStorage;
 import org.jwcarman.occlude.jdbc.JdbcStorageConfig;
 import org.jwcarman.occlude.jdbc.MacAlgorithm;
 import org.jwcarman.occlude.storage.Storage;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -98,9 +97,9 @@ public class JdbcCharterAutoConfiguration {
    * construct a charter and it does not bring one into force, so nothing here decides what an
    * application is allowed to do.
    *
-   * <p>It refuses to start without keys and a root rather than contributing nothing, because an
-   * application that put this module on its classpath meant to keep values in a database, and the
-   * alternative is every portal refusing at request time.
+   * <p>Keys are required, not looked for: without a {@link DataKeyProvider} -- the application's,
+   * or the one built from {@code occlude.keys.*} -- the application fails to start with Spring's
+   * own report of the missing bean. A root is required the same way.
    */
   @Bean
   @ConditionalOnBean(Charter.class)
@@ -109,15 +108,8 @@ public class JdbcCharterAutoConfiguration {
       Charter charter,
       DataSource dataSource,
       CodecFactory codecs,
-      ObjectProvider<DataKeyProvider> dataKeys,
+      DataKeyProvider keys,
       CharterProperties properties) {
-    DataKeyProvider keys = dataKeys.getIfAvailable();
-    if (keys == null) {
-      throw new IllegalStateException(
-          "occlude-jdbc encrypts everything it keeps and has no keys to do it with: set"
-              + " occlude.keys.current and occlude.keys.keks.<id>, or contribute a DataKeyProvider"
-              + " bean");
-    }
     CharterProperties.Roots roots = properties.getRoots();
     if (roots.getCurrent() == null) {
       throw new IllegalStateException(

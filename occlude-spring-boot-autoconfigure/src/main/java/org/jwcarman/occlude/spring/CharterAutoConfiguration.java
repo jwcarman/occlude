@@ -22,7 +22,6 @@ import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.storage.Storage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -83,34 +82,34 @@ public class CharterAutoConfiguration {
    * brought into force before one is used.
    *
    * <p>Identity is where an access comes from, not what this application allows, so it arrives with
-   * the storage rather than in the charter the application writes. An application that contributes
-   * no {@link AccessContextProvider} has no notion of identity, and every access is nobody in
-   * particular.
+   * the storage rather than in the charter the application writes.
+   *
+   * <p>Storage is required, not looked for: an application that declared a charter and supplies
+   * none fails to start, with Spring's own report of the missing bean, rather than serving requests
+   * that all refuse.
    */
   @Bean
+  @ConditionalOnBean(Axes.class)
   public SmartInitializingSingleton charterBinder(
-      ObjectProvider<Storage> storage,
-      ObjectProvider<AccessContextProvider> access,
-      CharterProperties properties) {
-    // ObjectProvider rather than Storage: storage is contributed by whichever module is on the
-    // classpath, and that auto-configuration runs after this one. A direct dependency would be
-    // evaluated before it exists and this bean would silently never match -- which it did, and the
-    // symptom was every portal refusing at request time because nothing had brought them into
-    // force.
+      Storage storage, AccessContextProvider access, CharterProperties properties) {
     return () -> {
       if (constituted == null) {
         return;
       }
-      Storage bindTo = storage.getIfAvailable();
-      if (bindTo == null) {
-        throw new IllegalStateException(
-            "this application declared a charter but nothing supplies storage for it: add a"
-                + " storage module, or contribute a Storage bean");
-      }
-      constituted.bind(bindTo, access.getIfAvailable(AccessContextProvider::none));
+      constituted.bind(storage, access);
       if (properties.isLogManifest()) {
         log.info("\n{}", constituted.manifest());
       }
     };
+  }
+
+  /**
+   * Nobody in particular, for an application with no notion of identity. Any {@link
+   * AccessContextProvider} the application contributes replaces it.
+   */
+  @Bean
+  @ConditionalOnMissingBean
+  public AccessContextProvider accessContextProvider() {
+    return AccessContextProvider.none();
   }
 }

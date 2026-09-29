@@ -93,8 +93,9 @@ Keys and roots come from the environment or a secret store, never a committed fi
 `DataKeyProvider` bean — a KMS, Vault — replaces the configured keys entirely. Without keys, or
 without a root, startup fails naming what is missing.
 
-If an application declares a charter and nothing supplies storage, startup fails with a message
-saying so. It used to carry on silently and every portal refused at request time instead.
+If an application declares a charter and nothing supplies storage -- or uses `occlude-jdbc` with no
+keys -- startup fails with Spring's report of the missing bean. It used to carry on silently and every
+portal refused at request time instead.
 
 ## The charter endpoint
 

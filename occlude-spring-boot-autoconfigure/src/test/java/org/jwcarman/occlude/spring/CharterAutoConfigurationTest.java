@@ -48,6 +48,7 @@ import org.jwcarman.occlude.lattice.Label;
 import org.jwcarman.occlude.storage.MemoryStorage;
 import org.jwcarman.occlude.storage.Storage;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.boot.actuate.autoconfigure.endpoint.EndpointAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -510,10 +511,12 @@ class CharterAutoConfigurationTest {
     }
   }
 
-  /** A charter with nowhere to keep anything is a bug worth a sentence, not a quiet no-op. */
+  /**
+   * A charter with nowhere to keep anything fails at startup, never as refusals at request time.
+   */
   @Test
-  @DisplayName("says so when an application declares a charter and supplies no storage")
-  void says_so_when_there_is_no_storage() {
+  @DisplayName("fails to start when an application declares a charter and supplies no storage")
+  void fails_to_start_without_storage() {
     new ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(CharterAutoConfiguration.class))
         .withUserConfiguration(NoStorage.class)
@@ -522,7 +525,8 @@ class CharterAutoConfigurationTest {
                 assertThat(context)
                     .hasFailed()
                     .getFailure()
-                    .hasMessageContaining("nothing supplies storage"));
+                    .hasRootCauseInstanceOf(NoSuchBeanDefinitionException.class)
+                    .hasStackTraceContaining(Storage.class.getName()));
   }
 
   @Configuration(proxyBeanMethods = false)

@@ -27,13 +27,13 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 class DemoProfileTest {
 
   @Test
-  @DisplayName("refuses to start, saying it has no keys, rather than running on committed secrets")
+  @DisplayName("refuses to start for want of keys, rather than running on committed secrets")
   void refuses_to_start_without_the_demo_profile() {
     SpringApplicationBuilder example =
         new SpringApplicationBuilder(BillingSupportApplication.class)
             .web(WebApplicationType.NONE)
             .properties("occlude.migrate=false", "spring.main.banner-mode=off");
 
-    assertThatThrownBy(example::run).hasStackTraceContaining("has no keys to do it with");
+    assertThatThrownBy(example::run).hasStackTraceContaining("DataKeyProvider");
   }
 }
