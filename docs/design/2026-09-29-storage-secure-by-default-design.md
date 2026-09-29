@@ -1,6 +1,6 @@
 # Storage, secure by default
 
-Status: phase 1 landed; phase 2 (crypto agility, row binding, padding) not started.
+Status: phase 1 landed; phase 2 (the record signed over plaintext commitments, algorithm agility, signed heads) agreed, not started.
 
 ## What prompted this
 
@@ -72,7 +72,7 @@ can change the whole pipeline. Two gaps are occlude's, and are phase 2:
 2. **Nothing retires a key.** Retiring one means re-encrypting what it protects (decode, then encode
    under the current version and key). A cheap re-wrap is impossible by design: `EnvelopeCodec`
    authenticates its whole header, wrapped key included, as GCM associated data. Re-encrypting audit
-   lines breaks the chain, which signs their encrypted bytes, so this needs its own decision.
+   lines breaks the chain, which signs their encrypted bytes; phase 2 below resolves it.
 
 ## Also phase 2
 
@@ -81,6 +81,30 @@ can change the whole pipeline. Two gaps are occlude's, and are phase 2:
   than wait for a digest check to notice.
 - **Length padding.** Ciphertext length tracks plaintext length. Padding to size buckets would hide
   it, and fits as a pipeline version 2.
+
+## Phase 2: the record, the standard way (agreed 2026-09-29)
+
+The trail and the value digests are signed over **ciphertext** today, which ties integrity to
+encryption: re-encrypting anything breaks the chain, so a key can never be retired. Established
+practice keeps the two layers apart — CloudTrail's log-file integrity validation signs digests of
+the log while storage encryption sits underneath it, and the tamper-evident logging literature
+(Schneier–Kelsey; Crosby–Wallach history trees; Certificate Transparency) signs the log's content,
+not its storage form. Occlude will do the same:
+
+- **Sign keyed commitments to the plaintext.** Each line and value stores `HMAC(root, canonical
+  plaintext)` for its encrypted fields, and the chain and value digests cover those commitments and
+  the clear columns, never ciphertext. Keyed, because an unkeyed hash of a small value — a role, a
+  last-4 — is brute-forced in moments.
+- **Encryption becomes freely replaceable.** A re-encryption job can decode and re-encode under the
+  current pipeline version and key, and every digest still verifies. That is what makes retiring a
+  key possible.
+- **Erasure by key destruction still works.** Commitments survive a destroyed key, so the chain still
+  verifies; only matching ciphertext to its commitment becomes impossible, which is the intent.
+- **The MAC algorithm is recorded with the root**, so a root is a secret and an algorithm, and moving
+  algorithms is a root rotation.
+- **Signed heads are published** for anchoring, closing the truncation gap the record already
+  documents: the head, signed, written somewhere the database cannot reach. Forward-secure key
+  evolution and Merkle-tree proofs are the natural next steps and are not in this phase.
 
 ## What changes
 
