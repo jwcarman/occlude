@@ -66,11 +66,8 @@ class AuditRecordTest {
             Optional.of("{tenant=acme}"),
             Map.of("tenant", "acme", "principal", "dana"));
 
-    assertThat(entry.toString())
-        .isEqualTo("REVEAL occ_1 -> vendor-llm REFUSED: ABOVE_CEILING")
-        .doesNotContain("acme")
-        .doesNotContain("dana");
-    assertThat(allowed(Map.of()).toString()).isEqualTo("REVEAL occ_1 -> vendor-llm ALLOWED");
+    assertThat(entry).hasToString("REVEAL occ_1 -> vendor-llm REFUSED: ABOVE_CEILING");
+    assertThat(allowed(Map.of())).hasToString("REVEAL occ_1 -> vendor-llm ALLOWED");
   }
 
   /** A line names who asked the way the edge said it, not in a hash order that varies by run. */

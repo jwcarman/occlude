@@ -73,6 +73,6 @@ class OccludedTravelTest {
   void prints_as_its_id_and_nothing_else() {
     String id = "occ_5d5a1f0e-4c71-4a2e-9f0a-2b1c3d4e5f60";
 
-    assertThat(Occluded.of(id).toString()).isEqualTo(id).doesNotContain("Card");
+    assertThat(Occluded.of(id)).hasToString(id);
   }
 }
