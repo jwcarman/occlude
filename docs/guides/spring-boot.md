@@ -174,10 +174,15 @@ It is still a map of your security posture. Protect it as you would `/actuator/b
 
 ## Logging the manifest at startup
 
+On by default: the manifest is printed as the charter is bound. Turn it off with
+
 ```yaml
 occlude:
-  log-manifest: true
+  log-manifest: false
 ```
 
-Prints the manifest as the charter is bound. Pair it with a build that renders one per
+It is rendered for nobody, since there is no request at startup, so a door whose ceiling reads the
+tenant prints `(could not decide for this access (it threw ...))` rather than what it accepts. The
+declarations, the weakening list and the findings are all still there, and those are what a log at
+startup is for. Pair it with a build that renders one per
 representative access and diffs it — see [Reviewing a Charter](reviewing.md).

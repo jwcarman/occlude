@@ -3,6 +3,38 @@
 A worked example: a support desk that reads customer emails, where the email body must never reach
 a vendor model and cardholder data must never reach any model.
 
+## 0. Add the dependencies
+
+Import the BOM once, and every Occlude module agrees on a version:
+
+```xml
+<dependencyManagement>
+  <dependencies>
+    <dependency>
+      <groupId>org.jwcarman.occlude</groupId>
+      <artifactId>occlude-bom</artifactId>
+      <version>0.1.0</version>
+      <type>pom</type>
+      <scope>import</scope>
+    </dependency>
+  </dependencies>
+</dependencyManagement>
+```
+
+Then one of three, depending on where you are:
+
+| You have | Add |
+|---|---|
+| Spring Boot and Postgres | `org.jwcarman.occlude:occlude-spring-boot-starter`, and the `org.postgresql:postgresql` driver |
+| Plain Java and Postgres | `org.jwcarman.occlude:occlude-jdbc`, `org.jwcarman.codec:codec-jackson`, and the Postgres driver |
+| Nothing yet, and want to try it | `org.jwcarman.occlude:occlude-core`, which includes `MemoryStorage` |
+
+Occlude does no cryptography or serialisation of its own. It uses
+[codec](https://github.com/jwcarman/codec) (`org.jwcarman.codec`), a small library that turns
+values into bytes and encrypts, signs and versions them. `occlude-jdbc` brings its encryption in
+transitively; `codec-jackson` is how values become bytes, and the Spring starter includes it. You
+will meet codec's `DataKeyProvider` when you supply keys — see [Storage](storage.md).
+
 ## 1. Say what you ask about values
 
 ```java
@@ -52,6 +84,14 @@ Reveal<Mail> vendorLlm = charter.sink("vendor-llm",
                   .with(SENSITIVITY, Constraint.atMost(ORDINARY)),
     MAIL).reading(MAIL);
 ```
+
+**The type's name is permanent.** `"mail"` is written beside every value and checked when one is
+read back, so it behaves like a schema version: renaming it orphans what is stored. Say it
+yourself, as above, for anything that should outlive a refactor. `OccludedType.of(Mail.class)`
+derives one from the class instead — `@OccludedName` if it has one, otherwise the kebab-cased
+simple name — which drops any enclosing type, so two nested `Invoice` records collide and are
+refused at startup. A container needs a name and a `TypeRef`:
+`OccludedType.of("cards", TypeRef.listOf(TypeRef.of(Card.class)))`.
 
 Erasing a value and reading its label are portals too, each declared with what decides it:
 

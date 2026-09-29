@@ -33,6 +33,21 @@ looked up**. There is no registry and no `charter.get("customer-mail")`. Code ca
 operation because something handed it the portal that performs it — so "what can this class do?" is
 answered by reading its constructor parameters.
 
+## Install
+
+```xml
+<dependency>
+  <groupId>org.jwcarman.occlude</groupId>
+  <artifactId>occlude-spring-boot-starter</artifactId>
+  <version>0.1.0</version>
+</dependency>
+```
+
+That is the Spring Boot path; add a Postgres driver beside it. Plain Java, the BOM, and trying it
+in memory are in [Getting Started](https://jwcarman.github.io/occlude/guides/getting-started/).
+Occlude's encryption and serialisation come from [codec](https://github.com/jwcarman/codec), a
+small library it depends on.
+
 ## Read the docs
 
 The [documentation site](https://jwcarman.github.io/occlude/) is the manual: concepts, guides, and
@@ -247,6 +262,10 @@ on what its plaintext says — the side channel CRIME and BREACH exploit — and
 no size to save that is worth it.
 
 A `MemoryStorage` exists for tests and for proving a policy before a database is involved.
+
+The store is for the charter, not for your code: it hands over any value it holds with no ceiling
+asked and no line written. Operations code — sweeps, re-encryption, anchoring — takes
+`storage.integrity()`, which reads no value.
 
 ## Spring Boot
 

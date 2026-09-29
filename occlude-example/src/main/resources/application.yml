@@ -17,7 +17,3 @@ management:
     web:
       exposure:
         include: charter
-
-logging:
-  level:
-    org.jwcarman.occlude.example.billing.OccludeConfiguration: INFO

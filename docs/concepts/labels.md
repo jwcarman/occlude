@@ -111,3 +111,41 @@ those rows *unreadable* rather than universally readable.
     A ladder's bottom usually means something — `ORDINARY` is a real sensitivity, not a gap. A
     matching axis is the case where bottom and "nobody said" look identical, which is what
     `required()` exists for.
+
+## Isolating tenants
+
+Occlude has no idea what a tenant is, and does not need one. Multi-tenancy is one thing an
+application can build out of an axis, and the pieces are all above. Put together:
+
+**Declare the axis, and require it.**
+
+```java
+public static final Axis<String> TENANT = Axis.matching("tenant").required();
+```
+
+Matching, because two tenants are simply different. Required, because this is the axis isolation
+rests on, and an unanswered matching axis is readable by everyone. Leaving `required()` off is a
+legitimate choice for an axis that genuinely may go unsaid — it is just not this one. Nothing warns
+you, because whether a gap is a mistake is yours to know.
+
+**Say it at every door from ambient identity, never from the caller.**
+
+```java
+Occlude<Invoice> invoices = charter.source("invoices", INVOICE,
+    ctx -> Label.of(TENANT, ctx.get("tenant").orElseThrow()));
+
+charter.sink("billing-ui", ctx -> Ceiling.of(TENANT,
+    Constraint.atMost(ctx.get("tenant").orElseThrow())), INVOICE);
+```
+
+The tenant arrives through the `AccessContextProvider` given at binding, which reads it from
+wherever the request established it. A call site cannot pass one, so code holding a portal cannot
+name itself somebody else's tenant.
+
+**Decide what happens with no tenant.** A batch job or a message consumer may run with nothing in
+context. With `orElseThrow()` above, a source refuses and a door accepts nothing, which is usually
+right. Something that genuinely acts for every tenant is declared as its own door, with
+`Constraint.any()` on the axis, where a reviewer will see it in the manifest.
+
+**Let the lattice do the rest.** A value derived from two tenants' data carries a mixture, and no
+ceiling admits a mixture. Isolation across derivations is not a rule to remember.

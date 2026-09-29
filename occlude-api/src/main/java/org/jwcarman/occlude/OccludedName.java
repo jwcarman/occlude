@@ -23,18 +23,18 @@ import java.lang.annotation.Target;
 /**
  * The name values of this type are stored under.
  *
- * <p>Optional. Without it the configured naming strategy decides, which by default is the
- * kebab-cased simple name -- {@code DisputeClaim} becomes {@code dispute-claim}. With it, this wins
- * over the strategy, and an explicit name passed to {@code type(...)} wins over both.
+ * <p>Optional, and read by {@link OccludedType#of(Class)}. Without it that uses the kebab-cased
+ * simple name -- {@code DisputeClaim} becomes {@code dispute-claim}. With it, this wins; and a name
+ * passed explicitly to {@link OccludedType#of(String, Class)} wins over both.
  *
  * <p><b>Whatever it says is permanent.</b> The name is written beside every value of this type and
  * compared when one is read back, so changing it orphans everything already stored. It reads like a
  * label and behaves like a schema version. If you expect the shape to change, say so here from the
  * start: {@code @OccludedName("billing.invoice/v1")}.
  *
- * <p>This is the one annotation this library offers, and taking it is a choice: a custom {@link
- * org.jwcarman.occlude.NamingStrategy} can read an annotation of your own instead, and then nothing
- * of ours appears in your domain model.
+ * <p>This is the one annotation this library offers, and taking it is a choice: name every type
+ * explicitly with {@link OccludedType#of(String, Class)} instead, and nothing of ours appears in
+ * your domain model.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
