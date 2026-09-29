@@ -25,6 +25,7 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.time.Instant;
+import java.util.List;
 import java.util.logging.Logger;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
@@ -110,6 +111,20 @@ class JdbcStorageWhiteboxTest {
   private Object newValueRow(
       byte[] digest, byte[] payload, byte[] label, String derivation, String type, String rootId)
       throws ReflectiveOperationException {
+    return newValueRow(
+        digest, payload, label, derivation, type, rootId, "HmacSHA256", List.of("parent"));
+  }
+
+  private Object newValueRow(
+      byte[] digest,
+      byte[] payload,
+      byte[] label,
+      String derivation,
+      String type,
+      String rootId,
+      String mac,
+      List<String> parents)
+      throws ReflectiveOperationException {
     Class<?> commitmentsType = Class.forName("org.jwcarman.occlude.jdbc.Signer$ValueCommitments");
     Constructor<?> commitments = commitmentsType.getDeclaredConstructor(byte[].class, byte[].class);
     commitments.setAccessible(true);
@@ -121,10 +136,11 @@ class JdbcStorageWhiteboxTest {
                 String.class,
                 String.class,
                 String.class,
-                String.class);
+                String.class,
+                List.class);
     ctor.setAccessible(true);
     return ctor.newInstance(
-        digest, commitments.newInstance(payload, label), derivation, type, rootId, "HmacSHA256");
+        digest, commitments.newInstance(payload, label), derivation, type, rootId, mac, parents);
   }
 
   private Object aValueRow() throws ReflectiveOperationException {
@@ -252,29 +268,34 @@ class JdbcStorageWhiteboxTest {
   @DisplayName("a value row is unequal to one signed with a different MAC")
   void value_row_is_unequal_when_the_mac_differs() throws ReflectiveOperationException {
     Object baseline = aValueRow();
-    Class<?> commitmentsType = Class.forName("org.jwcarman.occlude.jdbc.Signer$ValueCommitments");
-    Constructor<?> commitments = commitmentsType.getDeclaredConstructor(byte[].class, byte[].class);
-    commitments.setAccessible(true);
-    Constructor<?> ctor =
-        Class.forName("org.jwcarman.occlude.jdbc.Verification$ValueRow")
-            .getDeclaredConstructor(
-                byte[].class,
-                commitmentsType,
-                String.class,
-                String.class,
-                String.class,
-                String.class);
-    ctor.setAccessible(true);
     Object differs =
-        ctor.newInstance(
+        newValueRow(
             "digest".getBytes(StandardCharsets.UTF_8),
-            commitments.newInstance(
-                "payload".getBytes(StandardCharsets.UTF_8),
-                "label".getBytes(StandardCharsets.UTF_8)),
+            "payload".getBytes(StandardCharsets.UTF_8),
+            "label".getBytes(StandardCharsets.UTF_8),
             "Card.last4",
             "card",
             "r1",
-            "HmacSHA512");
+            "HmacSHA512",
+            List.of("parent"));
+
+    assertThat(baseline).isNotEqualTo(differs);
+  }
+
+  @Test
+  @DisplayName("a value row is unequal to one made from other parents")
+  void value_row_is_unequal_when_the_parents_differ() throws ReflectiveOperationException {
+    Object baseline = aValueRow();
+    Object differs =
+        newValueRow(
+            "digest".getBytes(StandardCharsets.UTF_8),
+            "payload".getBytes(StandardCharsets.UTF_8),
+            "label".getBytes(StandardCharsets.UTF_8),
+            "Card.last4",
+            "card",
+            "r1",
+            "HmacSHA256",
+            List.of("another"));
 
     assertThat(baseline).isNotEqualTo(differs);
   }

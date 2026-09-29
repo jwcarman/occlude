@@ -91,6 +91,13 @@ ids, with the head at INFO so shipping that line somewhere the database cannot r
 Off unless set: a check reads and decrypts every row. A run that cannot finish is `failed`, and
 concludes nothing either way.
 
+What a run costs grows with the store. It streams, so memory stays flat however many rows there
+are, but it scans the values three times and the trail twice, and decrypts every field. Size the
+interval to that — hourly or daily for a large store, not every minute as the example's demo
+profile does — and set it on one instance: every instance with the property runs its own full
+check. A check only reads, so it can equally point at a replica. Reads are protected between runs
+regardless: a value that was tampered with is refused whenever anybody reads it.
+
 There is deliberately no health indicator. Health drives liveness and readiness probes, and an
 orchestrator restarting every instance because somebody edited one row turns a finding into an
 outage. Tampering is a page, not a restart.

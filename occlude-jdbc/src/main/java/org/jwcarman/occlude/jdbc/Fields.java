@@ -19,12 +19,9 @@ package org.jwcarman.occlude.jdbc;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.Array;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -359,21 +356,5 @@ final class Fields {
     Lineage lineage =
         derivation == null ? Lineage.occluded() : Lineage.derivedFrom(parents, derivation);
     return new StoredMetadata(rows.getString(Columns.VALUE_TYPE), label, lineage);
-  }
-
-  private static final String SELECT_PARENTS =
-      "SELECT parent_id FROM occlude_lineage WHERE child_id = ? ORDER BY position";
-
-  static List<String> parentsOf(Connection connection, String id) throws SQLException {
-    List<String> parents = new ArrayList<>();
-    try (PreparedStatement statement = connection.prepareStatement(SELECT_PARENTS)) {
-      statement.setString(1, id);
-      try (ResultSet rows = statement.executeQuery()) {
-        while (rows.next()) {
-          parents.add(rows.getString("parent_id"));
-        }
-      }
-    }
-    return parents;
   }
 }

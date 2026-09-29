@@ -43,14 +43,34 @@ import org.jwcarman.occlude.storage.StorageUnreadableException;
  */
 final class Verification {
 
+  /** How many rows a scan holds at a time. */
+  static final int SCAN_FETCH = 500;
+
   private final DataSource dataSource;
+  private final Transactions transactions;
   private final Signer signer;
   private final Fields fields;
 
   Verification(DataSource dataSource, Signer signer, Fields fields) {
     this.dataSource = dataSource;
+    this.transactions = new Transactions(dataSource);
     this.signer = signer;
     this.fields = fields;
+  }
+
+  /**
+   * A statement over a whole table, streamed rather than held.
+   *
+   * <p>PostgreSQL's driver reads a result set into memory entire unless it has a fetch size and
+   * runs inside a transaction, so every scan here is both: prepared through this, on a connection
+   * from {@link Transactions#inTransactionReturning}. Unstreamed, the check that exists to notice
+   * tampering was the thing that ran a large store's application out of heap -- the sweep reads
+   * every ciphertext the store holds.
+   */
+  private static PreparedStatement streamed(Connection connection, String sql) throws SQLException {
+    PreparedStatement statement = connection.prepareStatement(sql);
+    statement.setFetchSize(SCAN_FETCH);
+    return statement;
   }
 
   /**
@@ -61,47 +81,49 @@ final class Verification {
    * This reads everything, which needs the keys.
    */
   Sweep sweep() {
+    return transactions.inTransactionReturning("could not sweep the store", this::sweep);
+  }
+
+  private Sweep sweep(Connection connection) throws SQLException {
     List<String> alteredValues = new ArrayList<>();
     List<String> unreadableValues = new ArrayList<>();
     List<Long> alteredLines = new ArrayList<>();
     List<Long> unreadableLines = new ArrayList<>();
-    try (Connection connection = dataSource.getConnection()) {
-      try (PreparedStatement statement =
-              connection.prepareStatement(
-                  """
+    try (PreparedStatement statement =
+            streamed(
+                connection,
+                """
                   SELECT value_id, value_type, derivation, payload, label, payload_commitment,
                          label_commitment, root_id, mac,
                          (SELECT array_agg(parent_id ORDER BY position) FROM occlude_lineage l
                            WHERE l.child_id = v.value_id) AS parents
                     FROM occlude_value v ORDER BY value_id
                   """);
-          ResultSet rows = statement.executeQuery()) {
-        while (rows.next()) {
-          // Each field on its own: an unreadable payload must not hide an altered label beside it.
-          Finding payload = check(() -> fields.payloadOf(rows));
-          Finding label = check(() -> fields.labelPlaintextOf(rows, Fields.parentsIn(rows)));
-          payload
-              .worst(label)
-              .file(rows.getString(Columns.VALUE_ID), alteredValues, unreadableValues);
-        }
+        ResultSet rows = statement.executeQuery()) {
+      while (rows.next()) {
+        // Each field on its own: an unreadable payload must not hide an altered label beside it.
+        Finding payload = check(() -> fields.payloadOf(rows));
+        Finding label = check(() -> fields.labelPlaintextOf(rows, Fields.parentsIn(rows)));
+        payload
+            .worst(label)
+            .file(rows.getString(Columns.VALUE_ID), alteredValues, unreadableValues);
       }
-      try (PreparedStatement statement =
-              connection.prepareStatement(
-                  """
-                  SELECT entry_id, recorded_at, previous, detail, label, context, commitment,
-                         root_id, mac
-                    FROM occlude_audit ORDER BY entry_id
-                  """);
-          ResultSet rows = statement.executeQuery()) {
-        while (rows.next()) {
-          check(() -> fields.lineOf(rows))
-              .file(rows.getLong(Columns.ENTRY_ID), alteredLines, unreadableLines);
-        }
-      }
-      return new Sweep(alteredValues, unreadableValues, alteredLines, unreadableLines);
-    } catch (SQLException e) {
-      throw new IllegalStateException("could not sweep the store", e);
     }
+    try (PreparedStatement statement =
+            streamed(
+                connection,
+                """
+                SELECT entry_id, recorded_at, previous, detail, label, context, commitment,
+                       root_id, mac
+                  FROM occlude_audit ORDER BY entry_id
+                """);
+        ResultSet rows = statement.executeQuery()) {
+      while (rows.next()) {
+        check(() -> fields.lineOf(rows))
+            .file(rows.getLong(Columns.ENTRY_ID), alteredLines, unreadableLines);
+      }
+    }
+    return new Sweep(alteredValues, unreadableValues, alteredLines, unreadableLines);
   }
 
   /** A check over one row that reads the database, so it may throw what reading does. */
@@ -203,19 +225,21 @@ final class Verification {
    * @return the id of the first line that does not agree, or empty when the trail is intact
    */
   Optional<Long> firstBrokenEntry() {
-    try (Connection connection = dataSource.getConnection();
-        PreparedStatement statement =
-            connection.prepareStatement(
-                """
-                SELECT entry_id, recorded_at, operation, value_id, target, outcome, reason,
-                       previous, digest, root_id, commitment, mac
-                FROM occlude_audit ORDER BY entry_id
-                """);
-        ResultSet rows = statement.executeQuery()) {
-      return firstBrokenIn(rows);
-    } catch (SQLException e) {
-      throw new IllegalStateException("could not read the trail back", e);
-    }
+    return transactions.inTransactionReturning(
+        "could not read the trail back",
+        connection -> {
+          try (PreparedStatement statement =
+                  streamed(
+                      connection,
+                      """
+                      SELECT entry_id, recorded_at, operation, value_id, target, outcome, reason,
+                             previous, digest, root_id, commitment, mac
+                      FROM occlude_audit ORDER BY entry_id
+                      """);
+              ResultSet rows = statement.executeQuery()) {
+            return firstBrokenIn(rows);
+          }
+        });
   }
 
   /** The chain walk itself, over rows already selected in order. */
@@ -354,23 +378,30 @@ final class Verification {
    * what they were made from.
    */
   List<String> brokenValues() {
-    try (Connection connection = dataSource.getConnection();
-        PreparedStatement statement =
-            connection.prepareStatement(
-                "SELECT value_id, value_type, payload_commitment, label_commitment, digest,"
-                    + " root_id, mac, derivation FROM occlude_value ORDER BY value_id");
-        ResultSet rows = statement.executeQuery()) {
-      Map<String, ValueRow> byId = loadValueRows(rows);
-      List<String> broken = verifyToFixpoint(connection, byId);
-      broken.sort(Comparator.naturalOrder());
-      return broken;
-    } catch (SQLException e) {
-      throw new IllegalStateException("could not read the values back", e);
-    }
+    return transactions.inTransactionReturning(
+        "could not read the values back",
+        connection -> {
+          try (PreparedStatement statement =
+                  streamed(
+                      connection,
+                      "SELECT v.value_id, v.value_type, v.payload_commitment, v.label_commitment,"
+                          + " v.digest, v.root_id, v.mac, v.derivation, "
+                          + Fields.PARENTS_OF_V
+                          + " FROM occlude_value v ORDER BY v.value_id");
+              ResultSet rows = statement.executeQuery()) {
+            List<String> broken = verifyToFixpoint(loadValueRows(rows));
+            broken.sort(Comparator.naturalOrder());
+            return broken;
+          }
+        });
   }
 
   /**
    * One row of {@code occlude_value}, read once and passed around rather than re-queried.
+   *
+   * <p>Its parents come with it, from the same statement. They were asked for one value at a time,
+   * again on every pass of the fixpoint, which made the check a database round trip per value -- a
+   * million values, a million queries, every run.
    *
    * <p>Arrays compare by identity, so a record holding them gets an equals that answers "no" for
    * two rows carrying the same bytes. Nothing here compares one today; written out anyway, because
@@ -382,7 +413,8 @@ final class Verification {
       String derivation,
       String type,
       String rootId,
-      String mac) {
+      String mac,
+      List<String> parents) {
 
     @Override
     public boolean equals(Object other) {
@@ -394,18 +426,21 @@ final class Verification {
                   String otherDerivation,
                   String otherType,
                   String otherRootId,
-                  String otherMac)
+                  String otherMac,
+                  List<String> otherParents)
           && Arrays.equals(digest, otherDigest)
           && Objects.equals(commitments, otherCommitments)
           && Objects.equals(derivation, otherDerivation)
           && Objects.equals(type, otherType)
           && Objects.equals(rootId, otherRootId)
-          && Objects.equals(mac, otherMac);
+          && Objects.equals(mac, otherMac)
+          && Objects.equals(parents, otherParents);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(Arrays.hashCode(digest), commitments, derivation, type, rootId, mac);
+      return Objects.hash(
+          Arrays.hashCode(digest), commitments, derivation, type, rootId, mac, parents);
     }
 
     @Override
@@ -429,7 +464,8 @@ final class Verification {
               rows.getString(Columns.DERIVATION),
               rows.getString(Columns.VALUE_TYPE),
               rows.getString(Columns.ROOT_ID),
-              rows.getString(Columns.MAC)));
+              rows.getString(Columns.MAC),
+              Fields.parentsIn(rows)));
     }
     return byId;
   }
@@ -445,8 +481,7 @@ final class Verification {
    * <p>Each pass verifies whatever has become checkable. When a pass verifies nothing new, what is
    * left is genuinely unverifiable: broken, or descended from something broken or missing.
    */
-  List<String> verifyToFixpoint(Connection connection, Map<String, ValueRow> byId)
-      throws SQLException {
+  List<String> verifyToFixpoint(Map<String, ValueRow> byId) {
     Map<String, byte[]> seen = new LinkedHashMap<>();
     List<String> broken = new ArrayList<>();
     Set<String> unresolved = new LinkedHashSet<>(byId.keySet());
@@ -456,12 +491,12 @@ final class Verification {
       Iterator<String> remaining = unresolved.iterator();
       while (remaining.hasNext()) {
         String id = remaining.next();
-        Optional<List<byte[]>> checkable = checkableParents(connection, id, seen);
+        ValueRow row = byId.get(id);
+        Optional<List<byte[]>> checkable = checkableParents(row.parents(), seen);
         if (checkable.isEmpty()) {
           continue;
         }
         List<byte[]> parents = checkable.get();
-        ValueRow row = byId.get(id);
         Optional<byte[]> computed =
             signer.digestIfSigned(
                 row.rootId(),
@@ -494,10 +529,9 @@ final class Verification {
    * different answers and a value with no parents is the ordinary case: a freshly occluded value
    * has none and verifies on its own.
    */
-  Optional<List<byte[]>> checkableParents(
-      Connection connection, String id, Map<String, byte[]> seen) throws SQLException {
+  static Optional<List<byte[]>> checkableParents(List<String> parentIds, Map<String, byte[]> seen) {
     List<byte[]> parents = new ArrayList<>();
-    for (String parent : Fields.parentsOf(connection, id)) {
+    for (String parent : parentIds) {
       byte[] digest = seen.get(parent);
       if (digest == null) {
         return Optional.empty();
