@@ -7,8 +7,51 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing has been released yet. The public API is still moving, and identifiers, column names and
-digests have all changed more than once — a database written by one commit is not necessarily
-readable by the next. Migrations begin at the first release, not before.
+## [0.1.0] - 2026-09-29
 
-[Unreleased]: https://github.com/jwcarman/occlude/commits/main
+The first release. From here on the stored format -- the schema, the digests and the envelope -- is
+a baseline: a later release that changes any of it says so here and ships the way to move a store
+forward.
+
+### Added
+
+- **Occluded references.** `Occluded<T>` stands in for a sensitive value and discloses nothing but
+  its identifier; turning it back into a value is the one checked operation, and it always names
+  where the value is going.
+- **A lattice of labels and ceilings.** Values carry a label over the axes an application declares
+  (`Axis.matching` for identities, `Axis.ladder`
+  for ordered levels); every sink declares a ceiling. Derivation joins parents' labels,
+  so an ordinary derivation cannot weaken one, and the one operation that can lower a label is a
+  named, declared derivation.
+- **Portals as capabilities.** A `DefaultCharter` declares every door -- `Occlude`, `Reveal`,
+  `Derivation`, `Fold`, `Query`, `Erasure`, `Inspection` -- and hands each back as the object able to
+  perform it. There is no lookup by name. Binding the charter to storage and identity, once, is what
+  activates them.
+- **Sealed results.** `Revealed`, `Derived`, `Answer`, `Erased` and `Inspected` report a refusal as an
+  ordinary outcome with a reason code that names a rule and never a value; `orThrow()` for code that
+  cannot go on without it.
+- **A manifest.** Every declaration, readable at startup and pasted into a review, with findings for
+  what is provably unreachable.
+- **`occlude-jdbc`: storage in PostgreSQL.** Payloads, labels and protected audit fields encrypted
+  through codec's versioned envelope, with keys per tenant available through `keyedBy`. An
+  HMAC-chained audit trail, keyed digests over the value graph, and keyed commitments to every field,
+  all rooted in a secret the database does not hold.
+- **Integrity checking.** `StorageIntegrity.check()` verifies the trail, the value graph and every
+  ciphertext, and reports what is missing, unaccounted for, altered or unreadable; it streams, so a
+  large store checks in constant memory. `head()` and `stillHolds()` anchor the trail against
+  truncation; `reencrypt()` and `resign()` retire keys and roots. `AuditTrail` reads the record back.
+- **Observations.** Every operation is a Micrometer observation, `occlude.operation`, tagged with the
+  operation, portal, outcome, reason and error class -- never a value.
+- **Spring Boot.** `occlude-spring-boot-starter` configures storage and the charter from `occlude.*`
+  properties, schedules the integrity check with `occlude.integrity.interval`, and exposes the
+  manifest at `/actuator/charter`.
+- **`occlude-bom`** for aligning module versions.
+
+### Requirements
+
+- Java 25
+- PostgreSQL, for `occlude-jdbc`
+- Spring Boot 4.1, for the starter
+
+[Unreleased]: https://github.com/jwcarman/occlude/compare/0.1.0...HEAD
+[0.1.0]: https://github.com/jwcarman/occlude/releases/tag/0.1.0
