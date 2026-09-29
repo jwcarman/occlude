@@ -54,9 +54,4 @@ record DerivationSpec<O>(
   boolean privileged() {
     return relabel != null;
   }
-
-  /** What the parent in this position must be. A fold applies its one type to every parent. */
-  OccludedType<?> typeAt(int position) {
-    return fold ? inputTypes.getFirst() : inputTypes.get(position);
-  }
 }

@@ -94,10 +94,7 @@ final class Deriving {
           Derived.Reason.ABOVE_CEILING, "'" + id + Gate.COULD_NOT_SAY_WHAT_IT_ACCEPTS);
     }
 
-    List<String> parentIds = new ArrayList<>();
-    for (Occluded<?> parent : parents) {
-      parentIds.add(parent.id());
-    }
+    List<String> parentIds = parents.stream().map(Occluded::id).toList();
     Vetted<O> vetted = vetting(spec, parents, parentIds, ceiling, refused, because);
     if (vetted.refusal() != null) {
       return vetted.refusal();
@@ -186,7 +183,9 @@ final class Deriving {
     Label joined = null;
     for (int position = 0; position < parents.size(); position++) {
       Occluded<?> parent = parents.get(position);
-      OccludedType<?> expected = spec.typeAt(position);
+      // A fold applies its one type to every parent; a derivation has one per position.
+      OccludedType<?> expected =
+          spec.fold() ? spec.inputTypes().getFirst() : spec.inputTypes().get(position);
       StoredMetadata entry = labels.get(parent.id());
       if (entry == null) {
         return Vetted.refusing(Derived.Reason.NO_SUCH_VALUE, Gate.NOT_HOLDING + parent.id());

@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Label;
 
@@ -56,88 +57,82 @@ final class Manifests {
 
   /** An erasure's policy is a function of the label and the access, so only its name can show. */
   private static List<Manifest.Entry> erasureEntries(Declarations configuration) {
-    List<Manifest.Entry> erasures = new ArrayList<>();
-    for (ErasureSpec erasure : configuration.erasures()) {
-      erasures.add(
-          new Manifest.Entry(
-              erasure.name(),
-              "may erase what its policy allows, and everything derived from it",
-              false,
-              List.of(),
-              null));
-    }
-    return erasures;
+    return configuration.erasures().stream()
+        .map(
+            erasure ->
+                new Manifest.Entry(
+                    erasure.name(),
+                    "may erase what its policy allows, and everything derived from it",
+                    false,
+                    List.of(),
+                    null))
+        .toList();
   }
 
   private static List<Manifest.Entry> inspectionEntries(
       Declarations configuration, AccessContext as) {
-    List<Manifest.Entry> inspections = new ArrayList<>();
-    for (InspectionSpec inspection : configuration.inspections()) {
-      inspections.add(
-          new Manifest.Entry(
-              inspection.name(),
-              "reads labels and lineage up to " + accepts(inspection::ceilingFor, as),
-              false,
-              List.of(),
-              null));
-    }
-    return inspections;
+    return configuration.inspections().stream()
+        .map(
+            inspection ->
+                new Manifest.Entry(
+                    inspection.name(),
+                    "reads labels and lineage up to " + accepts(inspection::ceilingFor, as),
+                    false,
+                    List.of(),
+                    null))
+        .toList();
   }
 
   private static List<Manifest.Entry> sourceEntries(Declarations configuration) {
-    List<Manifest.Entry> ways = new ArrayList<>();
-    for (var source : configuration.sources().entrySet()) {
-      ways.add(
-          new Manifest.Entry(
-              source.getKey(),
-              "accepts a " + source.getValue().name(),
-              false,
-              List.of(),
-              source.getValue().name()));
-    }
-    return ways;
+    return configuration.sources().entrySet().stream()
+        .map(
+            source ->
+                new Manifest.Entry(
+                    source.getKey(),
+                    "accepts a " + source.getValue().name(),
+                    false,
+                    List.of(),
+                    source.getValue().name()))
+        .toList();
   }
 
   private static List<Manifest.Entry> sinkEntries(Declarations configuration, AccessContext as) {
-    List<Manifest.Entry> doors = new ArrayList<>();
-    for (SinkSpec sink : configuration.sinks()) {
-      doors.add(
-          new Manifest.Entry(
-              sink.name(),
-              "accepts up to " + accepts(sink::ceiling, as),
-              false,
-              List.copyOf(configuration.sinkReads().getOrDefault(sink.name(), Set.of())),
-              null));
-    }
-    return doors;
+    return configuration.sinks().stream()
+        .map(
+            sink ->
+                new Manifest.Entry(
+                    sink.name(),
+                    "accepts up to " + accepts(sink::ceiling, as),
+                    false,
+                    List.copyOf(configuration.sinkReads().getOrDefault(sink.name(), Set.of())),
+                    null))
+        .toList();
   }
 
   private static List<Manifest.Entry> derivationEntries(Declarations configuration) {
-    List<Manifest.Entry> entries = new ArrayList<>();
-    for (DerivationSpec<?> derivation : configuration.derivations()) {
-      entries.add(
-          new Manifest.Entry(
-              derivation.name(),
-              "%s -> %s".formatted(reads(derivation), derivation.outputType().name()),
-              derivation.privileged(),
-              derivation.inputTypes().stream().map(OccludedType::name).distinct().toList(),
-              derivation.outputType().name()));
-    }
-    return entries;
+    return configuration.derivations().stream()
+        .map(
+            derivation ->
+                new Manifest.Entry(
+                    derivation.name(),
+                    "%s -> %s".formatted(reads(derivation), derivation.outputType().name()),
+                    derivation.privileged(),
+                    derivation.inputTypes().stream().map(OccludedType::name).distinct().toList(),
+                    derivation.outputType().name()))
+        .toList();
   }
 
   private static List<Manifest.Entry> queryEntries(Declarations configuration) {
-    List<Manifest.Entry> questions = new ArrayList<>();
-    for (QuerySpec<?, ?> query : configuration.queries()) {
-      questions.add(
-          new Manifest.Entry(
-              query.name(),
-              "asks about " + query.inputType().name(),
-              false,
-              List.of(query.inputType().name()),
-              null));
-    }
-    return questions;
+    return configuration.queries().stream()
+        .map(
+            query ->
+                new Manifest.Entry(
+                    query.name(),
+                    "asks about " + query.inputType().name(),
+                    false,
+                    List.of(query.inputType().name()),
+                    null))
+        .toList();
   }
 
   /**
@@ -167,25 +162,25 @@ final class Manifests {
 
   /** Every type something in this charter can produce: a source's, or a derivation's output. */
   private static Set<String> producedTypes(Declarations configuration) {
-    Set<String> produced = new LinkedHashSet<>();
-    configuration.sources().values().forEach(type -> produced.add(type.name()));
-    for (DerivationSpec<?> derivation : configuration.derivations()) {
-      produced.add(derivation.outputType().name());
-    }
-    return produced;
+    return Stream.concat(
+            configuration.sources().values().stream(),
+            configuration.derivations().stream().map(DerivationSpec::outputType))
+        .map(OccludedType::name)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /** Every type something in this charter reads: a door's, a derivation's, or a question's. */
   private static Set<String> readTypes(Declarations configuration) {
-    Set<String> read = new LinkedHashSet<>();
-    configuration.sinkReads().values().forEach(read::addAll);
-    for (DerivationSpec<?> derivation : configuration.derivations()) {
-      derivation.inputTypes().forEach(type -> read.add(type.name()));
-    }
-    for (QuerySpec<?, ?> query : configuration.queries()) {
-      read.add(query.inputType().name());
-    }
-    return read;
+    Stream<String> byDoors = configuration.sinkReads().values().stream().flatMap(Set::stream);
+    Stream<String> byDerivations =
+        configuration.derivations().stream()
+            .flatMap(derivation -> derivation.inputTypes().stream())
+            .map(OccludedType::name);
+    Stream<String> byQueries =
+        configuration.queries().stream().map(query -> query.inputType().name());
+    return Stream.of(byDoors, byDerivations, byQueries)
+        .flatMap(names -> names)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
   /** Whether this charter has any door in and any door out at all. */

@@ -666,8 +666,8 @@ public final class JdbcStorage implements Storage {
     return mac.doFinal();
   }
 
-  /** The digest of one trail line, or {@code null} when it cannot be checked at all. */
-  private byte[] lineDigestOrNull(
+  /** The digest of one trail line, or empty when it cannot be checked at all. */
+  private Optional<byte[]> lineDigestIfSigned(
       String under,
       byte[] previous,
       Instant recordedAt,
@@ -676,9 +676,9 @@ public final class JdbcStorage implements Storage {
       byte[] label,
       byte[] context) {
     try {
-      return lineDigest(under, previous, recordedAt, facts, detail, label, context);
+      return Optional.of(lineDigest(under, previous, recordedAt, facts, detail, label, context));
     } catch (IllegalStateException _) {
-      return null;
+      return Optional.empty();
     }
   }
 
@@ -739,8 +739,8 @@ public final class JdbcStorage implements Storage {
                 rows.getString("target"),
                 rows.getString("outcome"),
                 rows.getString("reason"));
-        byte[] digest =
-            lineDigestOrNull(
+        Optional<byte[]> digest =
+            lineDigestIfSigned(
                 rows.getString("root_id"),
                 previous,
                 rows.getTimestamp("recorded_at").toInstant(),
@@ -748,10 +748,10 @@ public final class JdbcStorage implements Storage {
                 rows.getBytes("detail"),
                 rows.getBytes(COL_LABEL),
                 rows.getBytes("context"));
-        if (digest == null || !Arrays.equals(digest, rows.getBytes(COL_DIGEST))) {
+        if (digest.isEmpty() || !Arrays.equals(digest.get(), rows.getBytes(COL_DIGEST))) {
           return Optional.of(rows.getLong(COL_ENTRY_ID));
         }
-        expected = digest;
+        expected = digest.get();
       }
       return Optional.empty();
     } catch (SQLException e) {

@@ -116,12 +116,8 @@ public final class MemoryStorage implements Storage {
           });
       pending.addAll(children);
     }
-    List<String> removed = new ArrayList<>();
-    for (String id : doomed) {
-      if (values.remove(id) != null) {
-        removed.add(id);
-      }
-    }
+    // Removing and checking in one step, per value: another eraser may get to one first.
+    List<String> removed = doomed.stream().filter(id -> values.remove(id) != null).toList();
     removed.forEach(id -> append(lineFor.apply(id)));
     return removed;
   }

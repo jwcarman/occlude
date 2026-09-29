@@ -21,6 +21,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.StreamSupport;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.Manifest;
 import org.jwcarman.occlude.lattice.Axis;
@@ -213,11 +214,7 @@ public class CharterEndpoint {
 
   /** The questions this application asks about every value, in the order it declared them. */
   private List<String> axes() {
-    List<String> names = new ArrayList<>();
-    for (Axis<?> axis : charter.axes()) {
-      names.add(axis.name());
-    }
-    return names;
+    return StreamSupport.stream(charter.axes().spliterator(), false).map(Axis::name).toList();
   }
 
   private static List<Map<String, Object>> findings(Manifest manifest) {

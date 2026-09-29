@@ -15,6 +15,7 @@
  */
 package org.jwcarman.occlude;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -25,6 +26,7 @@ import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
@@ -180,10 +182,10 @@ public final class DefaultCharter implements Charter {
               + " next year.");
     }
     // Declaration order, not hash order: this list ends up in an error message somebody reads.
-    Set<String> names = new LinkedHashSet<>();
-    for (OccludedType<?> type : reads) {
-      names.add(type.name());
-    }
+    Set<String> names =
+        Arrays.stream(reads)
+            .map(OccludedType::name)
+            .collect(Collectors.toCollection(LinkedHashSet::new));
     stillWriting();
     SinkSpec sink = Sinks.varying(name, ceiling);
     declarations.sink(sink, names, reads);

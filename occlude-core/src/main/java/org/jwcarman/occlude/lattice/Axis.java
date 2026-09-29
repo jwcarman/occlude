@@ -15,9 +15,9 @@
  */
 package org.jwcarman.occlude.lattice;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.IntStream;
 
 /**
  * One independent question about a value: whose is it, do we believe it, how sensitive is it.
@@ -67,12 +67,12 @@ public final class Axis<T> {
     if (leastConstrainedFirst == null || leastConstrainedFirst.length == 0) {
       throw new IllegalArgumentException("'" + name + "' needs at least one rung");
     }
-    // Copied element by element: handing the generic array itself onward is what makes a varargs
-    // method unsafe, and javac cannot see that the callee only reads it.
-    List<E> rungs = new ArrayList<>(leastConstrainedFirst.length);
-    for (E rung : leastConstrainedFirst) {
-      rungs.add(rung);
-    }
+    // Read by index rather than handed onward: passing the generic array itself anywhere is what
+    // makes a varargs method unsafe, and javac cannot see that the callee would only read it.
+    List<E> rungs =
+        IntStream.range(0, leastConstrainedFirst.length)
+            .mapToObj(rung -> leastConstrainedFirst[rung])
+            .toList();
     return new Axis<>(name, Ladder.of(name, rungs), false);
   }
 
