@@ -77,7 +77,10 @@ class InspectionTest {
     Occluded<String> note = notes.occlude("hello");
     Occluded<String> shouted = upper.derive(note).orThrow();
 
-    Inspected.Seen seen = desk.inspect(shouted).orThrow();
+    Inspected inspected = desk.inspect(shouted);
+    assertThat(inspected.succeeded()).isTrue();
+    assertThat(inspected.seen()).isPresent();
+    Inspected.Seen seen = inspected.orThrow();
 
     assertThat(seen.label()).isEqualTo(Label.of(TENANT, "acme"));
     assertThat(seen.lineage().parents()).containsExactly(note.id());
@@ -125,6 +128,20 @@ class InspectionTest {
     assertThatThrownBy(inspected::orThrow)
         .isInstanceOf(AccessDeniedException.class)
         .hasMessageContaining("ABOVE_CEILING");
+  }
+
+  /** The common case: a desk that sees the same thing whoever is sitting at it. */
+  @Test
+  @DisplayName("works with a ceiling that does not depend on who is asking")
+  void works_with_a_fixed_ceiling() {
+    DefaultCharter fixed = new DefaultCharter(TENANT);
+    Occlude<String> mail = fixed.source("mail", NOTE, Label.of(TENANT, "acme"));
+    Inspection anyTenant = fixed.inspection("any-tenant", Ceiling.of(TENANT, Constraint.any()));
+    fixed.bind(new MemoryStorage(), AccessContextProvider.none());
+
+    Occluded<String> held = mail.occlude("hello");
+
+    assertThat(anyTenant.inspect(held).orThrow().label()).isEqualTo(Label.of(TENANT, "acme"));
   }
 
   @Test

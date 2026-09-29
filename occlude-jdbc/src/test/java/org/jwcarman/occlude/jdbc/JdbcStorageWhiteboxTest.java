@@ -249,6 +249,60 @@ class JdbcStorageWhiteboxTest {
     assertThat(baseline).isNotEqualTo(differs);
   }
 
+  @Test
+  @DisplayName("a value row is unequal to one signed with a different MAC")
+  void value_row_is_unequal_when_the_mac_differs() throws ReflectiveOperationException {
+    Object baseline = aValueRow();
+    Class<?> commitmentsType =
+        Class.forName("org.jwcarman.occlude.jdbc.JdbcStorage$ValueCommitments");
+    Constructor<?> commitments = commitmentsType.getDeclaredConstructor(byte[].class, byte[].class);
+    commitments.setAccessible(true);
+    Constructor<?> ctor =
+        Class.forName("org.jwcarman.occlude.jdbc.JdbcStorage$ValueRow")
+            .getDeclaredConstructor(
+                byte[].class,
+                commitmentsType,
+                String.class,
+                String.class,
+                String.class,
+                String.class);
+    ctor.setAccessible(true);
+    Object differs =
+        ctor.newInstance(
+            "digest".getBytes(StandardCharsets.UTF_8),
+            commitments.newInstance(
+                "payload".getBytes(StandardCharsets.UTF_8),
+                "label".getBytes(StandardCharsets.UTF_8)),
+            "Card.last4",
+            "card",
+            "r1",
+            "HmacSHA512");
+
+    assertThat(baseline).isNotEqualTo(differs);
+  }
+
+  /** Commitments are keyed MACs over plaintext; printing them would say nothing and risk plenty. */
+  @Test
+  @DisplayName("a row's commitments compare by content and print without their bytes")
+  void value_commitments_compare_by_content_and_print_nothing()
+      throws ReflectiveOperationException {
+    Class<?> commitmentsType =
+        Class.forName("org.jwcarman.occlude.jdbc.JdbcStorage$ValueCommitments");
+    Constructor<?> ctor = commitmentsType.getDeclaredConstructor(byte[].class, byte[].class);
+    ctor.setAccessible(true);
+    byte[] payload = "payload".getBytes(StandardCharsets.UTF_8);
+    byte[] label = "label".getBytes(StandardCharsets.UTF_8);
+    Object one = ctor.newInstance(payload, label);
+
+    assertThat(one)
+        .isEqualTo(ctor.newInstance(payload.clone(), label.clone()))
+        .hasSameHashCodeAs(ctor.newInstance(payload.clone(), label.clone()))
+        .isNotEqualTo(ctor.newInstance(payload, "other".getBytes(StandardCharsets.UTF_8)))
+        .isNotEqualTo(ctor.newInstance("other".getBytes(StandardCharsets.UTF_8), label))
+        .isNotEqualTo("not commitments")
+        .hasToString("ValueCommitments");
+  }
+
   /** Never the bytes: a payload is the value this library exists to keep out of a log line. */
   @Test
   @DisplayName("a value row prints its type, derivation and root, and never its bytes")

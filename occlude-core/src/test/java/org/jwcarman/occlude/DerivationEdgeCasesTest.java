@@ -16,9 +16,13 @@
 package org.jwcarman.occlude;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
@@ -54,6 +58,34 @@ class DerivationEdgeCasesTest {
 
   {
     charter.bind(new MemoryStorage(), AccessContextProvider.none());
+  }
+
+  /**
+   * A portal settles how many parents it takes, so this cannot be reached through one -- which is
+   * exactly why it is a crash rather than a refusal: arriving here means the machinery was misused.
+   */
+  @Test
+  @DisplayName("crashes when handed a number of parents its derivation never takes")
+  void crashes_on_the_wrong_number_of_parents() {
+    MemoryStorage storage = new MemoryStorage();
+    Deriving deriving =
+        new Deriving(
+            new Gate(Axes.of(TENANT), AccessContextProvider.none()), new Trail(storage), storage);
+    DerivationSpec<String> oneParent =
+        new DerivationSpec<>(
+            "upper",
+            List.of(STRING_TYPE),
+            STRING_TYPE,
+            (values, context) -> Optional.of("x"),
+            context -> Ceiling.of(TENANT, Constraint.any()),
+            null,
+            context -> true,
+            false);
+    List<Occluded<?>> twoParents = List.of(Occluded.of("occ_a"), Occluded.of("occ_b"));
+
+    assertThatThrownBy(() -> deriving.derive(oneParent, twoParents))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("reads 1 values and was given 2");
   }
 
   @Test

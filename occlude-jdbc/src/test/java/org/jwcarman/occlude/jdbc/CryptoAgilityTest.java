@@ -189,6 +189,126 @@ class CryptoAgilityTest {
             "the payload stored for " + written.getFirst().id() + " is not what was signed for it");
   }
 
+  /** A page is five hundred rows; a store bigger than one must come out entirely re-encrypted. */
+  @Test
+  @DisplayName("re-encrypts a store larger than one page, all of it")
+  void reencrypts_across_pages() {
+    JdbcStorage storage = underFirst();
+    DefaultCharter charter = new DefaultCharter(AXES);
+    Occlude<Note> notes = charter.source("notes", NOTE, Label.of(TENANT, "acme"));
+    charter.bind(storage, () -> AccessContext.of("tenant", "acme"));
+    List<Occluded<Note>> written = new ArrayList<>();
+    for (int i = 0; i < 520; i++) {
+      written.add(notes.occlude(new Note("note " + i)));
+    }
+
+    JdbcStorage rotating =
+        store(
+            new JceDataKeyProvider("k2", Map.of("k1", first, "k2", second)),
+            MacAlgorithm.HMAC_SHA256);
+    // 520 values and the 520 lines that announced them.
+    assertThat(rotating.reencrypt()).isEqualTo(1040);
+
+    JdbcStorage retired = underSecondOnly();
+    assertThat(retired.value(written.getLast().id(), NOTE_TYPE)).contains(new Note("note 519"));
+    assertIntact(retired);
+  }
+
+  @Test
+  @DisplayName("refuses to re-encrypt a line whose protected fields were swapped")
+  void refuses_to_launder_a_tampered_line() throws SQLException {
+    writeThrough(underFirst());
+    long first = firstLine();
+    try (Connection connection = dataSource.getConnection();
+        var statement =
+            connection.prepareStatement(
+                "UPDATE occlude_audit SET context = (SELECT context FROM occlude_audit WHERE"
+                    + " entry_id = ?) WHERE entry_id = ?")) {
+      statement.setLong(1, first + 1);
+      statement.setLong(2, first);
+      statement.executeUpdate();
+    }
+    // The context of every line here is the same access, so make the swap say something else.
+    try (Connection connection = dataSource.getConnection();
+        var statement =
+            connection.prepareStatement(
+                "UPDATE occlude_audit SET label = NULL WHERE entry_id = ?")) {
+      statement.setLong(1, first);
+      statement.executeUpdate();
+    }
+
+    JdbcStorage rotating = underFirst();
+
+    assertThatThrownBy(rotating::reencrypt)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("line " + first + " of the trail is not what was signed for it");
+  }
+
+  @Test
+  @DisplayName("refuses to re-encrypt a line whose MAC name was rewritten")
+  void refuses_to_reencrypt_a_line_with_a_rewritten_mac() throws SQLException {
+    writeThrough(underFirst());
+    long first = firstLine();
+    try (Connection connection = dataSource.getConnection();
+        var statement =
+            connection.prepareStatement(
+                "UPDATE occlude_audit SET mac = 'HmacMD5' WHERE entry_id = ?")) {
+      statement.setLong(1, first);
+      statement.executeUpdate();
+    }
+
+    JdbcStorage rotating = underFirst();
+
+    assertThatThrownBy(rotating::reencrypt).hasMessageContaining("line " + first);
+  }
+
+  /**
+   * A read is checked too, so a rewritten MAC name cannot make a stored value
+   * unverifiable-yet-served.
+   */
+  @Test
+  @DisplayName("refuses to read a value whose MAC name was rewritten")
+  void refuses_to_read_a_value_with_a_rewritten_mac() throws SQLException {
+    List<Occluded<Note>> written = writeThrough(underFirst());
+    String id = written.getFirst().id();
+    try (Connection connection = dataSource.getConnection();
+        var statement =
+            connection.prepareStatement(
+                "UPDATE occlude_value SET mac = 'HmacMD5' WHERE value_id = ?")) {
+      statement.setString(1, id);
+      statement.executeUpdate();
+    }
+
+    JdbcStorage storage = underFirst();
+
+    assertThatThrownBy(() -> storage.value(id, NOTE_TYPE))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("not what was signed");
+    assertThat(storage.brokenValues()).contains(id);
+  }
+
+  @Test
+  @DisplayName("does not accept an anchor whose digest was made up")
+  void does_not_accept_a_forged_anchor() {
+    JdbcStorage storage = underFirst();
+    writeThrough(storage);
+    TrailHead real = storage.head().orElseThrow();
+
+    TrailHead forged = new TrailHead(real.entryId(), new byte[] {1, 2, 3});
+
+    assertThat(storage.stillHolds(real)).isTrue();
+    assertThat(storage.stillHolds(forged)).isFalse();
+  }
+
+  private long firstLine() throws SQLException {
+    try (Connection connection = dataSource.getConnection();
+        var statement = connection.createStatement();
+        ResultSet rows = statement.executeQuery("SELECT MIN(entry_id) FROM occlude_audit")) {
+      rows.next();
+      return rows.getLong(1);
+    }
+  }
+
   /** Destroying a key erases what it protected, and must not take the record down with it. */
   @Test
   @DisplayName("still verifies after the key that encrypted everything is gone")

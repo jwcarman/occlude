@@ -41,7 +41,7 @@ public sealed interface Erased {
 
   /** How many values were removed, the root included, or empty when nothing was. */
   default OptionalInt removed() {
-    return this instanceof Removed(int count) ? OptionalInt.of(count) : OptionalInt.empty();
+    return this instanceof Removed removed ? OptionalInt.of(removed.count()) : OptionalInt.empty();
   }
 
   default boolean succeeded() {
@@ -50,8 +50,8 @@ public sealed interface Erased {
 
   /** How many values were removed, or an exception naming the refusal. */
   default int orThrow() {
-    if (this instanceof Removed(int count)) {
-      return count;
+    if (this instanceof Removed removed) {
+      return removed.count();
     }
     Refused refused = (Refused) this;
     throw new AccessDeniedException(refused.reason().name(), refused.detail());

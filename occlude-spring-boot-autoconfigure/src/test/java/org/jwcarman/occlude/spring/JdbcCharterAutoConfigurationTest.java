@@ -189,6 +189,23 @@ class JdbcCharterAutoConfigurationTest {
                     .hasMessageContaining("no secret by that name"));
   }
 
+  /**
+   * A secret mangled on its way into the environment should say which one, not just "bad input".
+   */
+  @Test
+  @DisplayName("refuses a key that is not base64, naming which one")
+  void refuses_a_key_that_is_not_base64() {
+    runner
+        .withPropertyValues("occlude.keys.keks.k1=not base64!")
+        .withUserConfiguration(AnApplication.class)
+        .run(
+            context ->
+                assertThat(context)
+                    .hasFailed()
+                    .getFailure()
+                    .hasStackTraceContaining("key 'k1' is not valid base64"));
+  }
+
   @Test
   @DisplayName("refuses a signing algorithm it does not know, naming the ones it does")
   void refuses_an_unknown_mac() {

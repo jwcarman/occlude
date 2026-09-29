@@ -33,6 +33,8 @@ import org.jwcarman.occlude.AccessContextProvider;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.DefaultCharter;
 import org.jwcarman.occlude.Derivation;
+import org.jwcarman.occlude.Erasure;
+import org.jwcarman.occlude.Inspection;
 import org.jwcarman.occlude.MemoryStorage;
 import org.jwcarman.occlude.Occlude;
 import org.jwcarman.occlude.Occluded;
@@ -186,6 +188,18 @@ class CharterAutoConfigurationTest {
               q.accepting(
                   Ceiling.of(TENANT, Constraint.any())
                       .with(CLEARANCE, Constraint.atMost(Clearance.OPEN))));
+    }
+
+    @Bean
+    Erasure compliance(Charter charter) {
+      return charter.erasure("compliance", (label, ctx) -> ctx.has("role", "compliance"));
+    }
+
+    @Bean
+    Inspection supportDesk(Charter charter) {
+      return charter.inspection(
+          "support-desk",
+          Ceiling.of(TENANT, Constraint.any()).with(CLEARANCE, Constraint.atMost(Clearance.OPEN)));
     }
   }
 
@@ -359,6 +373,9 @@ class CharterAutoConfigurationTest {
             assertThat(entries(endpoint.section("derivations"), "derivations"))
                 .contains("summarize");
             assertThat(entries(endpoint.section("questions"), "questions")).contains("longer-than");
+            assertThat(entries(endpoint.section("erasures"), "erasures")).contains("compliance");
+            assertThat(entries(endpoint.section("inspections"), "inspections"))
+                .contains("support-desk");
             assertThat(findingKinds(endpoint.section("findings"))).contains("no-writer");
           });
     }
@@ -375,6 +392,10 @@ class CharterAutoConfigurationTest {
                 .containsEntry("name", "summarize");
             assertThat(endpoint.named("questions", "longer-than"))
                 .containsEntry("name", "longer-than");
+            assertThat(endpoint.named("erasures", "compliance"))
+                .containsEntry("name", "compliance");
+            assertThat(endpoint.named("inspections", "support-desk"))
+                .containsEntry("name", "support-desk");
 
             // A section this endpoint has never heard of, unlike an unmatched name within one.
             assertThat(endpoint.named("no-such-section", "whatever")).isNull();

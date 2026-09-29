@@ -255,6 +255,21 @@ class ErasingAcrossTenantsTest {
         .hasMessageContaining("two erasures are registered as 'compliance'");
   }
 
+  /** An erasure's policy is a function, so the manifest can say only that it exists, by name. */
+  @Test
+  @DisplayName("is listed in the manifest by name")
+  void is_listed_in_the_manifest() {
+    DefaultCharter config = new DefaultCharter(TENANT, LEVEL);
+    config.erasure("compliance", (label, ctx) -> true);
+
+    Manifest manifest = config.manifest();
+
+    assertThat(manifest.erasures())
+        .singleElement()
+        .satisfies(entry -> assertThat(entry.name()).isEqualTo("compliance"));
+    assertThat(manifest.toString()).contains("erasures (1)").contains("compliance");
+  }
+
   /** The orThrow form, for a caller that cannot continue without the erasure having happened. */
   @Test
   @DisplayName("throws from orThrow when refused")

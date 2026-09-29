@@ -130,6 +130,31 @@ class BillingSupportTest {
     assertThat(confirmed.getBody().id()).startsWith("occ_");
   }
 
+  /** A message that names no invoice has nothing to confirm, and says so rather than guessing. */
+  @Test
+  @DisplayName("declines to confirm a message that names no invoice")
+  void declines_a_message_naming_no_invoice() {
+    var raised =
+        as(
+            "acme",
+            "agent",
+            HttpMethod.POST,
+            "/disputes",
+            new DisputeController.Raise("dana@acme.example", "something is wrong with my bill"),
+            DisputeController.Reference.class);
+
+    var confirmed =
+        as(
+            "acme",
+            "agent",
+            HttpMethod.POST,
+            "/disputes/" + raised.getBody().id() + "/confirm",
+            null,
+            String.class);
+
+    assertThat(confirmed.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+  }
+
   /** An invoice that exists, and belongs to somebody else. */
   @Test
   @DisplayName("refuses to confirm another customer's invoice")

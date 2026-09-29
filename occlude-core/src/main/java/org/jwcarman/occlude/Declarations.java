@@ -117,10 +117,6 @@ final class Declarations {
 
   // ------------------------------------------------------------------ reading, for the manifest
 
-  List<OccludedType<?>> types() {
-    return List.copyOf(types.values());
-  }
-
   Map<String, OccludedType<?>> sources() {
     return Collections.unmodifiableMap(sources);
   }

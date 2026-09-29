@@ -1368,6 +1368,38 @@ class JdbcCharterTest {
   }
 
   @Test
+  @DisplayName("checking an anchor reports a broken connection rather than answering")
+  void still_holds_reports_when_the_table_is_gone() throws SQLException {
+    TrailHead anchor = new TrailHead(1, new byte[] {1});
+    try (Connection connection = dataSource.getConnection();
+        var statement = connection.createStatement()) {
+      statement.execute("DROP TABLE occlude_audit");
+    }
+
+    assertThatThrownBy(() -> storage.stillHolds(anchor))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("could not look for the anchor");
+  }
+
+  /**
+   * A root lookup that answers with an empty secret is as good as one that does not answer: the
+   * rows under it are unverifiable, and the report says so rather than crashing.
+   */
+  @Test
+  @DisplayName("treats an empty root secret as a missing root")
+  void treats_an_empty_root_as_missing() {
+    card();
+    JdbcStorage emptyRoot =
+        rooted(
+            TestKeys.ROOT_ID,
+            Map.of(TestKeys.ROOT_ID, new byte[0]),
+            Axes.of(TENANT, INTEGRITY, DATA));
+
+    assertThat(emptyRoot.firstBrokenEntry()).isPresent();
+    assertThat(emptyRoot.brokenValues()).isNotEmpty();
+  }
+
+  @Test
   @DisplayName("checking the trail reports a broken connection rather than corrupting silently")
   void first_broken_entry_reports_when_the_table_is_gone() throws SQLException {
     try (Connection connection = dataSource.getConnection();

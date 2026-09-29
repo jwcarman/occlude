@@ -45,6 +45,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -225,10 +226,9 @@ public final class JdbcStorage implements Storage {
             .collect(Collectors.joining("\n"));
     try (Connection connection = dataSource.getConnection();
         Statement statement = connection.createStatement()) {
-      for (String each : sql.split(";")) {
-        if (!each.isBlank()) {
-          statement.execute(each);
-        }
+      for (String each :
+          Arrays.stream(sql.split(";")).filter(Predicate.not(String::isBlank)).toList()) {
+        statement.execute(each);
       }
     } catch (SQLException e) {
       throw new IllegalStateException("could not create the store schema", e);
@@ -532,7 +532,10 @@ public final class JdbcStorage implements Storage {
    */
   private Mac keyed(Domain domain, String id, MacAlgorithm algorithm) {
     byte[] secret = roots.apply(id);
-    if (secret == null) {
+    // Empty is as good as absent -- and left alone it would not even reach the MAC: SecretKeySpec
+    // throws IllegalArgumentException on it, which the verifier does not expect, so a lookup that
+    // answered with nothing would crash the report instead of marking the row broken.
+    if (secret == null || secret.length == 0) {
       throw new IllegalStateException(
           "nothing supplies the root '" + id + "', which some of this was written under");
     }
@@ -964,41 +967,46 @@ public final class JdbcStorage implements Storage {
                 FROM occlude_audit ORDER BY entry_id
                 """);
         ResultSet rows = statement.executeQuery()) {
-      byte[] expected = null;
-      while (rows.next()) {
-        byte[] previous = rows.getBytes("previous");
-        if (!Arrays.equals(previous, expected)) {
-          return Optional.of(rows.getLong(COL_ENTRY_ID));
-        }
-        // A root nothing supplies is a broken line, not a crashed verifier. Left to throw, an
-        // attacker who could edit a line could rewrite its root_id instead and turn "broken at
-        // entry 7" into an exception that reports nothing at all.
-        LineFacts facts =
-            new LineFacts(
-                rows.getString("operation"),
-                rows.getString(COL_VALUE_ID),
-                rows.getString("target"),
-                rows.getString("outcome"),
-                rows.getString("reason"));
-        // Commitments rather than ciphertext, so no key is needed here: the trail verifies even
-        // after the key that encrypted a line has been destroyed.
-        Optional<byte[]> digest =
-            lineDigestIfSigned(
-                rows.getString(COL_ROOT_ID),
-                rows.getString(COL_MAC),
-                previous,
-                rows.getTimestamp("recorded_at").toInstant(),
-                facts,
-                rows.getBytes(COL_COMMITMENT));
-        if (digest.isEmpty() || !Arrays.equals(digest.get(), rows.getBytes(COL_DIGEST))) {
-          return Optional.of(rows.getLong(COL_ENTRY_ID));
-        }
-        expected = digest.get();
-      }
-      return Optional.empty();
+      return firstBrokenIn(rows);
     } catch (SQLException e) {
       throw new IllegalStateException("could not read the trail back", e);
     }
+  }
+
+  /** The chain walk itself, over rows already selected in order. */
+  private Optional<Long> firstBrokenIn(ResultSet rows) throws SQLException {
+    byte[] expected = null;
+    while (rows.next()) {
+      byte[] previous = rows.getBytes("previous");
+      if (!Arrays.equals(previous, expected)) {
+        return Optional.of(rows.getLong(COL_ENTRY_ID));
+      }
+      // A root nothing supplies is a broken line, not a crashed verifier. Left to throw, an
+      // attacker who could edit a line could rewrite its root_id instead and turn "broken at
+      // entry 7" into an exception that reports nothing at all.
+      LineFacts facts =
+          new LineFacts(
+              rows.getString("operation"),
+              rows.getString(COL_VALUE_ID),
+              rows.getString("target"),
+              rows.getString("outcome"),
+              rows.getString("reason"));
+      // Commitments rather than ciphertext, so no key is needed here: the trail verifies even
+      // after the key that encrypted a line has been destroyed.
+      Optional<byte[]> digest =
+          lineDigestIfSigned(
+              rows.getString(COL_ROOT_ID),
+              rows.getString(COL_MAC),
+              previous,
+              rows.getTimestamp("recorded_at").toInstant(),
+              facts,
+              rows.getBytes(COL_COMMITMENT));
+      if (digest.isEmpty() || !Arrays.equals(digest.get(), rows.getBytes(COL_DIGEST))) {
+        return Optional.of(rows.getLong(COL_ENTRY_ID));
+      }
+      expected = digest.get();
+    }
+    return Optional.empty();
   }
 
   /**
@@ -1229,20 +1237,21 @@ public final class JdbcStorage implements Storage {
         PreparedStatement statement = connection.prepareStatement(SELECT_METADATA)) {
       statement.setString(1, id);
       try (ResultSet rows = statement.executeQuery()) {
-        if (!rows.next()) {
-          return Optional.empty();
-        }
-        Label label = labelOf(rows);
-        String derivation = rows.getString(COL_DERIVATION);
-        Lineage lineage =
-            derivation == null
-                ? Lineage.occluded()
-                : Lineage.derivedFrom(parentsOf(connection, id), derivation);
-        return Optional.of(new StoredMetadata(rows.getString(COL_VALUE_TYPE), label, lineage));
+        return rows.next() ? Optional.of(metadataOf(connection, rows)) : Optional.empty();
       }
     } catch (SQLException e) {
       throw new IllegalStateException("could not read " + id, e);
     }
+  }
+
+  /** One row's type, checked label and lineage. */
+  private StoredMetadata metadataOf(Connection connection, ResultSet rows) throws SQLException {
+    String derivation = rows.getString(COL_DERIVATION);
+    Lineage lineage =
+        derivation == null
+            ? Lineage.occluded()
+            : Lineage.derivedFrom(parentsOf(connection, rows.getString(COL_VALUE_ID)), derivation);
+    return new StoredMetadata(rows.getString(COL_VALUE_TYPE), labelOf(rows), lineage);
   }
 
   @Override
@@ -1256,14 +1265,7 @@ public final class JdbcStorage implements Storage {
       Map<String, StoredMetadata> found = new LinkedHashMap<>();
       try (ResultSet rows = statement.executeQuery()) {
         while (rows.next()) {
-          String id = rows.getString(COL_VALUE_ID);
-          Label label = labelOf(rows);
-          String derivation = rows.getString(COL_DERIVATION);
-          Lineage lineage =
-              derivation == null
-                  ? Lineage.occluded()
-                  : Lineage.derivedFrom(parentsOf(connection, id), derivation);
-          found.put(id, new StoredMetadata(rows.getString(COL_VALUE_TYPE), label, lineage));
+          found.put(rows.getString(COL_VALUE_ID), metadataOf(connection, rows));
         }
       }
       return found;
@@ -1299,10 +1301,9 @@ public final class JdbcStorage implements Storage {
         PreparedStatement statement = connection.prepareStatement(SELECT_PAYLOAD)) {
       statement.setString(1, id);
       try (ResultSet rows = statement.executeQuery()) {
-        if (!rows.next()) {
-          return Optional.empty();
-        }
-        return Optional.of(serialiserFor(type).decode(payloadOf(rows)));
+        return rows.next()
+            ? Optional.of(serialiserFor(type).decode(payloadOf(rows)))
+            : Optional.empty();
       }
     } catch (SQLException e) {
       throw new IllegalStateException("could not read " + id, e);
