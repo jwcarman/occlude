@@ -48,244 +48,52 @@ in memory are in [Getting Started](https://jwcarman.github.io/occlude/guides/get
 Occlude's encryption and serialisation come from [codec](https://github.com/jwcarman/codec), a
 small library it depends on.
 
+## In one page
+
+An application declares **axes** — the questions it asks about every value, such as a tenant, a
+sensitivity, whether it was vouched for — and every value carries a **label** answering them. Every
+place a value may go declares a **ceiling**, and reading is decided against both. Deriving a value
+joins its parents' labels, so an ordinary derivation *cannot* weaken one, and a value made from two
+tenants' data carries a mixture no ceiling admits.
+
+```java
+DefaultCharter charter = new DefaultCharter(Axes.of(TENANT, SENSITIVITY));
+
+Occlude<Mail> customerMail = charter.source("customer-mail", MAIL,
+    ctx -> Label.of(TENANT, ctx.get("tenant").orElseThrow()).with(SENSITIVITY, PERSONAL));
+Reveal<Mail> supportDesk = charter.reveal("support-desk",
+    ctx -> Ceiling.of(TENANT, Constraint.atMost(ctx.get("tenant").orElseThrow()))
+                  .with(SENSITIVITY, Constraint.atMost(PERSONAL)), MAIL);
+
+charter.bind(Bindings.of(storage).withIdentity(currentAccess));
+```
+
+A **charter** is where authority is declared, and each declaration hands back the one object able
+to perform it — a **portal**. Holding the portal is the only way to perform the operation; nothing
+can look one up. Every operation writes a line to a tamper-evident **record**, allowed and refused
+alike. Storage is Postgres, and everything it keeps is encrypted and signed.
+
+| module | what it is |
+|---|---|
+| `occlude-api` | the portals and results application code holds |
+| `occlude-core` | the charter, labels and ceilings, and `MemoryStorage` for tests |
+| `occlude-jdbc` | encrypted, signed storage in Postgres 13+ |
+| `occlude-spring-boot-starter` | Spring Boot wiring, with the JDBC store |
+| `occlude-bom` | versions for all of the above |
+
 ## Read the docs
 
-The [documentation site](https://jwcarman.github.io/occlude/) is the manual: concepts, guides, and
-[what Occlude does not do](https://jwcarman.github.io/occlude/limits/) — which is the page to read first
-if you are deciding whether it fits. This README is the front door.
+The [documentation site](https://jwcarman.github.io/occlude/) is the manual:
 
----
-
-## The vocabulary
-
-An application declares **axes**: the questions it asks about every value it holds. Occlude ships no
-mandatory scheme. In US government nomenclature CONFIDENTIAL sits *below* SECRET; in the common
-corporate convention it sits near the top. No regulated organisation will abandon its mandated
-scheme because a library has opinions.
-
-```java
-public static final Axis<String>      TENANT      = Axis.matching("tenant").required();
-public static final Axis<Integrity>   INTEGRITY   = Axis.ladder("integrity", ENDORSED, UNENDORSED);
-public static final Axis<Sensitivity> SENSITIVITY = Axis.ladder("sensitivity",
-                                                        ORDINARY, PERSONAL, CARDHOLDER);
-```
-
-A **ladder** is ordered. A **matching** axis is not — two tenants are simply different, and their
-combination is a *mixture* that no ceiling admits.
-
-Note which end of `INTEGRITY` is which. Untrusted data is the **more** constrained end, because it
-is the dangerous thing to handle. Vouching for something moves it *down*, which is why the
-operation that does it is called **lowering**.
-
-There is deliberately **no** factory that reads `Enum::ordinal`. Declaration order is a terrible
-place to keep a security-relevant contract: someone sorts a list of constants alphabetically in an
-unrelated tidy-up, every test still passes, and the gate now permits the opposite of what it
-should. Nothing about an enum declaration says "the order of these lines is load-bearing", so you
-state the order where a reviewer will see it, and every constant must appear.
-
-A **`Label`** is what one value says on every axis; a **`Ceiling`** is what a reader may see. A
-label speaking to an axis the ceiling never constrained is refused — silence is not permission. An
-axis marked `required()` must be answered, because an unanswered axis sits at the bottom of its
-order, and the bottom is below every ceiling: readable by everyone, not by nobody.
-
-## The portals
-
-A **charter** is where an application constitutes its authority. Each declaration hands back the
-one object able to perform that operation.
-
-```java
-Occlude<Mail> customerMail =
-    charter.source("customer-mail", MAIL, ctx -> label(ctx, UNENDORSED, PERSONAL));
-
-Reveal<Invoice> paymentProcessor =
-    charter.reveal("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE);
-
-Derivation<Invoice, Last4> cardLast4 =
-    charter.derivation("invoice.card.last4", INVOICE, LAST4,
-        invoice -> new Last4(last4(invoice.cardToken())),
-        d -> d.accepting(ctx -> ceiling(ctx, ENDORSED, CARDHOLDER))
-              .lowering(joined -> joined.with(SENSITIVITY, PERSONAL))
-              .availableTo(ctx -> ctx.has("role", "approver")));
-
-Query<Mail, String> mailMentions =
-    charter.query("mail.mentions", MAIL, String.class,
-        (mail, text, ctx) -> mail.body().toLowerCase().contains(text.toLowerCase()),
-        d -> d.accepting(ctx -> ceiling(ctx, UNENDORSED, PERSONAL)));
-```
-
-| portal | what holding it lets you do |
-|---|---|
-| `Occlude<T>` | hand over a real value, leave with an occluded reference |
-| `Reveal<T>` | turn an occluded reference back into a value, at one declared sink |
-| `Derivation<I,O>` | make one value from another |
-| `Fold<I,O>` | make one value from many |
-| `Query<I,Q>` | ask one question of a value without the value leaving |
-
-**`Occlude` takes no label argument.** The door carries its own, decided when it was declared, so
-code holding it writes at that label and no other. A service handed the door for customer-submitted
-disputes cannot create cardholder data — not "is refused at runtime", but cannot express the
-operation. Writing at another tenant's label is less refused than unsayable.
-
-**There is no reveal without a sink.** No overload omits it. You cannot obtain plaintext "in
-general", only plaintext for somewhere, and that somewhere is what the ceiling hangs off and what
-the audit records.
-
-An `Occluded` prints as its identifier and nothing else, and carries no runtime type — knowing that
-an occluded reference is a card token rather than a display name is itself a disclosure.
-
-## Deriving
-
-A derived value's label is the **join** of its parents': the least thing at or above all of them.
-Join only moves up, so an ordinary derivation cannot weaken a label. That is a theorem, not a rule
-anyone has to remember.
-
-One parent or many is the same operation — same ceiling, same lowering, same lineage, same audit
-line — so `Derivation` and `Fold` differ only in arity.
-
-The join does the quiet job: fold one ordinary note with one containing a home address and the
-result is `PERSONAL`, so it reaches the quarantined model and not the vendor's. And it does the
-loud one: fold two tenants' notes and the tenant axis joins to a **mixture** that is below no
-ceiling — so the report exists, remembers both parents honestly, and reaches nobody. Nothing had to
-be marked as conflicted.
-
-A derivation may declassify by declaring `lowering(...)`, and only what it declares. Truncating a
-card is a real reduction in sensitivity; tying a customer's claim to the mailbox it arrived from is
-a real increase in trust. Both appear in the manifest:
-
-```
-  4 operation(s) can WEAKEN a label:
-    invoice.card.last4      invoice -> last4
-    mail.confirmedInvoice   mail -> invoice
-```
-
-There should be few enough to read in one sitting, and a name like `invoiceNumber.trustMe` should
-stop a reviewer dead — which is the point, because **no algebra can tell you whether a check is
-strong enough.** An endorsement confirming a record exists looks identical to one tying it to the
-person who asked. That judgement is human, so the list exists to put it in front of a human.
-
-**Every derivation makes a new value.** There is no deduplication and no "deterministic" flag. A
-derivation function sees the access context, so reusing a result keyed on its parents alone would
-hand a second caller the first caller's answer without the function running — across tenants.
-Saving a row is not worth a rule with an exception in it.
-
-## Who is asking
-
-Identity is known at the edge and needed at the gate, which may be many layers down. Threading a
-context through all of them makes the safety feature the most annoying thing in the codebase, and
-annoying safety features get routed around. So say once where the answer lives, when the charter
-is bound to its storage:
-
-```java
-charter.bind(Bindings.of(storage).withIdentity(() -> AccessContext.of(Map.of(
-    "tenant", CurrentTenant.get(),
-    "principal", SecurityContextHolder.getContext().getAuthentication().getName()))));
-```
-
-A `ThreadLocal`, a `ScopedValue`, Spring's holders — Occlude has no opinion about how your request
-scope works. Nothing a caller passes influences a label or a ceiling: if a call site could override
-what the edge established, any code holding a portal could name itself whichever tenant it liked,
-which is not a policy system but a formality.
-
-## The record
-
-Every operation writes one line, allowed and refused alike. A thousand refused attempts against one
-value is the interesting event, and a log recording only successes cannot show it. A line never
-contains plaintext. It does carry the label, because an audit that cannot say *why* something was
-refused is not much of an audit — and the label is encrypted on disk for the same reason the value
-is, as is the access context, which this library does not interpret and so cannot judge harmless.
-
-The trail is a **keyed HMAC hash chain**: each line commits to the digest of the one before it.
-Keyed is the whole point — an unkeyed chain catches a careless edit and nothing else, because
-whoever removed a line could recompute everything after it. The key is not in the database.
-
-Values form a second signed structure. A value's digest covers its bytes, its label, what made it,
-and its parents' digests, so editing one breaks everything derived from it.
-
-```java
-storage.firstBrokenEntry();   // a line edited, removed, reordered or replayed
-storage.brokenValues();       // a value edited, or descended from one
-storage.missingValues();      // announced by the trail, never erased, and not here
-```
-
-The third catches a deleted **leaf**: nothing was derived from it, so nothing is left to disagree.
-Only the trail can answer that, because only the trail is outside the row — which is why erasure
-records *which* values it destroyed, in the same transaction as the deletes.
-
-**Tail truncation cannot be detected from the data alone.** Removing the most recent lines leaves a
-chain that verifies. Detecting it needs an anchor kept somewhere the writer cannot reach.
-
-## Erasing
-
-A label has nothing to say about whether a value may be *destroyed* — "possession is not authority"
-is a rule about reading. So the authority to erase is a portal of its own, `charter.erasure(name,
-policy)`, and an application that declares none keeps a store nothing can erase from.
-
-The policy sees the label of the value being destroyed as well as who is asking, because who alone
-is not enough: a rule checking only the caller's role lets one tenant's compliance officer destroy
-another tenant's records.
-
-Erasing takes everything ever derived from a value, however deeply, computed by walking the lineage
-that the value digests cover — so nothing decides what gets destroyed that a signature does not
-protect. Descendants go regardless of their own labels, which is what erasure means: a value
-derived from two customers dies with either of them.
-
-The audit outlives what it describes. `occlude_audit` has no foreign key into `occlude_value` and nothing
-cascades into it: the record that you erased somebody has to survive erasing them.
-
-## Storage
-
-Postgres. Everything a store keeps is **encrypted, and signed under a secret root** — neither is
-optional, and a store refuses to be built without both:
-
-```java
-JdbcStorage storage = new JdbcStorageConfig()
-    .dataSource(dataSource)
-    .codecs(new JacksonCodecFactory(objectMapper))      // how values become bytes
-    .encryptedWith(dataKeys)                            // a codec-crypto DataKeyProvider
-    .rootedIn("prod-2026", secret)                      // what the digests are signed under
-    .storage(axes);
-```
-
-`occlude-jdbc` contains no cryptography of its own. Every value, label, audit detail and audit
-context goes through codec's `EnvelopeCodec` — a fresh AES-256-GCM data key per payload, wrapped
-under your key-encryption key and recorded with its id — inside codec's `VersionedCodec`, so each
-payload names the pipeline that wrote it and a later one can be introduced without rewriting what is
-stored.
-
-`dataKeys` is yours: a `JceDataKeyProvider` over keys you hold, or a provider backed by your KMS.
-Rotating is adding a key and making it current; what the older one wrapped still decrypts under the
-id recorded in its envelope.
-
-**No compression**, deliberately. Compressing before encrypting makes a ciphertext's length depend
-on what its plaintext says — the side channel CRIME and BREACH exploit — and a security library has
-no size to save that is worth it.
-
-A `MemoryStorage` exists for tests and for proving a policy before a database is involved.
-
-The store is for the charter, not for your code: it hands over any value it holds with no ceiling
-asked and no line written. Operations code — sweeps, re-encryption, anchoring — takes
-`storage.integrity()`, which reads no value.
-
-## Spring Boot
-
-Declare the axes. The starter constructs the charter and is therefore the only thing able to bind
-it, so nothing in the application can bring one into force.
-
-```java
-@Bean
-Axes billingAxes() {
-  return Axes.of(TENANT, INTEGRITY, SENSITIVITY);
-}
-```
-
-`Charter` is the interface every bean is handed. It declares portals and reports on the
-*declarations* — `axes()`, `manifest()`. It cannot bind, and it answers nothing about a held value:
-erasing one takes an `Erasure` and reading its label takes an `Inspection`, portals somebody
-declared and handed over like any other.
-
-`manifest()` is meant to be printed at startup and pasted into a review. It answers before the
-charter is bound to any storage, because it describes the declarations rather than any value — so
-a build can render it, diff it against the last release, and fail on a change nobody meant to make.
+- [Getting Started](https://jwcarman.github.io/occlude/guides/getting-started/) — a worked example,
+  from axes to a first reveal
+- [Concepts](https://jwcarman.github.io/occlude/concepts/labels/) — labels, ceilings, portals,
+  deriving, the record, erasing
+- [Spring Boot](https://jwcarman.github.io/occlude/guides/spring-boot/),
+  [Storage](https://jwcarman.github.io/occlude/guides/storage/) and
+  [Operating a Store](https://jwcarman.github.io/occlude/guides/operating/)
+- [What Occlude does not do](https://jwcarman.github.io/occlude/limits/) — the page to read first if
+  you are deciding whether it fits
 
 ## Building
 

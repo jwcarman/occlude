@@ -43,23 +43,20 @@ outside, is occluded as *untrusted*, and the only path from untrusted to trusted
 
 ## Getting started
 
+With Spring Boot and Postgres, one dependency:
+
 ```xml
 <dependency>
   <groupId>org.jwcarman.occlude</groupId>
-  <artifactId>occlude-core</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <artifactId>occlude-spring-boot-starter</artifactId>
+  <version>0.1.0</version>
 </dependency>
 ```
 
-Then read **[Getting Started](guides/getting-started.md)**, or
-**[What Occlude Does Not Do](limits.md)** if you would rather know the limits first. That page is not
-an apology — knowing what a security library declines to promise is how you find out whether it
-fits.
-
-!!! warning "Nothing has been released yet"
-    The public API is still moving. Identifiers, column names and digests have all changed more
-    than once, so a database written by one commit is not necessarily readable by the next.
-    Migrations begin at the first release.
+Plain Java, the BOM, and trying it in memory are in **[Getting Started](guides/getting-started.md)**.
+Or read **[What Occlude Does Not Do](limits.md)** first, if you would rather know the limits. That
+page is not an apology — knowing what a security library declines to promise is how you find out
+whether it fits.
 
 ## Elsewhere
 
@@ -68,5 +65,5 @@ fits.
 
 ## Requirements
 
-Java 25, and Postgres if you want durable storage. A `MemoryStorage` is included for tests and for
+Java 25, and Postgres 13 or later if you want durable storage. A `MemoryStorage` is included for tests and for
 proving a policy before a database is involved.

@@ -20,7 +20,7 @@ that decides it:
 Erasure compliance = charter.erasure("compliance", (label, ctx) ->
     ctx.has("role", "compliance")
         && ctx.get("tenant")
-              .map(t -> Ceiling.of(TENANT, Constraint.atMost(t)).with(LEVEL, Constraint.any())
+              .map(t -> Ceiling.of(TENANT, Constraint.atMost(t)).with(SENSITIVITY, Constraint.any())
                                .permits(label))
               .orElse(false));
 ```

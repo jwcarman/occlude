@@ -68,4 +68,27 @@ public record TrailHead(long entryId, byte[] digest) {
   public String toString() {
     return entryId + ":" + HexFormat.of().formatHex(digest);
   }
+
+  /**
+   * A head written down with {@link #toString()}, read back, to check with {@code stillHolds}.
+   *
+   * @param written the position and the digest in hex, separated by a colon
+   * @return the head it describes
+   * @throws IllegalArgumentException if it is not in that form
+   */
+  public static TrailHead parse(String written) {
+    int colon = written.indexOf(':');
+    if (colon <= 0 || colon == written.length() - 1) {
+      throw new IllegalArgumentException(
+          "a trail head is written as <position>:<digest in hex>, not '" + written + "'");
+    }
+    try {
+      return new TrailHead(
+          Long.parseLong(written.substring(0, colon)),
+          HexFormat.of().parseHex(written.substring(colon + 1)));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "a trail head is written as <position>:<digest in hex>, not '" + written + "'", e);
+    }
+  }
 }

@@ -138,17 +138,17 @@ occluded for them.
 
 ## Keys per tenant cover payloads, not labels or the record
 
-`keyedBy` puts each tenant's payloads under that tenant's keys, so destroying one tenant's key makes
-exactly their values unreadable. Their labels and every line of the trail stay under the shared keys
-— a label is what says whose keys open the payload, and the record must outlive any tenant — so a
-tenant's labels outlive their key. Erase a tenant's values to remove those too.
+A tenant's labels, and every line of the trail about them, stay under the shared keys and outlive
+their key: a label is what says whose keys open the payload beside it, and the record must outlive
+any tenant. Erase a tenant's values to remove their labels too — see
+[keys per tenant](guides/storage.md#keys-per-tenant).
 
-## One backend, and no migrations yet
+## One backend, and no schema migrations
 
 Postgres 13 or later only — the storage uses advisory locks, recursive CTEs, `FOR SHARE`,
-`clock_timestamp()` and `pg_current_xact_id_if_assigned()`.
-Schema creation is `CREATE TABLE IF NOT EXISTS` and nothing alters an existing table, so a database
-written by one pre-release commit is not necessarily readable by the next.
+`clock_timestamp()` and `pg_current_xact_id_if_assigned()`. Schema creation is
+`CREATE TABLE IF NOT EXISTS`, and nothing alters an existing table: 0.1.0's schema is the baseline
+any later migration starts from.
 
 ## The privileged methods are public on the implementation
 

@@ -16,6 +16,7 @@
 package org.jwcarman.occlude.jdbc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.DisplayName;
@@ -73,5 +74,28 @@ class TrailHeadTest {
   @DisplayName("prints as its position and its digest in hex, the form to write down")
   void prints_as_position_and_hex() {
     assertThat(new TrailHead(7, DIGEST)).hasToString("7:646967657374");
+  }
+
+  /** Written down somewhere the database cannot reach, and read back to check against it. */
+  @Test
+  @DisplayName("reads back the form it is written down in")
+  void reads_back_what_it_writes() {
+    TrailHead head = new TrailHead(42, new byte[] {1, 2, (byte) 0xff});
+
+    assertThat(TrailHead.parse(head.toString())).isEqualTo(head);
+  }
+
+  @Test
+  @DisplayName("refuses anything not written in that form")
+  void refuses_anything_else() {
+    assertThatThrownBy(() -> TrailHead.parse("no colon"))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> TrailHead.parse(":abcd")).isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> TrailHead.parse("42:")).isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> TrailHead.parse("forty:abcd"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("<position>:<digest in hex>");
+    assertThatThrownBy(() -> TrailHead.parse("42:not-hex"))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }

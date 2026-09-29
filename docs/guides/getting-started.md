@@ -123,6 +123,12 @@ beside the storage, because it is where identity lives in this environment rathe
 the application grants. An application with no notion of identity says so with
 `withoutIdentity()` — there is no way to bind without deciding.
 
+To watch every operation as a timer and a span, hand binding a Micrometer `ObservationRegistry` —
+`Bindings.of(storage).withIdentity(...).observedBy(registry)`. Each observation carries the
+operation, the portal, the outcome and a refusal's reason, and never a value, an identifier, a label
+or an identity; the [Spring Boot guide](spring-boot.md#observability) lists them. The Spring starter
+does this for you.
+
 ## 5. Use it
 
 ```java

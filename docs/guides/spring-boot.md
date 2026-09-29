@@ -6,7 +6,7 @@ Add the starter and declare your axes. That is the whole of the wiring.
 <dependency>
   <groupId>org.jwcarman.occlude</groupId>
   <artifactId>occlude-spring-boot-starter</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.0</version>
 </dependency>
 ```
 
@@ -91,11 +91,11 @@ Storage storage() {
 }
 ```
 
-What operating the JDBC store needs -- `sweep()`, `reencrypt()`, `resign()`, the trail's `head()` for
-anchoring -- is published as a `StorageIntegrity` bean, which reads no value. Operations code takes
-that. The trail read back for an investigation, `AuditTrail`, discloses every label and identity, so
-it is registered like the store: ask for it with
-`@Qualifier(JdbcCharterAutoConfiguration.AUDIT_TRAIL)`.
+What operating the JDBC store needs — checking, sweeping, anchoring, re-encrypting, re-signing — is
+published as a `StorageIntegrity` bean, which reads no value; operations code takes that. The trail
+read back for an investigation, `AuditTrail`, discloses every label and identity, so it is registered
+like the store: ask for it with `@Qualifier(JdbcCharterAutoConfiguration.AUDIT_TRAIL)`. Both are
+[Operating a Store](operating.md).
 
 ```yaml
 occlude:
@@ -109,7 +109,10 @@ occlude:
     secrets:
       r1: ${OCCLUDE_ROOT_1}  # base64
     mac: HMAC_SHA256         # or HMAC_SHA384, HMAC_SHA512
+  migrate: true              # create the tables at startup; false where you manage the schema
 ```
+
+Every `occlude.*` property is in [Configuration](../configuration.md).
 
 What properties do not cover is reached with a `JdbcStorageConfigCustomizer` bean, applied before
 the store is built — keys per tenant, most often:
@@ -125,9 +128,9 @@ Keys and roots come from the environment or a secret store, never a committed fi
 `DataKeyProvider` bean — a KMS, Vault — replaces the configured keys entirely. Without keys, or
 without a root, startup fails naming what is missing.
 
-If an application declares a charter and nothing supplies storage -- or uses `occlude-jdbc` with no
-keys -- startup fails with Spring's report of the missing bean. It used to carry on silently and every
-portal refused at request time instead.
+If an application declares a charter and nothing supplies storage — or uses `occlude-jdbc` with no
+keys — startup fails with Spring's report of the missing bean, rather than serving requests that all
+refuse.
 
 ## The charter endpoint
 
@@ -143,13 +146,16 @@ management:
 ```
 
 ```
-/actuator/charter                      everything, and what to ask next
-/actuator/charter/types                every occluded type this charter mentions
-/actuator/charter/types/{name}         everything declared about values of that type
-/actuator/charter/sources/{name}       one door in
-/actuator/charter/sinks/{name}  one door out
-/actuator/charter/derivations/{name}   one way of making a value from another
-/actuator/charter/findings             what is provably unreachable
+/actuator/charter                       everything, and what to ask next
+/actuator/charter/types                 every occluded type this charter mentions
+/actuator/charter/types/{name}          everything declared about values of that type
+/actuator/charter/sources[/{name}]      the doors values enter through
+/actuator/charter/sinks[/{name}]        the doors values leave through
+/actuator/charter/derivations[/{name}]  what makes one value from others
+/actuator/charter/questions[/{name}]    what asks one bit of a value
+/actuator/charter/erasures[/{name}]     what may forget a value and its descendants
+/actuator/charter/inspections[/{name}]  what may read a value's label and lineage
+/actuator/charter/findings              what is provably unreachable
 ```
 
 The drill-down by type is the one to reach for. *"What can happen to an invoice?"* is one request:
@@ -158,12 +164,15 @@ The drill-down by type is the one to reach for. *"What can happen to an invoice?
 {
   "type": "invoice",
   "occludedBy": [],
-  "revealedAt": [ { "name": "support-ui",         "reads": ["invoice"] },
-                  { "name": "payment-processor",  "reads": ["invoice"] } ],
-  "madeBy":     [ { "name": "mail.confirmedInvoice", "detail": "mail -> invoice",
-                    "weakens": true } ],
-  "readBy":     [ { "name": "invoice.card.last4",    "detail": "invoice -> last4",
-                    "weakens": true } ],
+  "revealedAt": [ { "name": "support-ui", "reads": ["invoice"],
+                    "ceiling": "depends on the caller; render a manifest for one to see it" },
+                  { "name": "payment-processor", "reads": ["invoice"],
+                    "ceiling": "depends on the caller; render a manifest for one to see it" } ],
+  "madeBy":       [ { "name": "mail.confirmedInvoice", "detail": "mail -> invoice",
+                      "weakens": true } ],
+  "readBy":       [ { "name": "invoice.card.last4", "detail": "invoice -> last4",
+                      "weakens": true } ],
+  "askedAboutBy": [],
   "findings": []
 }
 ```
@@ -218,38 +227,9 @@ missing, and a jump in `ABOVE_CEILING` at one portal, which is somebody probing 
 broke a ceiling. To rename or reshape the observation, register an
 `OccludeObservationConvention` on the registry.
 
-### Checking the store on a schedule
-
-```yaml
-occlude:
-  integrity:
-    interval: 1h
-```
-
-Runs `StorageIntegrity.check()` — the chain, the values, what is missing, every ciphertext — on its
-own thread. Each run is an observation, `occlude.integrity`, tagged `occlude.integrity.result` =
-`intact`, `unreadable`, `altered` or `failed`; alert on `altered`. What was found is logged as counts, never
-ids, with the trail's head at INFO so shipping that line somewhere the database cannot reach is
-your anchor. Off unless set: a check reads and decrypts every row.
-
-### Seeing it in Grafana
-
-The example runs Grafana's all-in-one LGTM image beside its database. Start it with the demo
-profile and Spring Boot brings both containers up:
-
-```bash
-./mvnw -pl occlude-example spring-boot:run -Dspring-boot.run.profiles=demo
-```
-
-Grafana is at <http://localhost:3000>. In Explore, Prometheus has `occlude_operation_milliseconds_*`
-by operation, portal, outcome and reason, and `occlude_integrity_milliseconds_*` by result; Tempo
-has each request's trace with the Occlude operations inside it. If the example's database container
-is already running from an earlier session, Spring Boot starts nothing, so bring the rest up with
-`docker compose up -d` in `occlude-example` first.
-
-There is deliberately no health indicator. Health drives liveness and readiness probes, and an
-orchestrator restarting every instance because somebody edited one row turns a finding into an
-outage. Tampering is a page, not a restart.
+The store can also check itself on a schedule, with each run observed the same way — see
+[Operating a Store](operating.md#on-a-schedule). To see all of it in Grafana, the example application
+runs the whole stack beside its database; its README says how.
 
 ## Logging the manifest at startup
 

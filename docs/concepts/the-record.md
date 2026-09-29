@@ -23,26 +23,34 @@ a line could recompute everything after it.
 digests of its parents — so editing one breaks every value derived from it. There is no global
 order here and none is needed: a value is fixed by its ancestry rather than by when it arrived.
 
-## Three verifiers
+## Four verifiers
 
 ```java
-storage.firstBrokenEntry();   // a line edited, removed, reordered or replayed
-storage.brokenValues();       // a value edited, or descended from one
-storage.missingValues();      // announced by the trail, never erased, and not here
+integrity.firstBrokenEntry();   // a line edited, removed, reordered or replayed
+integrity.brokenValues();       // a value edited, or descended from one
+integrity.missingValues();      // announced by the trail, never erased, and not here
+integrity.unaccountedValues();  // here, and never announced or already erased
 ```
+
+`integrity.check()` runs them all, with a sweep of every ciphertext against its commitment. They
+live on the JDBC store's `StorageIntegrity`, not on the `Storage` interface — see
+[Operating a Store](../guides/operating.md).
 
 The third exists because the value graph is blind to one case. Deleting a **leaf** orphans nothing,
 so there is nothing left to disagree, and a verifier that walks the rows still present cannot miss
 what is absent. Only the trail can answer that, because only the trail is outside the row — which
-is why erasure records *which* values it destroyed, in the same transaction as the deletes.
+is why erasure records *which* values it destroyed, in the same transaction as the deletes. The
+fourth is the same argument the other way: a value put back after it was erased carries a genuine
+digest, and only the trail knows it should be gone.
 
-Check the chain first. `missingValues()` reports claims the trail makes, and whoever could delete a
-value row could delete its CONCEAL line too; the chain is what makes that visible.
+Check the chain first. The last two report claims the trail makes, and whoever could delete a value
+row could delete its CONCEAL line too; the chain is what makes that visible.
 
 ## What this does not detect
 
 **Tail truncation.** Removing the most recent lines leaves a chain that verifies perfectly.
 Detecting it requires an anchor kept somewhere the writer cannot reach — a periodic digest
-published elsewhere. This is a property of hash chains, not an oversight.
+published elsewhere, and checked with `stillHolds`. This is a property of hash chains, not an
+oversight.
 
 See [What Occlude Does Not Do](../limits.md).

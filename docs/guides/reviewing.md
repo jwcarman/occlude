@@ -15,25 +15,40 @@ charter manifest, as {tenant=acme}
   unconstrained label (bottom)
     {}
 
+  sources (1)
+    customer-mail  accepts a mail
+
   sinks (3)
-    support-ui         accepts up to {tenant=acme, integrity<=ENDORSED, sensitivity<=ORDINARY}
-    quarantined-llm    accepts up to {tenant=acme, integrity=any, sensitivity<=PERSONAL}
-    payment-processor  accepts up to {tenant=acme, integrity<=ENDORSED, sensitivity<=CARDHOLDER}
+    support-ui         accepts up to {tenant=acme, integrity=ENDORSED, sensitivity=ORDINARY}
+    approval-desk      accepts up to {tenant=acme, integrity=ENDORSED, sensitivity=ORDINARY}
+    payment-processor  accepts up to {tenant=acme, integrity=ENDORSED, sensitivity=CARDHOLDER}
     (what these doors accept for this access; another may be offered more or less)
 
   derivations (2)
+    mail.confirmedInvoice  mail -> invoice   << WEAKENS LABELS
     invoice.card.last4     invoice -> last4   << WEAKENS LABELS
-    mail.confirmedInvoice  mail -> invoice    << WEAKENS LABELS
 
   questions (1)
     mail.mentions  asks about mail, given a java.lang.String
-    (each answer is one bit and the asker chooses the question, so enough questions
-     read the value; a ceiling is what limits who may ask at all)
+    (each answer is one bit and the asker chooses the question, so enough questions read the
+     value; a ceiling is what limits who may ask at all)
+
+  erasures (0)
+    nothing can be erased
+
+  inspections (0)
+    no label can be read without the value
 
   2 operation(s) can WEAKEN a label:
-    invoice.card.last4     invoice -> last4
     mail.confirmedInvoice  mail -> invoice
+    invoice.card.last4  invoice -> last4
+
+  nothing unreachable: every door can be used and every type can exist
 ```
+
+That is the example application's charter, rendered for one tenant. The approval desk shows what
+it offers somebody who is not an approver; render it for `{tenant=acme, role=approver}` and it
+offers more.
 
 ## Render it for somebody
 

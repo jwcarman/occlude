@@ -79,9 +79,11 @@ nav:
       - Getting Started: guides/getting-started.md
       - Spring Boot: guides/spring-boot.md
       - Storage: guides/storage.md
+      - Operating a Store: guides/operating.md
       - Reviewing a Charter: guides/reviewing.md
       - Testing: guides/testing.md
   - Reference:
       - What Occlude Does Not Do: limits.md
+      - Configuration: configuration.md
       - Security Policy: https://github.com/jwcarman/occlude/blob/main/SECURITY.md
       - Changelog: https://github.com/jwcarman/occlude/blob/main/CHANGELOG.md

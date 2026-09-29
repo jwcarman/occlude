@@ -10,6 +10,8 @@ one object able to perform that operation — a **portal**.
 | `Derivation<I,O>` | make one value from another |
 | `Fold<I,O>` | make one value from many |
 | `Query<I,Q>` | ask one question of a value without the value leaving |
+| `Erasure` | forget a value and everything derived from it — see [Erasing](erasing.md) |
+| `Inspection` | read a value's label and lineage, without the value |
 
 ## Authority is held, never looked up
 
@@ -49,7 +51,19 @@ door it has says something else. Writing at another tenant's label is less refus
 
 The label may still depend on who is acting: a door fixes what is a property of the door itself —
 what arrives there, how far it is trusted, how sensitive it is — and reads the tenant from ambient
-context. So it is not quite a constant, but nothing a caller passes influences it.
+context. So it is not quite a constant, but nothing a caller passes influences it. A source takes its
+label in one of three shapes:
+
+```java
+charter.source("notes", NOTE, Label.of(TENANT, "acme"));                  // always the same
+charter.source("customer-mail", MAIL, ctx -> label(ctx, UNENDORSED, PERSONAL)); // who is acting
+charter.source("claims", CLAIM, (claim, ctx) -> labelFor(claim, ctx));    // and what arrived
+```
+
+The last reads the arriving value itself — a claim that mentions a card is labelled `CARDHOLDER`,
+say. It is the door's function doing it, declared once and listed in the manifest, not the caller.
+Occluding is refused with a `RefusedException` when the function cannot say (`SOURCE_CANNOT_LABEL`)
+or leaves a required axis unsaid (`INCOMPLETE_LABEL`).
 
 !!! note "Occluding is the axiom"
     Occluding is where data enters, and at that moment there is no earlier label to check against.
@@ -78,17 +92,70 @@ ordinary outcome worth branching on.
 
 ```java
 switch (out) {
-  case Revealed.Allowed<Invoice> allowed -> send(allowed.value());
+  case Revealed.Allowed<Invoice> allowed -> send(allowed.plaintext());
   case Revealed.Denied<Invoice> denied   -> log(denied.reason());
 }
 ```
+
+## Asking a question
+
+A question looks at the value and returns one bit, and the value never leaves:
+
+```java
+Query<Mail, String> mentions = charter.query("mail.mentions", MAIL, String.class,
+    (mail, text, ctx) -> mail.body().contains(text),
+    q -> q.accepting(ctx -> ceiling(ctx, UNENDORSED, PERSONAL))
+          .availableTo(ctx -> ctx.has("role", "agent")));
+
+Answer answer = mentions.ask(held, "INV-4471");
+if (answer.isTrue()) { ... }         // ran, and said yes
+if (answer.isFalse()) { ... }        // ran, and said no -- a refusal is neither
+```
+
+`accepting` says which values it may look at; `availableTo`, optional, says in which contexts it is
+offered at all. Ask it against plain values only: a question handed a `Consumer` or a list could put
+the value there, and the manifest lists any that are not, as a `not-a-plain-value` finding. Enough
+questions read a value a bit at a time — see [What Occlude Does Not Do](../limits.md).
+
+## Reading a label
+
+An `Inspection` reads what the record says about a value — its label and its lineage — without the
+value. It is a portal of its own because a label can say as much as the value it describes:
+
+```java
+Inspection supportDesk = charter.inspection("support-desk",
+    ctx -> Ceiling.of(TENANT, Constraint.atMost(ctx.get("tenant").orElseThrow())));
+
+supportDesk.inspect(held).value()
+    .ifPresent(seen -> render(seen.label(), seen.lineage()));
+```
+
+## What comes back
+
+Every portal but `Occlude` returns a sealed result rather than throwing, because a refusal is an
+ordinary outcome: a prompt renders the handle instead, a tool reports that it cannot proceed. Each
+has `value()` — what it produced, when it produced anything — `succeeded()`, and `orThrow()` for code
+that cannot go on without it, which throws a `RefusedException` naming the reason.
+
+| portal | result | when it succeeds | reasons it refuses |
+|---|---|---|---|
+| `Reveal` | `Revealed` | `Allowed(plaintext)` | `NO_SUCH_VALUE`, `WRONG_TYPE`, `ABOVE_CEILING` |
+| `Derivation`, `Fold` | `Derived` | `Made(occluded)` | `NO_PARENTS`, `NO_SUCH_VALUE`, `WRONG_TYPE`, `ABOVE_CEILING`, `NOT_AVAILABLE_HERE`, `NOT_A_LOWERING`, `DECLINED` |
+| `Query` | `Answer` | `Answered(value)` — see `isTrue()` / `isFalse()` | `NO_SUCH_VALUE`, `WRONG_TYPE`, `ABOVE_CEILING`, `NOT_AVAILABLE_HERE` |
+| `Erasure` | `Erased` | `Removed(count)` | `NO_SUCH_VALUE`, `NOT_PERMITTED` |
+| `Inspection` | `Inspected` | `Seen(label, lineage)` | `NO_SUCH_VALUE`, `ABOVE_CEILING` |
+
+The reason is a code that names a rule and never a value; each refusal also carries a `detail` for
+whoever handles it. When application code a portal runs — a ceiling, a derivation — throws, the
+refusal says which exception, by class name, and never its message.
 
 ## Occluded references disclose nothing
 
 An `Occluded<T>` prints as its identifier and nothing else, and carries no runtime type. Knowing
 that an occluded reference is a card token rather than a display name is itself a disclosure, so a refusal
 will not tell you either — the ceiling is checked before the type, and a caller who may not see the
-value is not told what kind of value it is.
+value is not told what kind of value it is. (Its identifier does disclose when the value was made —
+see [What Occlude Does Not Do](../limits.md).)
 
 ## The lifecycle
 

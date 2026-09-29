@@ -13,10 +13,12 @@ class InvoiceChecksTest {
 
   private final MemoryStorage storage = new MemoryStorage();
   private final Map<String, String> asking = new HashMap<>(Map.of("tenant", "acme"));
-  private final DefaultCharter charter = new DefaultCharter(BillingAxes.axes());
+  private final DefaultCharter charter = new DefaultCharter(Axes.of(TENANT, SENSITIVITY));
 
-  private final Occlude<Invoice> invoices = Invoices.source(charter);
-  private final Reveal<Invoice> billingUi = Invoices.billingUi(charter);
+  // Your own declarations -- the same methods your configuration calls, so the test exercises the
+  // real ceilings rather than copies of them.
+  private final Occlude<Invoice> invoices = InvoicePortals.source(charter);
+  private final Reveal<Invoice> billingUi = InvoicePortals.billingUi(charter);
 
   {
     charter.bind(Bindings.of(storage).withIdentity(() -> AccessContext.of(asking)));
@@ -33,8 +35,9 @@ class InvoiceChecksTest {
 }
 ```
 
-Declare your portals the same way production does — a static method or a configuration class that
-takes the `Charter` — so the test exercises the real ceilings rather than copies of them.
+`InvoicePortals` stands for wherever your application declares its portals: keep the declarations
+in methods that take the `Charter` — a configuration class, or static methods like these — so a test
+calls exactly what production does.
 
 **Refusals are results, so assert on them directly.** `reveal(...).succeeded()`, `derive(...).value()`,
 `ask(...)` returning `Answer.Refused` with a reason. Nothing needs to be caught, and the reason tells
@@ -115,5 +118,6 @@ class BillingIT {
 The example application does the same with a `demo` profile holding fixed secrets, which is fine
 for a demo and exactly what a real application must never check in.
 
-This is also the place to test operations code: take the `StorageIntegrity` bean, and assert that
-`sweep().intact()` holds after your test has run its traffic through.
+This is also the place to test operations code — `MemoryStorage` has no `integrity()` or `trail()`,
+so checking and reading the record back need the real store. Take the `StorageIntegrity` bean and
+assert that `check().intact()` holds after your test has run its traffic through.
