@@ -24,10 +24,52 @@ package org.jwcarman.occlude;
 public sealed interface Answer {
 
   /** The check ran and this is what it said. */
-  record Answered(boolean value) implements Answer {}
+  record Answered(boolean value) implements Answer {
+
+    @Override
+    public boolean isTrue() {
+      return value;
+    }
+
+    @Override
+    public boolean isFalse() {
+      return !value;
+    }
+
+    @Override
+    public boolean ran() {
+      return true;
+    }
+
+    @Override
+    public boolean orThrow() {
+      return value;
+    }
+  }
 
   /** The check did not run. */
-  record Refused(Reason reason, String detail) implements Answer {}
+  record Refused(Reason reason, String detail) implements Answer {
+
+    @Override
+    public boolean isTrue() {
+      return false;
+    }
+
+    @Override
+    public boolean isFalse() {
+      return false;
+    }
+
+    @Override
+    public boolean ran() {
+      return false;
+    }
+
+    @Override
+    public boolean orThrow() {
+      throw new AccessDeniedException(reason.name(), detail);
+    }
+  }
 
   enum Reason {
     NO_SUCH_VALUE,
@@ -37,18 +79,13 @@ public sealed interface Answer {
   }
 
   /** True only when the check ran and said yes. A refusal is not a yes. */
-  default boolean isTrue() {
-    return this instanceof Answered answered && answered.value();
-  }
+  boolean isTrue();
 
   /** True only when the check ran and said no. A refusal is not a no either. */
-  default boolean isFalse() {
-    return this instanceof Answered answered && !answered.value();
-  }
+  boolean isFalse();
 
-  default boolean ran() {
-    return this instanceof Answered;
-  }
+  /** Whether the check ran at all. */
+  boolean ran();
 
   /**
    * The answer, or an exception naming the refusal.
@@ -56,11 +93,5 @@ public sealed interface Answer {
    * <p>For a caller that cannot proceed without one. Prefer {@link #isTrue()} where a refusal and a
    * "no" should be handled differently, which is usually.
    */
-  default boolean orThrow() {
-    if (this instanceof Answered answered) {
-      return answered.value();
-    }
-    Refused refused = (Refused) this;
-    throw new AccessDeniedException(refused.reason().name(), refused.detail());
-  }
+  boolean orThrow();
 }

@@ -26,10 +26,42 @@ import java.util.OptionalInt;
 public sealed interface Erased {
 
   /** The value and everything derived from it are gone. */
-  record Removed(int count) implements Erased {}
+  record Removed(int count) implements Erased {
+
+    @Override
+    public OptionalInt removed() {
+      return OptionalInt.of(count);
+    }
+
+    @Override
+    public boolean succeeded() {
+      return true;
+    }
+
+    @Override
+    public int orThrow() {
+      return count;
+    }
+  }
 
   /** Nothing was removed, and why. */
-  record Refused(Reason reason, String detail) implements Erased {}
+  record Refused(Reason reason, String detail) implements Erased {
+
+    @Override
+    public OptionalInt removed() {
+      return OptionalInt.empty();
+    }
+
+    @Override
+    public boolean succeeded() {
+      return false;
+    }
+
+    @Override
+    public int orThrow() {
+      throw new AccessDeniedException(reason.name(), detail);
+    }
+  }
 
   /** Why nothing was removed. */
   enum Reason {
@@ -40,20 +72,11 @@ public sealed interface Erased {
   }
 
   /** How many values were removed, the root included, or empty when nothing was. */
-  default OptionalInt removed() {
-    return this instanceof Removed removed ? OptionalInt.of(removed.count()) : OptionalInt.empty();
-  }
+  OptionalInt removed();
 
-  default boolean succeeded() {
-    return this instanceof Removed;
-  }
+  /** Whether anything was removed. */
+  boolean succeeded();
 
   /** How many values were removed, or an exception naming the refusal. */
-  default int orThrow() {
-    if (this instanceof Removed removed) {
-      return removed.count();
-    }
-    Refused refused = (Refused) this;
-    throw new AccessDeniedException(refused.reason().name(), refused.detail());
-  }
+  int orThrow();
 }

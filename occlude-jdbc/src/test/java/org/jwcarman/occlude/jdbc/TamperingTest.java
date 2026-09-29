@@ -184,7 +184,8 @@ class TamperingTest {
     assertThatThrownBy(() -> memoDesk.reveal(asMemo)).isInstanceOf(StorageIntegrityException.class);
     assertThat(reasonsRecorded()).contains("NOT_AS_SIGNED");
     TypeRef<Memo> memoType = TypeRef.of(Memo.class);
-    assertThatThrownBy(() -> storage.value(note.id(), memoType))
+    String id = note.id();
+    assertThatThrownBy(() -> storage.value(id, memoType))
         .isInstanceOf(StorageIntegrityException.class);
   }
 
@@ -195,8 +196,8 @@ class TamperingTest {
 
     execute("UPDATE occlude_value SET derivation = 'whisper' WHERE value_id = ?", shouted.id());
 
-    assertThatThrownBy(() -> storage.metadata(shouted.id()))
-        .isInstanceOf(StorageIntegrityException.class);
+    String id = shouted.id();
+    assertThatThrownBy(() -> storage.metadata(id)).isInstanceOf(StorageIntegrityException.class);
   }
 
   /**
@@ -209,8 +210,8 @@ class TamperingTest {
 
     execute("DELETE FROM occlude_lineage WHERE child_id = ?", shouted.id());
 
-    assertThatThrownBy(() -> storage.metadata(shouted.id()))
-        .isInstanceOf(StorageIntegrityException.class);
+    String id = shouted.id();
+    assertThatThrownBy(() -> storage.metadata(id)).isInstanceOf(StorageIntegrityException.class);
     assertThat(storage.brokenValues()).contains(shouted.id());
   }
 
@@ -225,8 +226,8 @@ class TamperingTest {
         second.id(),
         first.id());
 
-    assertThatThrownBy(() -> storage.metadata(second.id()))
-        .isInstanceOf(StorageIntegrityException.class);
+    String id = second.id();
+    assertThatThrownBy(() -> storage.metadata(id)).isInstanceOf(StorageIntegrityException.class);
   }
 
   // ------------------------------------------------------------------ sweeping for it

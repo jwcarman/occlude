@@ -366,8 +366,8 @@ class JdbcCharterTest {
     }
 
     TypeRef<Card> cardType = TypeRef.of(Card.class);
-    assertThatThrownBy(() -> storage.value(card.id(), cardType))
-        .isInstanceOf(RuntimeException.class);
+    String id = card.id();
+    assertThatThrownBy(() -> storage.value(id, cardType)).isInstanceOf(RuntimeException.class);
   }
 
   /**
@@ -396,10 +396,11 @@ class JdbcCharterTest {
     }
 
     TypeRef<Card> cardType = TypeRef.of(Card.class);
-    assertThatThrownBy(() -> storage.value(mine.id(), cardType))
+    String id = mine.id();
+    assertThatThrownBy(() -> storage.value(id, cardType))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("not what was signed");
-    assertThatThrownBy(() -> storage.metadata(mine.id()))
+    assertThatThrownBy(() -> storage.metadata(id))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("not what was signed");
   }

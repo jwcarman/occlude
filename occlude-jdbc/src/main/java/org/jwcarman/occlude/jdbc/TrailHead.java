@@ -42,9 +42,14 @@ public record TrailHead(long entryId, byte[] digest) {
 
   @Override
   public boolean equals(Object other) {
-    return other instanceof TrailHead that
-        && entryId == that.entryId
-        && Arrays.equals(digest, that.digest);
+    if (this == other) {
+      return true;
+    }
+    if (other == null || getClass() != other.getClass()) {
+      return false;
+    }
+    TrailHead that = (TrailHead) other;
+    return entryId == that.entryId && Arrays.equals(digest, that.digest);
   }
 
   @Override

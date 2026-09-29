@@ -48,9 +48,8 @@ final class Operations {
    * <p>Irreversible: there is no unbinding, no rebinding, and no replacing the storage.
    */
   void bind(Axes axes, Storage storage, AccessContextProvider currentAccess) {
-    if (bound.get() != null) {
-      throw new IllegalStateException("this charter is already bound");
-    }
+    // Built first, published once. Whoever loses the compare-and-set -- a second bind, or one that
+    // raced the first -- is refused the same way, and what it built is never seen by anything.
     Gate gate = new Gate(axes, currentAccess);
     Trail trail = new Trail(storage);
     Bound operations =
@@ -62,7 +61,7 @@ final class Operations {
             new Erasing(gate, trail, storage),
             new Inspecting(gate, trail, storage));
     if (!bound.compareAndSet(null, operations)) {
-      throw new IllegalStateException("this charter was bound while it was being bound");
+      throw new IllegalStateException("this charter is already bound");
     }
   }
 

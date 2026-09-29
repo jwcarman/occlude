@@ -106,13 +106,13 @@ final class Signer {
           "the root '" + id + "' is shorter than " + MINIMUM_ROOT_BYTES + " bytes");
     }
     try {
-      Mac mac = Mac.getInstance(algorithm.jcaName());
-      mac.init(new SecretKeySpec(secret, algorithm.jcaName()));
-      mac.update((byte) domain.ordinal());
-      feed(mac, id.getBytes(UTF_8));
+      Mac hmac = Mac.getInstance(algorithm.jcaName());
+      hmac.init(new SecretKeySpec(secret, algorithm.jcaName()));
+      hmac.update((byte) domain.ordinal());
+      feed(hmac, id.getBytes(UTF_8));
       // The algorithm is signed too, so a row cannot claim one it was not signed with.
-      feed(mac, algorithm.jcaName().getBytes(UTF_8));
-      return mac;
+      feed(hmac, algorithm.jcaName().getBytes(UTF_8));
+      return hmac;
     } catch (NoSuchAlgorithmException | InvalidKeyException e) {
       throw new IllegalStateException("this JVM cannot compute " + algorithm.jcaName(), e);
     }
@@ -280,21 +280,21 @@ final class Signer {
       ValueCommitments commitments,
       String derivation,
       List<byte[]> parents) {
-    Mac mac = keyed(Domain.VALUE, under, algorithm);
+    Mac hmac = keyed(Domain.VALUE, under, algorithm);
     // Counted before they are fed. The parents are the only run whose length varies, so without a
     // count a value with two parents and a value with one could be fed identical bytes.
-    feedCount(mac, parents.size());
+    feedCount(hmac, parents.size());
     for (byte[] parent : parents) {
-      feed(mac, parent);
+      feed(hmac, parent);
     }
-    feed(mac, id.getBytes(UTF_8));
-    feed(mac, type.getBytes(UTF_8));
-    feed(mac, commitments.payload());
-    feed(mac, commitments.label());
+    feed(hmac, id.getBytes(UTF_8));
+    feed(hmac, type.getBytes(UTF_8));
+    feed(hmac, commitments.payload());
+    feed(hmac, commitments.label());
     // What made it. Left out, it was free to change: the parents stayed right, the digest stayed
     // right, and lineage() named a derivation that had never run.
-    feed(mac, derivation == null ? null : derivation.getBytes(UTF_8));
-    return mac.doFinal();
+    feed(hmac, derivation == null ? null : derivation.getBytes(UTF_8));
+    return hmac.doFinal();
   }
 
   /**
@@ -321,16 +321,16 @@ final class Signer {
       Instant recordedAt,
       LineFacts facts,
       byte[] commitment) {
-    Mac mac = keyed(Domain.LINE, under, algorithm);
-    feed(mac, previous);
-    feed(mac, recordedAt.toString().getBytes(UTF_8));
-    feed(mac, facts.operation().getBytes(UTF_8));
-    feed(mac, facts.value().getBytes(UTF_8));
-    feed(mac, facts.target() == null ? null : facts.target().getBytes(UTF_8));
-    feed(mac, facts.outcome().getBytes(UTF_8));
-    feed(mac, facts.reason() == null ? null : facts.reason().getBytes(UTF_8));
-    feed(mac, commitment);
-    return mac.doFinal();
+    Mac hmac = keyed(Domain.LINE, under, algorithm);
+    feed(hmac, previous);
+    feed(hmac, recordedAt.toString().getBytes(UTF_8));
+    feed(hmac, facts.operation().getBytes(UTF_8));
+    feed(hmac, facts.value().getBytes(UTF_8));
+    feed(hmac, facts.target() == null ? null : facts.target().getBytes(UTF_8));
+    feed(hmac, facts.outcome().getBytes(UTF_8));
+    feed(hmac, facts.reason() == null ? null : facts.reason().getBytes(UTF_8));
+    feed(hmac, commitment);
+    return hmac.doFinal();
   }
 
   /** The digest of one trail line, or empty when it cannot be checked at all. */

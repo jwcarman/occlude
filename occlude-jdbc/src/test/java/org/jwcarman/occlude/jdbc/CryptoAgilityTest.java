@@ -147,7 +147,8 @@ class CryptoAgilityTest {
   void retires_a_key_after_reencrypting() {
     List<Occluded<Note>> written = writeThrough(underFirst());
     String id = written.getFirst().id();
-    assertThatThrownBy(() -> underSecondOnly().value(id, NOTE_TYPE))
+    JdbcStorage withoutTheOldKey = underSecondOnly();
+    assertThatThrownBy(() -> withoutTheOldKey.value(id, NOTE_TYPE))
         .as("before re-encrypting, the old key is still needed")
         .isInstanceOf(RuntimeException.class);
 
@@ -218,14 +219,14 @@ class CryptoAgilityTest {
   @DisplayName("refuses to re-encrypt a line whose protected fields were swapped")
   void refuses_to_launder_a_tampered_line() throws SQLException {
     writeThrough(underFirst());
-    long first = firstLine();
+    long firstEntry = firstLine();
     try (Connection connection = dataSource.getConnection();
         var statement =
             connection.prepareStatement(
                 "UPDATE occlude_audit SET context = (SELECT context FROM occlude_audit WHERE"
                     + " entry_id = ?) WHERE entry_id = ?")) {
-      statement.setLong(1, first + 1);
-      statement.setLong(2, first);
+      statement.setLong(1, firstEntry + 1);
+      statement.setLong(2, firstEntry);
       statement.executeUpdate();
     }
     // The context of every line here is the same access, so make the swap say something else.
@@ -233,7 +234,7 @@ class CryptoAgilityTest {
         var statement =
             connection.prepareStatement(
                 "UPDATE occlude_audit SET label = NULL WHERE entry_id = ?")) {
-      statement.setLong(1, first);
+      statement.setLong(1, firstEntry);
       statement.executeUpdate();
     }
 
@@ -241,25 +242,25 @@ class CryptoAgilityTest {
 
     assertThatThrownBy(rotating::reencrypt)
         .isInstanceOf(IllegalStateException.class)
-        .hasMessage("line " + first + " of the trail is not what was signed for it");
+        .hasMessage("line " + firstEntry + " of the trail is not what was signed for it");
   }
 
   @Test
   @DisplayName("refuses to re-encrypt a line whose MAC name was rewritten")
   void refuses_to_reencrypt_a_line_with_a_rewritten_mac() throws SQLException {
     writeThrough(underFirst());
-    long first = firstLine();
+    long firstEntry = firstLine();
     try (Connection connection = dataSource.getConnection();
         var statement =
             connection.prepareStatement(
                 "UPDATE occlude_audit SET mac = 'HmacMD5' WHERE entry_id = ?")) {
-      statement.setLong(1, first);
+      statement.setLong(1, firstEntry);
       statement.executeUpdate();
     }
 
     JdbcStorage rotating = underFirst();
 
-    assertThatThrownBy(rotating::reencrypt).hasMessageContaining("line " + first);
+    assertThatThrownBy(rotating::reencrypt).hasMessageContaining("line " + firstEntry);
   }
 
   /**

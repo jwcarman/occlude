@@ -181,8 +181,9 @@ public final class JdbcStorage implements Storage {
         Statement statement = connection.createStatement()) {
       for (String each :
           Arrays.stream(sql.split(";")).filter(Predicate.not(String::isBlank)).toList()) {
-        statement.execute(each);
+        statement.addBatch(each);
       }
+      statement.executeBatch();
     } catch (SQLException e) {
       throw new IllegalStateException("could not create the store schema", e);
     }

@@ -154,10 +154,10 @@ final class Fields {
 
     @Override
     public boolean equals(Object other) {
-      return other instanceof Line that
-          && Arrays.equals(detail, that.detail)
-          && Arrays.equals(label, that.label)
-          && Arrays.equals(context, that.context);
+      return other instanceof Line(byte[] thatDetail, byte[] thatLabel, byte[] thatContext)
+          && Arrays.equals(detail, thatDetail)
+          && Arrays.equals(label, thatLabel)
+          && Arrays.equals(context, thatContext);
     }
 
     @Override

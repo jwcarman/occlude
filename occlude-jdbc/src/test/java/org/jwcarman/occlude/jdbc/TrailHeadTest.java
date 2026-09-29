@@ -38,6 +38,14 @@ class TrailHeadTest {
   }
 
   @Test
+  @DisplayName("is equal to itself and never to nothing")
+  void equals_itself_and_not_null() {
+    TrailHead head = new TrailHead(7, DIGEST);
+
+    assertThat(head).isEqualTo(head).isNotEqualTo(null);
+  }
+
+  @Test
   @DisplayName("is not equal to a different line, a different digest, or something else")
   void is_unequal_otherwise() {
     TrailHead head = new TrailHead(7, DIGEST);
