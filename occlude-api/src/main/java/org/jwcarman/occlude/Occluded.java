@@ -59,7 +59,13 @@ public record Occluded<T>(String id) {
     }
   }
 
-  /** A typed view of an occluded reference that arrived as text. */
+  /**
+   * A typed view of an occluded reference that arrived as text.
+   *
+   * @param id the value's identifier, never blank
+   * @param <T> the type of value the reference stands in for, as far as the compiler is concerned
+   * @return the reference
+   */
   public static <T> Occluded<T> of(String id) {
     return new Occluded<>(id);
   }

@@ -77,11 +77,17 @@ public record Manifest(
   public record Entry(
       String name, String detail, boolean weakens, List<String> reads, String writes) {
 
+    /** Copies the reads, so an entry cannot change once made. */
     public Entry {
       reads = List.copyOf(reads);
     }
 
-    /** Whether this declaration has anything to do with values of that type. */
+    /**
+     * Whether this declaration has anything to do with values of that type.
+     *
+     * @param type the occluded type's name
+     * @return true if this reads that type or writes it
+     */
     public boolean touches(String type) {
       return reads.contains(type) || type.equals(writes);
     }
@@ -105,6 +111,7 @@ public record Manifest(
    */
   public record Finding(String kind, String about, String detail) {}
 
+  /** Copies every list, so a manifest cannot change once rendered. */
   public Manifest {
     sources = List.copyOf(sources);
     findings = List.copyOf(findings);
@@ -115,7 +122,12 @@ public record Manifest(
     inspections = List.copyOf(inspections);
   }
 
-  /** Findings of one kind, for a build that cares about some and not others. */
+  /**
+   * Findings of one kind, for a build that cares about some and not others.
+   *
+   * @param kind the stable code to select
+   * @return the findings of that kind
+   */
   public List<Finding> findings(String kind) {
     return findings.stream().filter(finding -> kind.equals(finding.kind())).toList();
   }
@@ -126,6 +138,9 @@ public record Manifest(
    * <p>The question somebody actually arrives with: not "what does this application permit" but
    * "what can happen to a card". Which doors it enters through, which doors it leaves by, what can
    * be made from it and what it can be made from, what may be asked about it.
+   *
+   * @param type the occluded type's name
+   * @return a manifest of only what concerns that type
    */
   public Manifest about(String type) {
     return new Manifest(
@@ -148,6 +163,8 @@ public record Manifest(
    * <p>One list, because there is one kind of operation. Derivations over several values were once
    * a separate type, and were quietly missing from this report for exactly as long as nobody
    * looked.
+   *
+   * @return the entries that can weaken a label
    */
   public List<Entry> weakening() {
     return derivations.stream().filter(Entry::weakens).toList();

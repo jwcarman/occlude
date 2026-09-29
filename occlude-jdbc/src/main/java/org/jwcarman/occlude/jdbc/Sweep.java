@@ -51,6 +51,8 @@ public record Sweep(
   /**
    * Whether nothing was <i>provably</i> altered. Not the same as untouched: unreadable fields are
    * not counted, for the reasons in the class notes.
+   *
+   * @return true when no value or line was provably altered
    */
   public boolean intact() {
     return alteredValues.isEmpty() && alteredLines.isEmpty();

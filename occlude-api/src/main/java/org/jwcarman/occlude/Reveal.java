@@ -50,7 +50,11 @@ package org.jwcarman.occlude;
  */
 public interface Reveal<T> {
 
-  /** What comes out of it. */
+  /**
+   * What comes out of it.
+   *
+   * @return the type this door hands over, and the name it is stored under
+   */
   OccludedType<T> type();
 
   /**
@@ -66,6 +70,8 @@ public interface Reveal<T> {
    * message that explains itself is an oracle: code that may not read a value could still learn its
    * classification by asking often enough.
    *
+   * @param occluded the reference to the value wanted
+   * @return the value, or the refusal
    * @throws IllegalStateException if this door was never brought into force
    */
   Revealed<T> reveal(Occluded<T> occluded);

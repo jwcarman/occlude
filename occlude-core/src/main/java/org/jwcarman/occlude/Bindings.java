@@ -46,7 +46,12 @@ public final class Bindings {
     this.observations = observations;
   }
 
-  /** Binding to this store; identity is decided next. */
+  /**
+   * Binding to this store; identity is decided next.
+   *
+   * @param storage the storage the charter is bound to, never null
+   * @return the next step, which still has to decide identity
+   */
   public static Store of(Storage storage) {
     return new Store(Objects.requireNonNull(storage, "a charter is bound to a storage"));
   }
@@ -70,6 +75,9 @@ public final class Bindings {
    * portal, the outcome, the reason for a refusal and the class of anything thrown -- a timer and a
    * span through whatever handlers the registry has. Nothing a value, a label or an identity could
    * appear in. Without this, nothing is observed at all.
+   *
+   * @param observations the registry every operation is observed through, never null
+   * @return these bindings, observed through that registry
    */
   public Bindings observedBy(ObservationRegistry observations) {
     return new Bindings(
@@ -93,6 +101,9 @@ public final class Bindings {
      * <p>Whatever this returns is taken as fact. It is the one input a caller cannot argue with,
      * which is why it must come from somewhere a caller does not control: a {@code ThreadLocal}, a
      * {@code ScopedValue}, Spring's {@code SecurityContextHolder}.
+     *
+     * @param currentAccess where the acting identity comes from, never null
+     * @return bindings that ask that source on every operation
      */
     public Bindings withIdentity(AccessContextProvider currentAccess) {
       return new Bindings(
@@ -106,6 +117,8 @@ public final class Bindings {
      *
      * <p>Said here rather than arrived at by leaving something out. A ceiling written as "unless
      * the context says otherwise" is wider than it looks when the context is always empty.
+     *
+     * @return bindings with no identity behind any access
      */
     public Bindings withoutIdentity() {
       return new Bindings(storage, AccessContextProvider.none(), ObservationRegistry.NOOP);

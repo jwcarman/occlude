@@ -27,6 +27,12 @@ public class StorageUnreadableException extends IllegalStateException {
 
   private static final long serialVersionUID = 1L;
 
+  /**
+   * A field that would not decrypt with the keys at hand.
+   *
+   * @param message which field, naming identifiers and never values
+   * @param cause why it would not decrypt
+   */
   public StorageUnreadableException(String message, Throwable cause) {
     super(message, cause);
   }

@@ -57,10 +57,23 @@ public sealed interface Constraint<T> {
    */
   record Any<T>() implements Constraint<T> {}
 
+  /**
+   * At or below one value.
+   *
+   * @param <T> the axis's type
+   * @param value the most constrained value admitted
+   * @return the constraint
+   */
   static <T> Constraint<T> atMost(T value) {
     return new AtMost<>(value);
   }
 
+  /**
+   * Anything the axis considers a usable value.
+   *
+   * @param <T> the axis's type
+   * @return the constraint
+   */
   static <T> Constraint<T> any() {
     return new Any<>();
   }

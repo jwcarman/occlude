@@ -41,6 +41,7 @@ public final class StorageIntegrity {
   /**
    * The digest of the last line written, for publishing somewhere the database cannot reach.
    *
+   * @return the head, or empty when nothing has been recorded yet
    * @see JdbcStorage#head()
    */
   public Optional<TrailHead> head() {
@@ -50,6 +51,8 @@ public final class StorageIntegrity {
   /**
    * Whether the trail still contains a head published earlier, exactly as it was.
    *
+   * @param anchor a head published earlier, never null
+   * @return true when the trail still holds that head exactly
    * @see JdbcStorage#stillHolds(TrailHead)
    */
   public boolean stillHolds(TrailHead anchor) {
@@ -59,6 +62,7 @@ public final class StorageIntegrity {
   /**
    * Where the trail stops agreeing with itself, or empty when it is intact.
    *
+   * @return the id of the first line that does not agree, or empty when the trail is intact
    * @see JdbcStorage#firstBrokenEntry()
    */
   public Optional<Long> firstBrokenEntry() {
@@ -68,6 +72,7 @@ public final class StorageIntegrity {
   /**
    * Every value the trail says should be here and is not.
    *
+   * @return the identifiers of values the trail announced, never erased, and which are not here
    * @see JdbcStorage#missingValues()
    */
   public List<String> missingValues() {
@@ -77,6 +82,7 @@ public final class StorageIntegrity {
   /**
    * Every value present that the trail says should not be: never announced, or lawfully erased.
    *
+   * @return the identifiers of values the trail does not account for
    * @see JdbcStorage#unaccountedValues()
    */
   public List<String> unaccountedValues() {
@@ -86,6 +92,7 @@ public final class StorageIntegrity {
   /**
    * Every value whose digest no longer agrees with its own bytes and its ancestry.
    *
+   * @return the identifiers of values whose digest does not agree
    * @see JdbcStorage#brokenValues()
    */
   public List<String> brokenValues() {
@@ -96,6 +103,7 @@ public final class StorageIntegrity {
    * Every stored field decrypted and checked against what was signed for it, reporting what was
    * altered apart from what was unreadable.
    *
+   * @return the values and lines found altered, and those found unreadable
    * @see JdbcStorage#sweep()
    */
   public Sweep sweep() {
@@ -108,6 +116,8 @@ public final class StorageIntegrity {
    *
    * <p>What a scheduled job runs. The head is read first, so a line written while the checks run is
    * simply after it, and an anchor taken from this report was verified up to where it points.
+   *
+   * @return every finding, and the head to anchor
    */
   public IntegrityReport check() {
     Optional<TrailHead> head = storage.head();
@@ -136,6 +146,7 @@ public final class StorageIntegrity {
    * The same, for a store that has never published an anchor -- a choice, for the reason given
    * there.
    *
+   * @return what was re-signed, and the trail's head before and after
    * @see JdbcStorage#resignWithoutAnchors()
    */
   public Resigned resignWithoutAnchors() {

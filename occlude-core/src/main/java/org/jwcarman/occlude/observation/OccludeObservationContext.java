@@ -39,7 +39,11 @@ public class OccludeObservationContext extends Observation.Context {
     /** Something went wrong that is not a decision: a database down, a key service unreachable. */
     FAILED;
 
-    /** The value as it appears on a metric or a span. */
+    /**
+     * The value as it appears on a metric or a span.
+     *
+     * @return the outcome's lower-case name
+     */
     public String value() {
       return name().toLowerCase(Locale.ROOT);
     }
@@ -51,44 +55,79 @@ public class OccludeObservationContext extends Observation.Context {
   private String reason;
   private String errorType;
 
+  /**
+   * An observation of one operation at one portal.
+   *
+   * @param operation what is being attempted, never null
+   * @param portal the portal's declared name, never null
+   */
   public OccludeObservationContext(AuditRecord.Operation operation, String portal) {
     this.operation = Objects.requireNonNull(operation, "an observation is of some operation");
     this.portal = Objects.requireNonNull(portal, "an observation is at some portal");
   }
 
-  /** What was attempted. */
+  /**
+   * What was attempted.
+   *
+   * @return the operation
+   */
   public AuditRecord.Operation getOperation() {
     return operation;
   }
 
-  /** The portal's declared name. */
+  /**
+   * The portal's declared name.
+   *
+   * @return the portal's name
+   */
   public String getPortal() {
     return portal;
   }
 
-  /** How it ended; {@link Outcome#ALLOWED} until told otherwise. */
+  /**
+   * How it ended; {@link Outcome#ALLOWED} until told otherwise.
+   *
+   * @return the outcome
+   */
   public Outcome getOutcome() {
     return outcome;
   }
 
-  /** The coarse reason code for a refusal, or {@code null}. Names a rule, never a value. */
+  /**
+   * The coarse reason code for a refusal, or {@code null}. Names a rule, never a value.
+   *
+   * @return the refusal's code, or null
+   */
   public String getReason() {
     return reason;
   }
 
-  /** The fully-qualified class name of what was thrown, or {@code null}. Never its message. */
+  /**
+   * The fully-qualified class name of what was thrown, or {@code null}. Never its message.
+   *
+   * @return the class name of what was thrown, or null
+   */
   public String getErrorType() {
     return errorType;
   }
 
-  /** It was refused, for this reason; {@code thrown} is what said so, when anything did. */
+  /**
+   * It was refused, for this reason; {@code thrown} is what said so, when anything did.
+   *
+   * @param reason a code naming the rule that refused, never a value
+   * @param thrown what said so, or null if nothing did
+   */
   public void refused(String reason, Throwable thrown) {
     this.outcome = Outcome.REFUSED;
     this.reason = reason;
     this.errorType = thrown == null ? null : thrown.getClass().getName();
   }
 
-  /** It failed with this, which was not a decision. */
+  /**
+   * It failed with this, which was not a decision.
+   *
+   * @param thrown what went wrong, never null
+   */
   public void failed(Throwable thrown) {
     this.outcome = Outcome.FAILED;
     this.reason = null;

@@ -31,9 +31,17 @@ package org.jwcarman.occlude;
  * ordinary derivation already does and declaring it here is a mistake worth naming.
  *
  * <p>Minted during configuration, and obtainable only by being handed one.
+ *
+ * @param <I> the type of the value derived from
+ * @param <O> the type of the value made
  */
 public interface Derivation<I, O> {
 
-  /** Makes the new value, or refuses. */
+  /**
+   * Makes the new value, or refuses.
+   *
+   * @param parent the value to derive from
+   * @return the new value's handle, or the refusal
+   */
   Derived<O> derive(Occluded<I> parent);
 }

@@ -27,6 +27,11 @@ public class StorageIntegrityException extends IllegalStateException {
 
   private static final long serialVersionUID = 1L;
 
+  /**
+   * A finding about what a store holds.
+   *
+   * @param message what was found, naming identifiers and never values
+   */
   public StorageIntegrityException(String message) {
     super(message);
   }

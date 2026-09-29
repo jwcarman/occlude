@@ -46,7 +46,11 @@ import java.util.function.Supplier;
 @FunctionalInterface
 public interface AccessContextProvider extends Supplier<AccessContext> {
 
-  /** Nobody is acting, ever. The default, and the right one for a store with no notion of who. */
+  /**
+   * Nobody is acting, ever. The default, and the right one for a store with no notion of who.
+   *
+   * @return a provider that always returns the empty context
+   */
   static AccessContextProvider none() {
     return AccessContext::empty;
   }

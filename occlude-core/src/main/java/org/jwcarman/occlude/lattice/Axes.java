@@ -51,6 +51,8 @@ public final class Axes implements Iterable<Axis<?>> {
   /**
    * The axes an application asks about, in the order it wants them read.
    *
+   * @param axes the axes, in reading order; at least one, none null, no two with one name
+   * @return the axes as one set
    * @throws IllegalArgumentException if two axes want one name, which would make a stored label
    *     read as something it is not
    */
@@ -75,12 +77,21 @@ public final class Axes implements Iterable<Axis<?>> {
     return new Axes(List.of(axes), Map.copyOf(byName));
   }
 
-  /** The axis of this name, if it is one of these. */
+  /**
+   * The axis of this name, if it is one of these.
+   *
+   * @param name the axis name to look for
+   * @return the axis of that name, or empty if this set has none
+   */
   public Optional<Axis<?>> named(String name) {
     return Optional.ofNullable(byName.get(name));
   }
 
-  /** How many questions are asked. */
+  /**
+   * How many questions are asked.
+   *
+   * @return the number of axes
+   */
   public int size() {
     return ordered.size();
   }

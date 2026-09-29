@@ -70,12 +70,26 @@ public record OccludedType<T>(String name, TypeRef<T> type) {
     }
   }
 
-  /** A named type. */
+  /**
+   * A named type.
+   *
+   * @param name what values of this type are written down as, never blank
+   * @param type the class to decode to, never a primitive
+   * @param <T> the Java type
+   * @return the named type
+   */
   public static <T> OccludedType<T> of(String name, Class<T> type) {
     return new OccludedType<>(name, TypeRef.of(type));
   }
 
-  /** A named type, for a generic container. */
+  /**
+   * A named type, for a generic container.
+   *
+   * @param name what values of this type are written down as, never blank
+   * @param type how to decode one, never a primitive
+   * @param <T> the Java type
+   * @return the named type
+   */
   public static <T> OccludedType<T> of(String name, TypeRef<T> type) {
     return new OccludedType<>(name, type);
   }
@@ -92,6 +106,10 @@ public record OccludedType<T>(String name, TypeRef<T> type) {
    * <p>Convenient, and a little fragile: a name derived from a class name changes when the class is
    * renamed, and a stored name is permanent. Say the name yourself for anything you expect to
    * outlive a refactor.
+   *
+   * @param type the class to name, never null or a primitive
+   * @param <T> the Java type
+   * @return the named type
    */
   public static <T> OccludedType<T> of(Class<T> type) {
     Objects.requireNonNull(type, "a type must not be null");

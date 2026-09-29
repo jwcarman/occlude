@@ -38,6 +38,9 @@ public interface Sink {
   /**
    * A reader for one of the types this sink was declared to read.
    *
+   * @param type the type to read, which must be one this sink declared
+   * @param <T> the Java type read
+   * @return a reader for it, at this sink's ceiling
    * @throws IllegalStateException if that type was not declared here
    */
   <T> Reveal<T> reading(OccludedType<T> type);

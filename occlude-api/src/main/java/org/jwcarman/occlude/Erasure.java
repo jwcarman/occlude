@@ -38,6 +38,8 @@ public interface Erasure {
   /**
    * Forgets the value and everything made from it, or refuses.
    *
+   * @param root the value to forget; what is derived from it goes too
+   * @return how many values were removed, or the refusal
    * @throws IllegalStateException if this erasure was never brought into force
    */
   Erased erase(Occluded<?> root);

@@ -45,10 +45,21 @@ package org.jwcarman.occlude;
  */
 public interface Query<I, Q> {
 
-  /** Answers, or refuses. The answer is a bit; what was asked never appears in the record. */
+  /**
+   * Answers, or refuses. The answer is a bit; what was asked never appears in the record.
+   *
+   * @param about the value asked about
+   * @param against what it is asked against
+   * @return the one bit, or the refusal
+   */
   Answer ask(Occluded<I> about, Q against);
 
-  /** What a query actually does: looks at the value, and returns one bit. */
+  /**
+   * What a query actually does: looks at the value, and returns one bit.
+   *
+   * @param <I> the type of value this can be asked about
+   * @param <Q> what the question is asked against
+   */
   @FunctionalInterface
   interface Asking<I, Q> {
     /**

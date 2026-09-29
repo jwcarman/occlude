@@ -37,7 +37,11 @@ public enum MacAlgorithm {
     this.jcaName = jcaName;
   }
 
-  /** The name the JCA and the stored rows know it by. */
+  /**
+   * The name the JCA and the stored rows know it by.
+   *
+   * @return the JCA algorithm name, such as {@code HmacSHA256}
+   */
   public String jcaName() {
     return jcaName;
   }

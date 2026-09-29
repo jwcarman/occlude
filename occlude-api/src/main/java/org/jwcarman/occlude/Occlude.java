@@ -58,6 +58,8 @@ public interface Occlude<T> {
    * configuration faults rather than ordinary outcomes. Being turned away while reading is routine
    * and deserves a value; being unable to say how a value is labelled is a bug.
    *
+   * @param value the real value, never null
+   * @return the occluded reference that stands in for it
    * @throws IllegalArgumentException if the value is null
    * @throws RefusedException if this door cannot say how to label what arrived
    * @throws IllegalStateException if this door was never brought into force

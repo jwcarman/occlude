@@ -38,6 +38,17 @@ public class DisputeService {
   private final Derivation<Domain.Invoice, Domain.Last4> cardLast4;
   private final Query<Domain.Mail, String> mailMentions;
 
+  /**
+   * Creates the service from the outlets it may use.
+   *
+   * @param customerMail the one source, for messages from customers
+   * @param supportUi the outlet to the support agent's screen
+   * @param approvalDesk the outlet to the approval desk
+   * @param paymentProcessor the outlet to the payment processor
+   * @param confirmInvoice ties a claimed invoice to the mailbox it came from
+   * @param cardLast4 truncates a card to its last four digits
+   * @param mailMentions asks whether a message mentions some text
+   */
   // What this class may do is this list. It was handed three outlets, so it can reach three
   // places; it was handed one source, so there is exactly one label it can create a value at.
   public DisputeService(
@@ -61,12 +72,21 @@ public class DisputeService {
    * A customer's message arrives.
    *
    * <p>The one place this application states what something is. After this, labels are computed.
+   *
+   * @param mail the message
+   * @return the reference to the stored message
    */
   public String receive(Domain.Mail mail) {
     return customerMail.occlude(mail).id();
   }
 
-  /** Does the message mention this? Answered without the message leaving the store. */
+  /**
+   * Does the message mention this? Answered without the message leaving the store.
+   *
+   * @param mail the reference to the message
+   * @param text the text to look for
+   * @return true when the message mentions it
+   */
   public boolean mentions(String mail, String text) {
     return mailMentions.ask(Occluded.of(mail), text).isTrue();
   }
@@ -76,12 +96,20 @@ public class DisputeService {
    *
    * <p>Fails when the invoice does not exist, belongs to another tenant, or was not raised from the
    * address that wrote in. Only then does the result become endorsed.
+   *
+   * @param mail the reference to the message
+   * @return the reference to the endorsed invoice
    */
   public String confirm(String mail) {
     return confirmInvoice.derive(Occluded.of(mail)).orThrow().id();
   }
 
-  /** What an approver is shown: four digits, and only if they are an approver. */
+  /**
+   * What an approver is shown: four digits, and only if they are an approver.
+   *
+   * @param invoice the reference to the invoice
+   * @return the last four digits of its card
+   */
   public Domain.Last4 cardForApproval(String invoice) {
     String last4 = cardLast4.derive(Occluded.of(invoice)).orThrow().id();
     return approvalDesk.reveal(Occluded.of(last4)).orThrow();
@@ -93,6 +121,9 @@ public class DisputeService {
    * <p>The card token reaches the payment processor and nowhere else, because that is the only sink
    * whose ceiling admits {@link BillingAxes.Sensitivity#CARDHOLDER}. Not a rule anybody remembered
    * to write: every other sink sits below it in the order.
+   *
+   * @param invoice the reference to the invoice
+   * @return what was refunded
    */
   public String refund(String invoice) {
     Domain.Invoice confirmed = paymentProcessor.reveal(Occluded.of(invoice)).orThrow();
@@ -100,7 +131,12 @@ public class DisputeService {
         .formatted(confirmed.amount(), last4(confirmed.cardToken()));
   }
 
-  /** What the support agent's screen may show. */
+  /**
+   * What the support agent's screen may show.
+   *
+   * @param invoice the reference to the invoice
+   * @return the invoice, as the support screen may see it
+   */
   public Domain.Invoice forSupportScreen(String invoice) {
     return supportUi.reveal(Occluded.of(invoice)).orThrow();
   }

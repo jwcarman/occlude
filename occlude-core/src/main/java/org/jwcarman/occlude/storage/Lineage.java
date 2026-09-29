@@ -32,20 +32,36 @@ public record Lineage(List<String> parents, Optional<String> derivation) {
 
   private static final Lineage CONCEALED = new Lineage(List.of(), Optional.empty());
 
+  /** Copies the parents, so a lineage cannot change once made. */
   public Lineage {
     parents = List.copyOf(parents);
   }
 
-  /** A value nobody derived: it was handed to the store by trusted code at a boundary. */
+  /**
+   * A value nobody derived: it was handed to the store by trusted code at a boundary.
+   *
+   * @return the lineage of a value with no parents
+   */
   public static Lineage occluded() {
     return CONCEALED;
   }
 
+  /**
+   * A value made from others by a named derivation.
+   *
+   * @param parents the values it was made from, in the order they were given
+   * @param derivation the name of what made it
+   * @return the lineage of a derived value
+   */
   public static Lineage derivedFrom(List<String> parents, String derivation) {
     return new Lineage(parents, Optional.of(derivation));
   }
 
-  /** Whether this value was asserted at a boundary rather than computed from something. */
+  /**
+   * Whether this value was asserted at a boundary rather than computed from something.
+   *
+   * @return true if nothing made this from anything
+   */
   public boolean asserted() {
     return derivation.isEmpty();
   }

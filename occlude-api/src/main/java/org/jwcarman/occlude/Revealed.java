@@ -24,6 +24,8 @@ import java.util.Optional;
  * Assembling a prompt treats a refusal as "render the handle instead" and carries on; a tool treats
  * it as a call that cannot proceed. Throwing would force the first caller to catch in its normal
  * path.
+ *
+ * @param <T> the type of the value asked for
  */
 public sealed interface Revealed<T> {
 
@@ -67,12 +69,20 @@ public sealed interface Revealed<T> {
     ABOVE_CEILING
   }
 
-  /** The value when the gate allowed it, empty when it did not. */
+  /**
+   * The value when the gate allowed it, empty when it did not.
+   *
+   * @return the value, or empty on a refusal
+   */
   default Optional<T> value() {
     return this instanceof Allowed<T>(T plaintext) ? Optional.of(plaintext) : Optional.empty();
   }
 
-  /** Whether the gate allowed it. */
+  /**
+   * Whether the gate allowed it.
+   *
+   * @return true when the value was handed over
+   */
   default boolean succeeded() {
     return this instanceof Allowed<T>;
   }
@@ -81,6 +91,8 @@ public sealed interface Revealed<T> {
    * The value, or an exception naming the refusal.
    *
    * <p>For code that genuinely cannot continue without it, and whose caller is not a prompt.
+   *
+   * @return the value
    */
   default T orThrow() {
     if (this instanceof Allowed<T>(T plaintext)) {

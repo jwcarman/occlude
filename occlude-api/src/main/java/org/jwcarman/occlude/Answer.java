@@ -92,13 +92,25 @@ public sealed interface Answer {
     NOT_AVAILABLE_HERE
   }
 
-  /** True only when the check ran and said yes. A refusal is not a yes. */
+  /**
+   * True only when the check ran and said yes. A refusal is not a yes.
+   *
+   * @return whether the check ran and said yes
+   */
   boolean isTrue();
 
-  /** True only when the check ran and said no. A refusal is not a no either. */
+  /**
+   * True only when the check ran and said no. A refusal is not a no either.
+   *
+   * @return whether the check ran and said no
+   */
   boolean isFalse();
 
-  /** Whether the check ran at all. */
+  /**
+   * Whether the check ran at all.
+   *
+   * @return true when the check ran, whatever it said
+   */
   boolean succeeded();
 
   /**
@@ -106,6 +118,8 @@ public sealed interface Answer {
    *
    * <p>For a caller that cannot proceed without one. Prefer {@link #isTrue()} where a refusal and a
    * "no" should be handled differently, which is usually.
+   *
+   * @return what the check said
    */
   boolean orThrow();
 }

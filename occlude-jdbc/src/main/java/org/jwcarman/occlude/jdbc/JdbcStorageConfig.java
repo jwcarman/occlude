@@ -67,13 +67,23 @@ public final class JdbcStorageConfig {
   private Axis<?> keyAxis;
   private Function<String, DataKeyProvider> keysFor;
 
-  /** Where the tables are. */
+  /**
+   * Where the tables are.
+   *
+   * @param dataSource the source of connections to the database, never null
+   * @return this configuration
+   */
   public JdbcStorageConfig dataSource(DataSource dataSource) {
     this.dataSource = Objects.requireNonNull(dataSource, "a durable store needs a data source");
     return this;
   }
 
-  /** How values become bytes. */
+  /**
+   * How values become bytes.
+   *
+   * @param codecs the factory that serialises values, never null
+   * @return this configuration
+   */
   public JdbcStorageConfig codecs(CodecFactory codecs) {
     this.codecs = Objects.requireNonNull(codecs, "a durable store needs codecs");
     return this;
@@ -91,6 +101,9 @@ public final class JdbcStorageConfig {
    * <p>No compression, deliberately. Compressing before encrypting makes the ciphertext's length
    * depend on what the plaintext says, which is the side channel CRIME and BREACH exploit, and a
    * security library has no size to save that is worth it.
+   *
+   * @param dataKeys the provider of the keys that wrap each payload's data key, never null
+   * @return this configuration
    */
   public JdbcStorageConfig encryptedWith(DataKeyProvider dataKeys) {
     this.dataKeys = Objects.requireNonNull(dataKeys, "a durable store needs keys to encrypt with");
@@ -102,6 +115,9 @@ public final class JdbcStorageConfig {
    *
    * <p>Recorded on every row, so changing it takes effect for what comes next and leaves what was
    * already signed verifying under the algorithm it names. Pair a change with a new root.
+   *
+   * @param mac the algorithm new values and lines are signed with, never null
+   * @return this configuration
    */
   public JdbcStorageConfig signedWith(MacAlgorithm mac) {
     this.mac = Objects.requireNonNull(mac, "a store signs with some algorithm");
@@ -125,6 +141,11 @@ public final class JdbcStorageConfig {
    * <p>Offboarding a tenant is erasing their values first, and destroying their key after: a value
    * whose key is gone can no longer be re-encrypted or re-signed, and a sweep reports it
    * unreadable.
+   *
+   * @param axis the axis whose label decides which keys encrypt a payload, never null
+   * @param keysFor the source of keys for a value of the axis, given as it is written down, never
+   *     null
+   * @return this configuration
    */
   public JdbcStorageConfig keyedBy(Axis<?> axis, Function<String, DataKeyProvider> keysFor) {
     this.keyAxis = Objects.requireNonNull(axis, "keyed by some axis");
@@ -132,7 +153,11 @@ public final class JdbcStorageConfig {
     return this;
   }
 
-  /** Leaves the tables alone, for somewhere that manages its own schema. */
+  /**
+   * Leaves the tables alone, for somewhere that manages its own schema.
+   *
+   * @return this configuration
+   */
   public JdbcStorageConfig withoutMigration() {
     this.migrate = false;
     return this;
@@ -161,6 +186,10 @@ public final class JdbcStorageConfig {
    * <p>Make the lookup a closed set: the ids you have issued, and nothing else. It is asked for
    * whatever root id a stored row names, and anyone who can write the tables chooses that name -- a
    * lookup that fetched any name it was given from a secret manager would fetch on their say-so.
+   *
+   * @param id the name of the current root, never null
+   * @param roots the lookup from a root id to its secret, empty of any id that was never issued
+   * @return this configuration
    */
   public JdbcStorageConfig rootedIn(String id, Function<String, byte[]> roots) {
     this.rootId = Objects.requireNonNull(id, "a root needs a name");
@@ -168,7 +197,13 @@ public final class JdbcStorageConfig {
     return this;
   }
 
-  /** The same, for an application that has only ever had one root. */
+  /**
+   * The same, for an application that has only ever had one root.
+   *
+   * @param id the name of the root, never null
+   * @param secret the root's secret, never null
+   * @return this configuration
+   */
   public JdbcStorageConfig rootedIn(String id, byte[] secret) {
     Objects.requireNonNull(secret, "a root needs a secret");
     requireStrong(id, secret);
@@ -181,6 +216,9 @@ public final class JdbcStorageConfig {
    *
    * <p>The only way to build one, and it refuses until it has been told where the tables are, how
    * values are serialised, whose keys encrypt them and what they are signed under.
+   *
+   * @param axes the charter's axes, never null
+   * @return the storage bound to them
    */
   public JdbcStorage storage(Axes axes) {
     Objects.requireNonNull(axes, "a durable store needs the charter's axes");

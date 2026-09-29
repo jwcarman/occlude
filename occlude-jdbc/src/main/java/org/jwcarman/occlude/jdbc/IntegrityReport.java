@@ -50,6 +50,8 @@ public record IntegrityReport(
   /**
    * Whether nothing was provably altered, removed or cut. Unreadable fields are not counted: they
    * are what a destroyed key looks like, and only whoever manages the keys can tell.
+   *
+   * @return true when nothing was provably altered, removed or cut
    */
   public boolean intact() {
     return firstBrokenEntry.isEmpty()
@@ -59,7 +61,11 @@ public record IntegrityReport(
         && sweep.intact();
   }
 
-  /** Whether anything would not decrypt with the keys at hand. */
+  /**
+   * Whether anything would not decrypt with the keys at hand.
+   *
+   * @return true when any value or line would not decrypt
+   */
   public boolean unreadable() {
     return !sweep.unreadableValues().isEmpty() || !sweep.unreadableLines().isEmpty();
   }

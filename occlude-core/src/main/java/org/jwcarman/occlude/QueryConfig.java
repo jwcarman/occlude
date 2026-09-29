@@ -34,19 +34,34 @@ public final class QueryConfig {
 
   QueryConfig() {}
 
-  /** The most a parent may be labelled and still be read here. */
+  /**
+   * The most a value may be labelled and still be asked about here.
+   *
+   * @param ceiling what a value may be labelled and still be read
+   * @return this configuration
+   */
   public QueryConfig accepting(Ceiling ceiling) {
     Objects.requireNonNull(ceiling, "a ceiling must not be null");
     return accepting(context -> ceiling);
   }
 
-  /** A ceiling that depends on who is asking, which a tenant always does. */
+  /**
+   * A ceiling that depends on who is asking, which a tenant always does.
+   *
+   * @param ceiling chooses what a value may be labelled from who is asking
+   * @return this configuration
+   */
   public QueryConfig accepting(Function<AccessContext, Ceiling> ceiling) {
     this.ceiling = Objects.requireNonNull(ceiling, "a ceiling must not be null");
     return this;
   }
 
-  /** Whether this is offered at all, given who is asking. */
+  /**
+   * Whether this is offered at all, given who is asking.
+   *
+   * @param availableTo true for an access this is offered to
+   * @return this configuration
+   */
   public QueryConfig availableTo(Predicate<AccessContext> availableTo) {
     this.availableTo = Objects.requireNonNull(availableTo, "an availability must not be null");
     return this;

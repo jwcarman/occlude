@@ -59,12 +59,18 @@ public final class DefaultCharter implements Charter {
    * <p>Constructor arguments because they are not configuration -- they are what this charter is.
    * They decide what a label is able to say at all and what a stored row is decoded against, so a
    * charter cannot meaningfully exist before them.
+   *
+   * @param axes the questions this charter asks, never null
    */
   public DefaultCharter(Axes axes) {
     this.axes = Objects.requireNonNull(axes, "a charter needs axes");
   }
 
-  /** The same, for an application naming its axes inline rather than handing over a schema. */
+  /**
+   * The same, for an application naming its axes inline rather than handing over a schema.
+   *
+   * @param axes the questions this charter asks, at least one, no two with one name
+   */
   public DefaultCharter(Axis<?>... axes) {
     this(Axes.of(axes));
   }
@@ -97,6 +103,8 @@ public final class DefaultCharter implements Charter {
    *
    * <p>An application with no notion of identity says so with {@link
    * Bindings.Store#withoutIdentity()}, rather than getting it by forgetting.
+   *
+   * @param bindings the storage and identity source to bring into force, never null
    */
   public void bind(Bindings bindings) {
     Objects.requireNonNull(bindings, "a charter is bound to something");
@@ -111,6 +119,8 @@ public final class DefaultCharter implements Charter {
    * <p>A question anyone may ask: the answer grants nothing. It is how wiring that did not
    * construct a charter can tell that whoever did forgot to bind it, at startup rather than at a
    * portal's first use.
+   *
+   * @return true once this charter has been bound
    */
   public boolean isBound() {
     return operations.bound();

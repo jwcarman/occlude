@@ -40,6 +40,10 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 public @interface OccludedName {
 
-  /** The stored name. */
+  /**
+   * The stored name.
+   *
+   * @return the name values of this type are stored under
+   */
   String value();
 }

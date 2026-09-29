@@ -61,6 +61,11 @@ public final class Axis<T> {
    * <p>Order is declared by listing rather than by comparing, because a hand-written comparison can
    * be inconsistent -- non-transitive, or disagreeing with {@code equals} -- and an inconsistent
    * order does not fail loudly. It quietly permits the wrong things.
+   *
+   * @param <E> the enum the rungs are drawn from
+   * @param name the axis name, never null
+   * @param leastConstrainedFirst the rungs in order, least constrained first; at least one
+   * @return an axis ranked by that order
    */
   @SafeVarargs
   public static <E extends Enum<E>> Axis<E> ladder(String name, E... leastConstrainedFirst) {
@@ -89,6 +94,9 @@ public final class Axis<T> {
    * <p>Breadth here means <i>any one value</i>, never a mixture. A reporting job entitled to read
    * every tenant reads acme's row, then globex's row, and the combination it makes from them is
    * unusable. Blocking the individual reads would block the wrong thing.
+   *
+   * @param name the axis name, never null
+   * @return an axis whose values must match exactly
    */
   public static Axis<String> matching(String name) {
     Objects.requireNonNull(name, "an axis needs a name");
@@ -103,12 +111,18 @@ public final class Axis<T> {
    * which is a real and common value, and requiring it would forbid endorsed data entirely.
    *
    * <p>Nothing can check this for you. The judgement is yours and it is per axis.
+   *
+   * @return a required axis of the same name and order
    */
   public Axis<T> required() {
     return new Axis<>(name, order, true);
   }
 
-  /** How this axis is written down: in the manifest, in an audit line, in storage. */
+  /**
+   * How this axis is written down: in the manifest, in an audit line, in storage.
+   *
+   * @return the axis name, unique within its set
+   */
   public String name() {
     return name;
   }

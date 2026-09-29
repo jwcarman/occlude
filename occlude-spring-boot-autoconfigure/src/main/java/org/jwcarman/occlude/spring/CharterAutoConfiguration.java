@@ -83,6 +83,9 @@ public class CharterAutoConfiguration {
    *
    * <p>Conditional on the application having said what it asks about every value. Guessing a
    * vocabulary would be the worst thing this could do.
+   *
+   * @param axes what the application asks about every value
+   * @return the charter, not yet bound
    */
   @Bean
   @ConditionalOnBean(Axes.class)
@@ -111,6 +114,12 @@ public class CharterAutoConfiguration {
    * always there: this module depends on Boot's observation auto-configuration and runs after it,
    * as Boot's own observation auto-configurations do. With no handler it records nothing; Actuator
    * or a tracing bridge adds one, and every operation shows up.
+   *
+   * @param storage the charter's store, found by name
+   * @param access where identity comes from
+   * @param observations the registry every operation is observed through
+   * @param properties the starter's configuration
+   * @return the initializer that binds the charter once the context is ready
    */
   @Bean
   @ConditionalOnBean(Axes.class)
@@ -137,6 +146,9 @@ public class CharterAutoConfiguration {
    * starter follows for its own -- so it is left alone. But left unbound, every portal refused at
    * its first use, long after startup said all was well. Once the context has refreshed, every
    * singleton has had its chance to bind it; one still unbound is a mistake, and said so now.
+   *
+   * @param charter the application's charter
+   * @return the listener that makes the check once the context has refreshed
    */
   @Bean
   @ConditionalOnBean(Charter.class)
@@ -159,6 +171,8 @@ public class CharterAutoConfiguration {
    * <p>Said out loud, because a charter's rule is that no identity is something an application
    * declares rather than gets by forgetting: a ceiling written as "unless the context says
    * otherwise" is wider than it looks when the context is always empty.
+   *
+   * @return a provider whose context is always empty
    */
   @Bean
   @ConditionalOnBean(Axes.class)

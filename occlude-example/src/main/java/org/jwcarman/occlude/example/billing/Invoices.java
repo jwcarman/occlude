@@ -24,6 +24,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class Invoices {
 
+  /** Creates the repository, which Spring instantiates. */
+  public Invoices() {}
+
   private static final List<Domain.Invoice> ROWS =
       List.of(
           new Domain.Invoice(
@@ -39,6 +42,12 @@ public class Invoices {
               new BigDecimal("12.00"),
               "tok_live_7733221188"));
 
+  /**
+   * The invoice with this number, if there is one.
+   *
+   * @param number the invoice number
+   * @return the invoice, or empty when there is none
+   */
   public Optional<Domain.Invoice> find(String number) {
     return ROWS.stream().filter(invoice -> invoice.number().equals(number)).findFirst();
   }

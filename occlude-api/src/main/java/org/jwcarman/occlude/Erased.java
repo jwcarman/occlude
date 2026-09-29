@@ -80,12 +80,24 @@ public sealed interface Erased {
     NOT_PERMITTED
   }
 
-  /** How many values were removed, the root included, or empty when nothing was. */
+  /**
+   * How many values were removed, the root included, or empty when nothing was.
+   *
+   * @return the count removed, or empty on a refusal
+   */
   OptionalInt value();
 
-  /** Whether anything was removed. */
+  /**
+   * Whether anything was removed.
+   *
+   * @return true when the value and its descendants are gone
+   */
   boolean succeeded();
 
-  /** How many values were removed, or an exception naming the refusal. */
+  /**
+   * How many values were removed, or an exception naming the refusal.
+   *
+   * @return the count removed, the root included
+   */
   int orThrow();
 }

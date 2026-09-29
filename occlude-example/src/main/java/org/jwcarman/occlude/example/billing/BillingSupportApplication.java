@@ -22,6 +22,14 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class BillingSupportApplication {
 
+  /** Creates the application class, which Spring Boot instantiates as its configuration. */
+  public BillingSupportApplication() {}
+
+  /**
+   * Starts the support desk.
+   *
+   * @param args the command line arguments, passed to Spring Boot
+   */
   public static void main(String[] args) {
     SpringApplication.run(BillingSupportApplication.class, args);
   }

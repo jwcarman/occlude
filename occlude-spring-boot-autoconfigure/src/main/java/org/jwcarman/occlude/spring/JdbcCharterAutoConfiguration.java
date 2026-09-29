@@ -82,7 +82,11 @@ public class JdbcCharterAutoConfiguration {
   /** The name the audit trail is registered, and found, under. */
   public static final String AUDIT_TRAIL = "occludeAuditTrail";
 
-  /** How values are serialised, before they are encrypted. */
+  /**
+   * How values are serialised, before they are encrypted.
+   *
+   * @return the factory that makes a codec for each occluded type
+   */
   @Bean
   @ConditionalOnMissingBean
   public CodecFactory occludedCodecFactory() {
@@ -95,6 +99,9 @@ public class JdbcCharterAutoConfiguration {
    * <p>Only when {@code occlude.keys.current} is set, and never when the application contributes
    * its own {@link DataKeyProvider}: a KMS or Vault replaces this entirely. Nothing here generates
    * a key or has one to fall back on.
+   *
+   * @param properties the configured keys
+   * @return a provider of the configured key-encryption keys, current one first
    */
   @Bean
   @ConditionalOnMissingBean(DataKeyProvider.class)

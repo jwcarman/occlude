@@ -522,6 +522,8 @@ public final class JdbcStorage implements Storage {
    *
    * <p>An authority in its own right: it discloses every line's label and who was asking, across
    * every value. Hand it to investigation code and nothing else.
+   *
+   * @return the trail reader, which discloses every line
    */
   public AuditTrail trail() {
     return trail;
@@ -531,6 +533,8 @@ public final class JdbcStorage implements Storage {
    * This store's verification, anchoring and re-encryption, without its reads.
    *
    * <p>What to hand an operations job instead of the store itself, which can decrypt anything.
+   *
+   * @return the verification and maintenance view of this store
    */
   public StorageIntegrity integrity() {
     return new StorageIntegrity(this);
@@ -557,6 +561,9 @@ public final class JdbcStorage implements Storage {
    * <p>False when that line is gone -- the trail was cut back past it -- or says something else.
    * Together with {@link #firstBrokenEntry()}, which says everything up to the end agrees with
    * itself, this is what notices truncation.
+   *
+   * @param anchor a head published earlier, never null
+   * @return true when the trail still holds that head exactly
    */
   public boolean stillHolds(TrailHead anchor) {
     return verification.stillHolds(anchor);
@@ -579,6 +586,8 @@ public final class JdbcStorage implements Storage {
    * Every value present that the trail does not account for: one no line ever announced, or one the
    * trail says was lawfully erased -- a value restored from a copy taken before its erasure, say.
    * Its digest is genuine, so only the trail can tell it should be gone. Needs no key.
+   *
+   * @return the identifiers of values the trail does not account for
    */
   public List<String> unaccountedValues() {
     return verification.unaccountedValues();
@@ -617,6 +626,8 @@ public final class JdbcStorage implements Storage {
    * <p>An edited value appears here; so does every value derived from it, because their digests
    * were computed from what it used to be. A deleted value appears as its children failing to find
    * what they were made from.
+   *
+   * @return the identifiers of values whose digest does not agree
    */
   public List<String> brokenValues() {
     return verification.brokenValues();
@@ -689,6 +700,8 @@ public final class JdbcStorage implements Storage {
    * <p>Named, because it is a choice: with no anchor to check, a trail cut back before this runs
    * comes out of it looking whole, and nothing afterwards can tell. Publish heads, and pass them to
    * {@link #resign(TrailHead, TrailHead...)} instead.
+   *
+   * @return what was re-signed, and the head before and after
    */
   public Resigned resignWithoutAnchors() {
     return resigning.resign(List.of());
@@ -705,6 +718,8 @@ public final class JdbcStorage implements Storage {
    * <p>What was <i>altered</i> is proof of tampering. What was <i>unreadable</i> would not decrypt
    * with the keys at hand -- a destroyed key, or a damaged ciphertext -- and only whoever manages
    * the keys can say which.
+   *
+   * @return the values and lines found altered, and those found unreadable
    */
   public Sweep sweep() {
     return verification.sweep();

@@ -39,6 +39,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Component
 public final class CurrentAccess implements AccessContextProvider {
 
+  /** Creates the provider, which Spring instantiates. */
+  public CurrentAccess() {}
+
   @Override
   public AccessContext get() {
     if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs)) {

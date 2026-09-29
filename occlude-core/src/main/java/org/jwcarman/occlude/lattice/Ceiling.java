@@ -49,17 +49,33 @@ public final class Ceiling {
    *
    * <p>It admits a label that says nothing at all, which is the only thing below every ceiling, and
    * refuses everything else -- so it is the fail-closed starting point rather than a closed door.
+   *
+   * @return a ceiling that constrains no axis
    */
   public static Ceiling nothing() {
     return new Ceiling(Map.of());
   }
 
-  /** What a reader is entitled to on one axis. */
+  /**
+   * What a reader is entitled to on one axis.
+   *
+   * @param <T> what an application writes on the axis
+   * @param axis the axis constrained
+   * @param constraint what the reader is entitled to on it
+   * @return a ceiling saying only that
+   */
   public static <T> Ceiling of(Axis<T> axis, Constraint<T> constraint) {
     return nothing().with(axis, constraint);
   }
 
-  /** The same ceiling, saying something else about this axis. */
+  /**
+   * The same ceiling, saying something else about this axis.
+   *
+   * @param <T> what an application writes on the axis
+   * @param axis the axis constrained, never null
+   * @param constraint what the reader is entitled to on it, never null
+   * @return a new ceiling with that axis constrained
+   */
   public <T> Ceiling with(Axis<T> axis, Constraint<T> constraint) {
     Objects.requireNonNull(axis, "a ceiling needs an axis to constrain");
     Objects.requireNonNull(constraint, "'" + axis.name() + "' needs a constraint");
@@ -80,6 +96,9 @@ public final class Ceiling {
    *
    * <p>Every axis the label speaks to has to pass. An axis this ceiling never constrained fails,
    * which is what keeps a forgotten axis from reading like a deliberate one.
+   *
+   * @param label the label of the value being read
+   * @return true if every axis the label speaks to passes
    */
   public boolean permits(Label label) {
     for (Axis<?> axis : label.axes()) {
@@ -96,7 +115,12 @@ public final class Ceiling {
     return true;
   }
 
-  /** Whether this ceiling has said anything at all about an axis. */
+  /**
+   * Whether this ceiling has said anything at all about an axis.
+   *
+   * @param axis the axis to ask about
+   * @return true if this ceiling constrains that axis, deliberately broad or not
+   */
   public boolean constrains(Axis<?> axis) {
     return bounds.containsKey(axis);
   }

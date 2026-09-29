@@ -41,14 +41,26 @@ import org.jwcarman.codec.TypeRef;
  */
 public final class MemoryStorage implements Storage {
 
+  /** Creates an empty store. */
+  public MemoryStorage() {}
+
   private final List<AuditRecord> audit = Collections.synchronizedList(new ArrayList<>());
 
-  /** Everything recorded so far, oldest first. The in-memory equivalent of the audit table. */
+  /**
+   * Everything recorded so far, oldest first. The in-memory equivalent of the audit table.
+   *
+   * @return the trail, oldest first
+   */
   public List<AuditRecord> audit() {
     return List.copyOf(audit);
   }
 
-  /** Just the lines for one kind of operation, oldest first. */
+  /**
+   * Just the lines for one kind of operation, oldest first.
+   *
+   * @param operation the kind of operation to select
+   * @return the lines for that operation, oldest first
+   */
   public List<AuditRecord> audit(AuditRecord.Operation operation) {
     return audit().stream().filter(entry -> entry.operation() == operation).toList();
   }
@@ -87,7 +99,11 @@ public final class MemoryStorage implements Storage {
     return Optional.ofNullable(values.get(id)).map(stored -> type.rawClass().cast(stored.value()));
   }
 
-  /** Everything currently held, for tests that need to prove something was not stored. */
+  /**
+   * Everything currently held, for tests that need to prove something was not stored.
+   *
+   * @return the identifier of every value held
+   */
   public Set<String> everything() {
     return Set.copyOf(values.keySet());
   }

@@ -30,6 +30,11 @@ public final class OccludeFailure extends RuntimeException {
 
   @Serial private static final long serialVersionUID = 1L;
 
+  /**
+   * Stands in for the failure that actually happened.
+   *
+   * @param actual what really failed; only its class name is kept
+   */
   public OccludeFailure(Throwable actual) {
     super(actual.getClass().getName(), null, false, false);
   }

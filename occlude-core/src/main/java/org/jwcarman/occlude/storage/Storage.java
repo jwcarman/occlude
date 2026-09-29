@@ -46,6 +46,10 @@ public interface Storage {
    * <p>Together on purpose. Written separately, a failure between them leaves either a value
    * nothing accounts for or an account of a value that does not exist, and the second is worse: it
    * is evidence of something that never happened.
+   *
+   * @param id the value's identifier
+   * @param value what to keep
+   * @param entry the record that it was kept
    */
   void put(String id, StoredValue value, AuditRecord entry);
 
@@ -54,10 +58,17 @@ public interface Storage {
    *
    * <p>Most of the trail is this. A refusal produces no value at all, and refusals are what an
    * auditor came to look at.
+   *
+   * @param entry the record to keep
    */
   void append(AuditRecord entry);
 
-  /** The label, the lineage and what it was stored as -- without decoding the value. */
+  /**
+   * The label, the lineage and what it was stored as -- without decoding the value.
+   *
+   * @param id the value's identifier
+   * @return its metadata, or empty if none is held
+   */
   Optional<StoredMetadata> metadata(String id);
 
   /**
@@ -65,6 +76,11 @@ public interface Storage {
    *
    * <p>Only ever called once {@link #metadata} has confirmed the stored type name matches, so the
    * type here is a verified fact rather than a claim being trusted.
+   *
+   * @param <T> the type the value is decoded as
+   * @param id the value's identifier
+   * @param type the type to decode it as
+   * @return the value, or empty if none is held
    */
   <T> Optional<T> value(String id, TypeRef<T> type);
 
@@ -76,6 +92,9 @@ public interface Storage {
    *
    * <p>Ids it is not holding are simply absent from the result, which is what lets one missing
    * parent be reported without a second lookup to find out which.
+   *
+   * @param ids the identifiers to look up
+   * @return the metadata of those held, keyed by identifier
    */
   default Map<String, StoredMetadata> metadata(List<String> ids) {
     Map<String, StoredMetadata> found = new LinkedHashMap<>();
@@ -91,6 +110,9 @@ public interface Storage {
    * <p>Separate from {@link #metadata(java.util.List)} on purpose, and called after it. A label is
    * checked before a payload is decrypted, so a read that is going to be refused never decrypts
    * anything -- merging the two would be one fewer round trip and one more place plaintext exists.
+   *
+   * @param wanted the identifiers to read, each with the type to read it as
+   * @return the values of those held, keyed by identifier
    */
   default Map<String, Object> values(Map<String, TypeRef<?>> wanted) {
     Map<String, Object> found = new LinkedHashMap<>();
@@ -111,11 +133,19 @@ public interface Storage {
    * instead.
    *
    * <p>74 bits of randomness either way, which is what keeps one unguessable.
+   *
+   * @return an identifier no value has yet
    */
   default String freshId() {
     return "occ_" + Generators.timeBasedEpochGenerator().generate();
   }
 
+  /**
+   * Whether a value is held under this identifier.
+   *
+   * @param id the value's identifier
+   * @return true if it is held
+   */
   boolean contains(String id);
 
   /**
@@ -137,6 +167,7 @@ public interface Storage {
    * attacked, and there is no second attempt that can repair it: the values are already gone, so
    * erasing again finds nothing and writes nothing.
    *
+   * @param root the identifier of the value to remove
    * @param lineFor the record to write for a value that was removed, called once per value
    * @return the values removed, the root included, in no particular order
    */

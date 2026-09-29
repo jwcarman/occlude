@@ -36,13 +36,19 @@ public final class BillingAxes {
    * why the operation that does it is called lowering.
    */
   public enum Integrity {
+    /** Something already trusted has agreed with it. */
     ENDORSED,
+    /** Nothing trusted has vouched for it. */
     UNENDORSED
   }
 
+  /** How much harm it does if it leaks, from harmless to cardholder data. */
   public enum Sensitivity {
+    /** Nothing about it needs protecting. */
     ORDINARY,
+    /** About a person. */
     PERSONAL,
+    /** Card data, which only the payment processor may see. */
     CARDHOLDER
   }
 
@@ -59,9 +65,11 @@ public final class BillingAxes {
    */
   public static final Axis<String> TENANT = Axis.matching("tenant").required();
 
+  /** Whether something we already trust has agreed with the value. */
   public static final Axis<Integrity> INTEGRITY =
       Axis.ladder("integrity", Integrity.ENDORSED, Integrity.UNENDORSED);
 
+  /** How sensitive the value is, from ordinary to cardholder. */
   public static final Axis<Sensitivity> SENSITIVITY =
       Axis.ladder(
           "sensitivity", Sensitivity.ORDINARY, Sensitivity.PERSONAL, Sensitivity.CARDHOLDER);

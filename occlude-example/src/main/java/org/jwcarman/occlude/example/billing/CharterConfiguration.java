@@ -54,6 +54,9 @@ public class CharterConfiguration {
 
   private static final Pattern INVOICE = Pattern.compile("INV-\\d+");
 
+  /** Creates the configuration, which Spring instantiates. */
+  public CharterConfiguration() {}
+
   /**
    * The questions this business asks about every value it holds.
    *
@@ -61,6 +64,8 @@ public class CharterConfiguration {
    * by the starter, which is therefore the only thing able to bind it -- so nothing here can bring
    * one into force. Authority arrives the same way it does everywhere else in this file: because
    * somebody handed it over.
+   *
+   * @return the axes of the charter
    */
   @Bean
   public Axes billingAxes() {
@@ -72,6 +77,10 @@ public class CharterConfiguration {
    *
    * <p>Nothing here knows when the store is built, and nothing has to: a capability is attached
    * when it is, and none of these is used before the context is ready.
+   *
+   * @param charter the charter the starter built, which declares every portal
+   * @param invoices the billing system of record
+   * @return the dispute service, holding only the portals it needs
    */
   @Bean
   public DisputeService disputeService(Charter charter, Invoices invoices) {

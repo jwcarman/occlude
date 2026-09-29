@@ -36,6 +36,8 @@ public interface Inspection {
   /**
    * The value's label and lineage, or a refusal.
    *
+   * @param occluded the value to read the label and lineage of
+   * @return what was seen, or the refusal
    * @throws IllegalStateException if this inspection was never brought into force
    */
   Inspected inspect(Occluded<?> occluded);

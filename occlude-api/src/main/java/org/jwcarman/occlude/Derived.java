@@ -17,7 +17,11 @@ package org.jwcarman.occlude;
 
 import java.util.Optional;
 
-/** What came of asking for a value to be derived from another. */
+/**
+ * What came of asking for a value to be derived from another.
+ *
+ * @param <O> the type of the value that would be made
+ */
 public sealed interface Derived<O> {
 
   /**
@@ -61,17 +65,29 @@ public sealed interface Derived<O> {
     DECLINED
   }
 
-  /** The new handle when it was made, empty when it was not. */
+  /**
+   * The new handle when it was made, empty when it was not.
+   *
+   * @return the new handle, or empty on a refusal
+   */
   default Optional<Occluded<O>> value() {
     return this instanceof Made<O>(Occluded<O> occluded) ? Optional.of(occluded) : Optional.empty();
   }
 
-  /** Whether it was made. */
+  /**
+   * Whether it was made.
+   *
+   * @return true when a new value was made
+   */
   default boolean succeeded() {
     return this instanceof Made<O>;
   }
 
-  /** The handle, or an exception naming the refusal. */
+  /**
+   * The handle, or an exception naming the refusal.
+   *
+   * @return the new handle
+   */
   default Occluded<O> orThrow() {
     if (this instanceof Made<O>(Occluded<O> occluded)) {
       return occluded;

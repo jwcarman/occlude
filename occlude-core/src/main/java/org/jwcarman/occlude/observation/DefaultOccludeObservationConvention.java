@@ -27,6 +27,9 @@ import org.jwcarman.occlude.observation.OccludeObservationDocumentation.LowCardi
  */
 public class DefaultOccludeObservationConvention implements OccludeObservationConvention {
 
+  /** Creates the convention. */
+  public DefaultOccludeObservationConvention() {}
+
   /** What an absent reason or error reads as, so every series has the same keys. */
   private static final String NONE = "none";
 

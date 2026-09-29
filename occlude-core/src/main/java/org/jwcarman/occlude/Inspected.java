@@ -46,16 +46,29 @@ public sealed interface Inspected {
     ABOVE_CEILING
   }
 
-  /** What was seen, or empty when the inspection was refused. */
+  /**
+   * What was seen, or empty when the inspection was refused.
+   *
+   * @return the label and lineage, or empty if refused
+   */
   default Optional<Seen> value() {
     return this instanceof Seen seen ? Optional.of(seen) : Optional.empty();
   }
 
+  /**
+   * Whether something was read.
+   *
+   * @return true if the inspection was answered rather than refused
+   */
   default boolean succeeded() {
     return this instanceof Seen;
   }
 
-  /** What was seen, or an exception naming the refusal. */
+  /**
+   * What was seen, or an exception naming the refusal.
+   *
+   * @return what was seen
+   */
   default Seen orThrow() {
     if (this instanceof Seen seen) {
       return seen;

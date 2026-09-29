@@ -32,6 +32,9 @@ import java.util.List;
  * ⊔ b ⊑ c} holds exactly when {@code a ⊑ c} and {@code b ⊑ c}, so five values that each passed a
  * sink's ceiling are proof the combination passes. A fold exists only because a <i>derived</i>
  * value's joined label has to be stored and carried forward.
+ *
+ * @param <I> the type of every value folded
+ * @param <O> the type of the value made
  */
 public interface Fold<I, O> {
 
@@ -40,6 +43,9 @@ public interface Fold<I, O> {
    *
    * <p>An empty list is a refusal rather than a thrown error: nothing arrived is data, not a
    * mistake in the caller.
+   *
+   * @param parents the values to fold, in the order given
+   * @return the new value's handle, or the refusal
    */
   Derived<O> fold(List<Occluded<I>> parents);
 }

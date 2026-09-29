@@ -56,7 +56,11 @@ public record AccessContext(Map<String, String> attributes) {
     attributes = Collections.unmodifiableMap(copy);
   }
 
-  /** Nobody in particular: the right answer for machine-to-machine work. */
+  /**
+   * Nobody in particular: the right answer for machine-to-machine work.
+   *
+   * @return the context with no attributes
+   */
   public static AccessContext empty() {
     return EMPTY;
   }
@@ -92,7 +96,13 @@ public record AccessContext(Map<String, String> attributes) {
     return Optional.ofNullable(attributes.get(key));
   }
 
-  /** Whether an attribute has exactly this value, which is what a ceiling function usually asks. */
+  /**
+   * Whether an attribute has exactly this value, which is what a ceiling function usually asks.
+   *
+   * @param key the attribute's name
+   * @param value the value to compare against, never null
+   * @return true only when the attribute is present and equal to the value
+   */
   public boolean has(String key, String value) {
     return value.equals(attributes.get(key));
   }

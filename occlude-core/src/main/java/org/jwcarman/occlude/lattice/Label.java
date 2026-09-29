@@ -47,12 +47,23 @@ public final class Label {
     this.said = said;
   }
 
-  /** A label that says nothing at all. Below every ceiling, which is why axes can be required. */
+  /**
+   * A label that says nothing at all. Below every ceiling, which is why axes can be required.
+   *
+   * @return the empty label
+   */
   public static Label nothing() {
     return new Label(Map.of());
   }
 
-  /** What one axis says about this value. */
+  /**
+   * What one axis says about this value.
+   *
+   * @param <T> what an application writes on the axis
+   * @param axis the axis spoken to
+   * @param value what the label says on it
+   * @return a label saying only that
+   */
   public static <T> Label of(Axis<T> axis, T value) {
     return nothing().with(axis, value);
   }
@@ -62,6 +73,11 @@ public final class Label {
    *
    * <p>Used both to build one up and to declassify: {@code joined.with(INTEGRITY, ENDORSED)} is how
    * a derivation vouches for what it checked.
+   *
+   * @param <T> what an application writes on the axis
+   * @param axis the axis to say something on, never null
+   * @param value what the label now says on it, never null
+   * @return a new label with that axis changed
    */
   public <T> Label with(Axis<T> axis, T value) {
     Objects.requireNonNull(axis, "a label needs an axis to say something about");
@@ -78,6 +94,9 @@ public final class Label {
    * why two labels describing different axes combine into one describing both.
    *
    * <p>On a matching axis this is where a mixture is born, and it is the only place one can be.
+   *
+   * @param other the label to combine with
+   * @return a label at least as constrained as both
    */
   public Label join(Label other) {
     Map<Axis<?>, Object> next = new LinkedHashMap<>(said);
@@ -94,6 +113,9 @@ public final class Label {
    *
    * <p>Derived from {@link #join} rather than written separately, for the same reason an axis
    * derives its own: two things that must agree cannot disagree if only one of them exists.
+   *
+   * @param other the label to compare against
+   * @return true if this is at or below it on every axis
    */
   public boolean atOrBelow(Label other) {
     return join(other).equals(other);
@@ -110,12 +132,22 @@ public final class Label {
    * <p>For assertions, manifests and reports. Not for decisions: what a reader may see is a {@link
    * Ceiling}, and asking a label one axis at a time and acting on the answers is how an application
    * would rebuild the gate badly, outside the audit.
+   *
+   * @param <T> what an application writes on the axis
+   * @param axis the axis asked about
+   * @param value what is asked whether the label says
+   * @return true only if the label says exactly that there
    */
   public <T> boolean says(Axis<T> axis, T value) {
     return at(axis).equals(axis.lift(value));
   }
 
-  /** Whether this axis was marked required and this label left it unsaid. */
+  /**
+   * Whether this axis was marked required and this label left it unsaid.
+   *
+   * @param axis the axis asked about
+   * @return true if the axis is required and this label says nothing on it
+   */
   public boolean unsaid(Axis<?> axis) {
     return axis.unsaid(at(axis));
   }
@@ -126,6 +158,8 @@ public final class Label {
    * <p>Names rather than positions, which is what stops a schema change from invalidating rows
    * already written. A record's components are positional: adding a fourth one makes every blob in
    * the table undecodable.
+   *
+   * @return each axis name with what this label says on it, as written down
    */
   public Map<String, String> encode() {
     Map<String, String> encoded = new LinkedHashMap<>();
@@ -148,6 +182,10 @@ public final class Label {
    * not fewer. What stops that is the engine refusing an incomplete label wherever it reads one
    * back, not anything this method does; marking an axis {@code required()} is what makes rows
    * written before it unreadable rather than universally readable.
+   *
+   * @param encoded each axis name with what the label said, as written down
+   * @param declared the axes the store now declares
+   * @return the label as it was stored
    */
   public static Label decode(Map<String, String> encoded, Axes declared) {
     Map<Axis<?>, Object> said = new LinkedHashMap<>();
@@ -173,6 +211,9 @@ public final class Label {
    * <p>For choosing <i>where</i> a value is kept -- which key encrypts it -- and never for deciding
    * who may read it. That is what a ceiling is for, and asking a label one axis at a time and
    * acting on the answer is how an application rebuilds the gate badly, outside the record.
+   *
+   * @param axis the axis asked about, never null
+   * @return the one value it says there, or empty if it says nothing or a mixture
    */
   public Optional<String> sole(Axis<?> axis) {
     Objects.requireNonNull(axis, "a label is asked about some axis");

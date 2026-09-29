@@ -87,7 +87,11 @@ public class CharterEndpoint {
     this.charter = charter;
   }
 
-  /** The whole charter, and what can be asked about next. */
+  /**
+   * The whole charter, and what can be asked about next.
+   *
+   * @return every section of the charter's report, by name
+   */
   @ReadOperation
   public Map<String, Object> charter() {
     Manifest manifest = charter.manifest();
@@ -114,6 +118,9 @@ public class CharterEndpoint {
    *
    * <p>Not an empty map: that would answer a misspelled section with 200 and an empty body, which
    * says the section exists and has nothing in it.
+   *
+   * @param section the section's name
+   * @return the section's report, or a 404 response when there is no such section
    */
   @ReadOperation
   public WebEndpointResponse<Map<String, Object>> section(@Selector String section) {
@@ -146,6 +153,11 @@ public class CharterEndpoint {
    *
    * <p>A type nobody declared answers with empty lists rather than 404. That it is mentioned
    * nowhere is the answer, and a different fact from there being no such section.
+   *
+   * @param section the section's name, or {@code types}
+   * @param name the declaration's name, or the occluded type's
+   * @return the report, or a 404 response when there is no such section or no such declaration in
+   *     it
    */
   @ReadOperation
   public WebEndpointResponse<Map<String, Object>> named(

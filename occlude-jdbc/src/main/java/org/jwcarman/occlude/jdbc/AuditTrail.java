@@ -72,13 +72,22 @@ public final class AuditTrail {
    *
    * <p>Found by the value id each line names -- a column in the clear, so a line whose id somebody
    * rewrote is not found here. {@link StorageIntegrity#check()} reports that line broken.
+   *
+   * @param valueId the value whose lines to find, never null
+   * @return its lines, oldest first; empty when none names it
    */
   public List<RecordedLine> about(String valueId) {
     Objects.requireNonNull(valueId, "lines about some value");
     return lines(COLUMNS + " WHERE value_id = ? ORDER BY entry_id", valueId);
   }
 
-  /** Every line recorded from {@code from}, inclusive, to {@code to}, exclusive, in order. */
+  /**
+   * Every line recorded from {@code from}, inclusive, to {@code to}, exclusive, in order.
+   *
+   * @param from the start of the window, inclusive, never null
+   * @param to the end of the window, exclusive, never null
+   * @return the lines recorded in the window, oldest first
+   */
   public List<RecordedLine> between(Instant from, Instant to) {
     Objects.requireNonNull(from, "a window starts somewhere");
     Objects.requireNonNull(to, "a window ends somewhere");
@@ -91,6 +100,11 @@ public final class AuditTrail {
   /**
    * Up to {@code limit} lines after {@code entryId}, in order: the way to walk the whole trail a
    * page at a time, starting from {@code 0}.
+   *
+   * @param entryId the id of the last line already seen, or {@code 0} to start at the beginning
+   * @param limit the most lines to return, at least 1
+   * @return up to {@code limit} lines, oldest first; empty when the trail has nothing after {@code
+   *     entryId}
    */
   public List<RecordedLine> after(long entryId, int limit) {
     if (limit <= 0) {

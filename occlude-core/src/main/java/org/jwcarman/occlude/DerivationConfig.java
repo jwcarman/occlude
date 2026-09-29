@@ -38,13 +38,23 @@ public final class DerivationConfig {
 
   DerivationConfig() {}
 
-  /** The most a parent may be labelled and still be read here. */
+  /**
+   * The most a parent may be labelled and still be read here.
+   *
+   * @param ceiling what a parent may be labelled and still be read
+   * @return this configuration
+   */
   public DerivationConfig accepting(Ceiling ceiling) {
     Objects.requireNonNull(ceiling, "a ceiling must not be null");
     return accepting(context -> ceiling);
   }
 
-  /** A ceiling that depends on who is asking, which a tenant always does. */
+  /**
+   * A ceiling that depends on who is asking, which a tenant always does.
+   *
+   * @param ceiling chooses what a parent may be labelled from who is asking
+   * @return this configuration
+   */
   public DerivationConfig accepting(Function<AccessContext, Ceiling> ceiling) {
     this.ceiling = Objects.requireNonNull(ceiling, "a ceiling must not be null");
     return this;
@@ -56,13 +66,21 @@ public final class DerivationConfig {
    * <p>The only way a label is ever weakened, and the engine still checks the result is genuinely
    * below the combination of the parents. Saying so here is what puts it in the manifest, under the
    * heading an auditor reads first.
+   *
+   * @param relabel gives the result's label from the combination of its parents' labels
+   * @return this configuration
    */
   public DerivationConfig lowering(UnaryOperator<Label> relabel) {
     this.relabel = Objects.requireNonNull(relabel, "a lowering must not be null");
     return this;
   }
 
-  /** Whether this is offered at all, given who is asking. */
+  /**
+   * Whether this is offered at all, given who is asking.
+   *
+   * @param availableTo true for an access this is offered to
+   * @return this configuration
+   */
   public DerivationConfig availableTo(Predicate<AccessContext> availableTo) {
     this.availableTo = Objects.requireNonNull(availableTo, "an availability must not be null");
     return this;
