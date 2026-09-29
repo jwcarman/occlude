@@ -29,6 +29,8 @@
 
   <artifactId>occlude-spring-boot-autoconfigure</artifactId>
   <name>Occlude :: Spring Boot AutoConfigure</name>
+  <description>Spring Boot auto-configuration for Occlude: constructs and binds the charter, wires
+    the JDBC store from configuration, and observes every operation.</description>
 
   <dependencies>
     <!-- Spring Boot's own ObservationRegistry, wherever this runs: every operation is observed

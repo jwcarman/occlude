@@ -1,0 +1,49 @@
+name: Publish package to the Maven Central Repository
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Maven Central Repository
+        uses: actions/setup-java@v6
+        with:
+          java-version: '25'
+          distribution: 'liberica'
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_SIGNING_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      # processAllModules, though occlude-bom does inherit from occlude-parent in source and is
+      # flattened only when published: versions:set walks the modules inheritance reaches, and a
+      # module it missed would keep its -SNAPSHOT version, route to the snapshot repository, and
+      # have the whole deployment refused -- how nessy's first release failed. It costs nothing.
+      #
+      # The tag arrives through the environment rather than being interpolated into the script.
+      # A release name is chosen by whoever cuts the release, and a value spliced straight into a
+      # shell command is a command anyone able to cut one gets to run on this job -- which holds
+      # the signing key and the Central token.
+      - name: Set version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: >-
+          ./mvnw versions:set
+          -DnewVersion="$RELEASE_TAG"
+          -DprocessAllModules=true
+          -DgenerateBackupPoms=false
+
+      - name: Publish package
+        run: ./mvnw -P release --batch-mode deploy -DskipTests
+        env:
+          MAVEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_SIGNING_KEY_PASSWORD }}
