@@ -29,7 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
-import org.jwcarman.occlude.AccessContextProvider;
+import org.jwcarman.occlude.Bindings;
 import org.jwcarman.occlude.DefaultCharter;
 import org.jwcarman.occlude.Occlude;
 import org.jwcarman.occlude.Occluded;
@@ -90,7 +90,7 @@ class AuditThroughputTest {
             .encryptedWith(TestKeys.dataKeys())
             .rootedIn(TestKeys.ROOT_ID, TestKeys.root())
             .storage(charter.axes());
-    charter.bind(storage, AccessContextProvider.none());
+    charter.bind(Bindings.of(storage).withoutIdentity());
   }
 
   /**

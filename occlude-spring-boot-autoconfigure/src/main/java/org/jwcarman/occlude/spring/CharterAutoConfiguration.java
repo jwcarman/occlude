@@ -16,6 +16,7 @@
 package org.jwcarman.occlude.spring;
 
 import org.jwcarman.occlude.AccessContextProvider;
+import org.jwcarman.occlude.Bindings;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.DefaultCharter;
 import org.jwcarman.occlude.lattice.Axes;
@@ -107,7 +108,7 @@ public class CharterAutoConfiguration {
       if (constituted == null) {
         return;
       }
-      constituted.bind(storage, access);
+      constituted.bind(Bindings.of(storage).withIdentity(access));
       if (properties.isLogManifest()) {
         log.info("\n{}", constituted.manifest());
       }

@@ -87,7 +87,7 @@ class WritingAtAnothersLabelTest {
           .reading(NOTE_TYPE);
 
   {
-    config.bind(storage, edge::get);
+    config.bind(Bindings.of(storage).withIdentity(edge::get));
   }
 
   // read `.tenant()` off the stored label is re-expressed against Label.toString(), which is

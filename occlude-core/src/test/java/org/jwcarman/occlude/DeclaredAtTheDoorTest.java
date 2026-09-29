@@ -77,7 +77,7 @@ class DeclaredAtTheDoorTest {
   private final MemoryStorage storage = new MemoryStorage();
 
   {
-    config.bind(storage, AccessContextProvider.none());
+    config.bind(Bindings.of(storage).withoutIdentity());
   }
 
   @Test

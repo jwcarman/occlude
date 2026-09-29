@@ -56,25 +56,23 @@ class DefaultCharterInternalsTest {
     @DisplayName("refuses to be bound twice")
     void refuses_to_be_bound_twice() {
       DefaultCharter charter = new DefaultCharter(TENANT);
-      charter.bind(new MemoryStorage(), AccessContextProvider.none());
-      MemoryStorage secondStorage = new MemoryStorage();
-      AccessContextProvider nobody = AccessContextProvider.none();
+      charter.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
+      Bindings again = Bindings.of(new MemoryStorage()).withoutIdentity();
 
-      assertThatThrownBy(() -> charter.bind(secondStorage, nobody))
+      assertThatThrownBy(() -> charter.bind(again))
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("already bound");
     }
 
     @Test
-    @DisplayName("refuses a storage or an access source that is not there")
+    @DisplayName("refuses bindings, a storage or an access source that is not there")
     void refuses_nulls() {
       DefaultCharter charter = new DefaultCharter(TENANT);
-      MemoryStorage storage = new MemoryStorage();
-      AccessContextProvider nobody = AccessContextProvider.none();
+      Bindings.Store store = Bindings.of(new MemoryStorage());
 
-      assertThatThrownBy(() -> charter.bind(null, nobody)).isInstanceOf(NullPointerException.class);
-      assertThatThrownBy(() -> charter.bind(storage, null))
-          .isInstanceOf(NullPointerException.class);
+      assertThatThrownBy(() -> charter.bind(null)).isInstanceOf(NullPointerException.class);
+      assertThatThrownBy(() -> Bindings.of(null)).isInstanceOf(NullPointerException.class);
+      assertThatThrownBy(() -> store.withIdentity(null)).isInstanceOf(NullPointerException.class);
     }
 
     /**
@@ -95,7 +93,7 @@ class DefaultCharterInternalsTest {
             ready.countDown();
             awaitUninterruptibly(go);
             try {
-              charter.bind(new MemoryStorage(), AccessContextProvider.none());
+              charter.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
               successes.incrementAndGet();
             } catch (IllegalStateException _) {
               failures.incrementAndGet();
@@ -149,7 +147,7 @@ class DefaultCharterInternalsTest {
               });
         }
         go.countDown();
-        charter.bind(new MemoryStorage(), AccessContextProvider.none());
+        charter.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
       }
 
       assertThat(unexpected).isEmpty();
@@ -179,9 +177,8 @@ class DefaultCharterInternalsTest {
       Thread rendering = Thread.ofVirtual().start(charter::manifest);
       inCeiling.await();
 
-      assertTimeoutPreemptively(
-          Duration.ofSeconds(5),
-          () -> charter.bind(new MemoryStorage(), AccessContextProvider.none()));
+      Bindings bindings = Bindings.of(new MemoryStorage()).withoutIdentity();
+      assertTimeoutPreemptively(Duration.ofSeconds(5), () -> charter.bind(bindings));
 
       release.countDown();
       rendering.join();
@@ -285,7 +282,7 @@ class DefaultCharterInternalsTest {
         charter.inspection("desk", Ceiling.of(TENANT, Constraint.any()));
 
     {
-      charter.bind(new MemoryStorage(), AccessContextProvider.none());
+      charter.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
     }
 
     @Test
@@ -338,7 +335,7 @@ class DefaultCharterInternalsTest {
           STRING_TYPE,
           String::toUpperCase,
           d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
-      charter.bind(storage, AccessContextProvider.none());
+      charter.bind(Bindings.of(storage).withoutIdentity());
     }
 
     @Test

@@ -78,7 +78,7 @@ class RequiredAxisTest {
   private final MemoryStorage kept = new MemoryStorage();
 
   {
-    config.bind(kept, edge::get);
+    config.bind(Bindings.of(kept).withIdentity(edge::get));
   }
 
   // that used to read `.tenant()` / `.level()` off a stored label are re-expressed against
@@ -122,7 +122,7 @@ class RequiredAxisTest {
                     .orElseGet(Label::nothing)
                     .with(LEVEL, Level.HIGH));
     MemoryStorage storage = new MemoryStorage();
-    own.bind(storage, edge::get);
+    own.bind(Bindings.of(storage).withIdentity(edge::get));
     edge.set(AccessContext.empty());
     Note orphan = new Note("orphan");
 
@@ -144,7 +144,7 @@ class RequiredAxisTest {
     Occlude<Note> low =
         own.source("low", NOTE_TYPE, ctx -> Label.of(TENANT, "acme").with(LEVEL, Level.LOW));
     MemoryStorage storage = new MemoryStorage();
-    own.bind(storage, AccessContextProvider.none());
+    own.bind(Bindings.of(storage).withoutIdentity());
 
     assertThat(Stored.label(storage, low.occlude(new Note("fine"))).says(LEVEL, Level.LOW))
         .isTrue();
@@ -179,7 +179,7 @@ class RequiredAxisTest {
                     // `of` where `with` was meant: the level survives, the tenant vanishes.
                     .lowering(joined -> Label.of(LEVEL, Level.LOW)));
     MemoryStorage storage = new MemoryStorage();
-    own.bind(storage, edge::get);
+    own.bind(Bindings.of(storage).withIdentity(edge::get));
     edge.set(AccessContext.of(Map.of("tenant", "acme")));
 
     Derived<Note> result = redact.derive(door.occlude(new Note("ours")));
@@ -214,7 +214,7 @@ class RequiredAxisTest {
                 Ceiling.of(TENANT, Constraint.any()).with(LEVEL, Constraint.atMost(Level.HIGH)),
                 NOTE_TYPE)
             .reading(NOTE_TYPE);
-    own.bind(storage, edge::get);
+    own.bind(Bindings.of(storage).withIdentity(edge::get));
 
     // A row from before the tenant axis was required: it says nothing about tenant at all.
     storage.put(

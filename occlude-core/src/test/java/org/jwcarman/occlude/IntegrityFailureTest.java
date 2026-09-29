@@ -115,7 +115,7 @@ class IntegrityFailureTest {
   private final Occluded<String> held;
 
   {
-    charter.bind(storage, AccessContextProvider.none());
+    charter.bind(Bindings.of(storage).withoutIdentity());
     held = notes.occlude("hello");
   }
 

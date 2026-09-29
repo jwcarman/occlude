@@ -162,9 +162,9 @@ annoying safety features get routed around. So say once where the answer lives, 
 is bound to its storage:
 
 ```java
-charter.bind(storage, () -> AccessContext.of(Map.of(
+charter.bind(Bindings.of(storage).withIdentity(() -> AccessContext.of(Map.of(
     "tenant", CurrentTenant.get(),
-    "principal", SecurityContextHolder.getContext().getAuthentication().getName())));
+    "principal", SecurityContextHolder.getContext().getAuthentication().getName()))));
 ```
 
 A `ThreadLocal`, a `ScopedValue`, Spring's holders — Occlude has no opinion about how your request

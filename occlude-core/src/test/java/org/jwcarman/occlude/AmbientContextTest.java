@@ -68,7 +68,7 @@ class AmbientContextTest {
                 ctx -> Ceiling.of(CLEARANCE, Constraint.atMost(ceiling.apply(ctx))),
                 STRING_TYPE)
             .reading(STRING_TYPE);
-    config.bind(new MemoryStorage(), access);
+    config.bind(Bindings.of(new MemoryStorage()).withIdentity(access));
     return new Wired(config, cards, card);
   }
 

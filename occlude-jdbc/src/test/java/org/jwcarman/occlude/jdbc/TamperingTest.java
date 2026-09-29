@@ -35,6 +35,7 @@ import org.jwcarman.codec.TypeRef;
 import org.jwcarman.codec.crypto.JceDataKeyProvider;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.occlude.AccessContext;
+import org.jwcarman.occlude.Bindings;
 import org.jwcarman.occlude.DefaultCharter;
 import org.jwcarman.occlude.Derivation;
 import org.jwcarman.occlude.Erasure;
@@ -132,7 +133,7 @@ class TamperingTest {
             d -> d.accepting(anything));
     erasure = charter.erasure("erasure", (label, ctx) -> true);
     memoDesk = charter.sink("memo-desk", anything, MEMO).reading(MEMO);
-    charter.bind(storage, () -> AccessContext.of("tenant", "acme"));
+    charter.bind(Bindings.of(storage).withIdentity(() -> AccessContext.of("tenant", "acme")));
   }
 
   /**

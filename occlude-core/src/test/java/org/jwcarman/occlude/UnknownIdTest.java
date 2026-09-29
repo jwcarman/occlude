@@ -41,7 +41,7 @@ class UnknownIdTest {
   private final Inspection desk = charter.inspection("desk", Ceiling.of(TENANT, Constraint.any()));
 
   {
-    charter.bind(storage, AccessContextProvider.none());
+    charter.bind(Bindings.of(storage).withoutIdentity());
   }
 
   @Test

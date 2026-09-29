@@ -58,7 +58,7 @@ class DerivationEdgeCasesTest {
           d -> d.accepting(Ceiling.of(TENANT, Constraint.atMost("acme"))));
 
   {
-    charter.bind(new MemoryStorage(), AccessContextProvider.none());
+    charter.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
   }
 
   /**

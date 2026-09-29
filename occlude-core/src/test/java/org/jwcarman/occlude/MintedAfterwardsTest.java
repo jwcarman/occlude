@@ -60,7 +60,7 @@ class MintedAfterwardsTest {
   private final MemoryStorage storage = new MemoryStorage();
 
   {
-    config.bind(storage, AccessContextProvider.none());
+    config.bind(Bindings.of(storage).withoutIdentity());
   }
 
   private final Occluded<Token> secret = acmeTokens.occlude(new Token("acme's cardholder token"));

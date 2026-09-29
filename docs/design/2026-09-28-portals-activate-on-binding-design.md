@@ -1,6 +1,6 @@
 # Portals activate on binding
 
-Status: landed.
+Status: landed. Since then `bind` takes a `Bindings` -- `Bindings.of(storage).withIdentity(currentAccess)` -- rather than two arguments.
 
 ## What prompted this
 

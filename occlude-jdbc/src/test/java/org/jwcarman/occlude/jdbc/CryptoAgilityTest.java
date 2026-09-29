@@ -36,6 +36,7 @@ import org.jwcarman.codec.crypto.JceDataKeyProvider;
 import org.jwcarman.codec.crypto.KeyAccessException;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.occlude.AccessContext;
+import org.jwcarman.occlude.Bindings;
 import org.jwcarman.occlude.DefaultCharter;
 import org.jwcarman.occlude.Derivation;
 import org.jwcarman.occlude.Occlude;
@@ -127,7 +128,7 @@ class CryptoAgilityTest {
             note -> new Note(note.text().toUpperCase()),
             d -> d.accepting(anything));
     Reveal<Note> desk = charter.sink("desk", anything, NOTE).reading(NOTE);
-    charter.bind(storage, () -> AccessContext.of("tenant", "acme"));
+    charter.bind(Bindings.of(storage).withIdentity(() -> AccessContext.of("tenant", "acme")));
 
     Occluded<Note> note = notes.occlude(new Note("hello"));
     Occluded<Note> shouted = shout.derive(note).orThrow();
@@ -228,7 +229,7 @@ class CryptoAgilityTest {
     JdbcStorage storage = underFirst();
     DefaultCharter charter = new DefaultCharter(AXES);
     Occlude<Note> notes = charter.source("notes", NOTE, Label.of(TENANT, "acme"));
-    charter.bind(storage, () -> AccessContext.of("tenant", "acme"));
+    charter.bind(Bindings.of(storage).withIdentity(() -> AccessContext.of("tenant", "acme")));
     List<Occluded<Note>> written = new ArrayList<>();
     for (int i = 0; i < 520; i++) {
       written.add(notes.occlude(new Note("note " + i)));

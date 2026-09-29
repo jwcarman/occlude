@@ -69,19 +69,19 @@ look them up later.
 ## 4. Bring it into force
 
 ```java
-charter.bind(new MemoryStorage(), () -> AccessContext.of(Map.of(
+charter.bind(Bindings.of(new MemoryStorage()).withIdentity(() -> AccessContext.of(Map.of(
     "tenant", CurrentTenant.get(),
-    "role", currentRole())));
+    "role", currentRole()))));
 ```
 
 Once, irreversibly. Before this, no portal works; after it, no further authority can be
 constituted, and the charter itself is no longer needed.
 
-The second argument is how identity reaches the gate without being threaded through every call. A
+`withIdentity` is how identity reaches the gate without being threaded through every call. A
 `ThreadLocal`, a `ScopedValue`, Spring's holders — occlude has no opinion. It is supplied here,
 beside the storage, because it is where identity lives in this environment rather than authority
-the application grants. An application with no notion of identity passes
-`AccessContextProvider.none()`.
+the application grants. An application with no notion of identity says so with
+`withoutIdentity()` — there is no way to bind without deciding.
 
 ## 5. Use it
 

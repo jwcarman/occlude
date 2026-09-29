@@ -70,7 +70,7 @@ class ArityTest {
   private final MemoryStorage storage = new MemoryStorage();
 
   {
-    config.bind(storage, AccessContextProvider.none());
+    config.bind(Bindings.of(storage).withoutIdentity());
   }
 
   private final Occluded<Note> first = notes.occlude(new Note("a"));
@@ -124,7 +124,7 @@ class ArityTest {
             NOTE,
             parts -> new Note(parts.size() + " notes"),
             d -> d.accepting(Ceiling.of(TENANT, Constraint.atMost("acme"))));
-    counted.bind(counting, AccessContextProvider.none());
+    counted.bind(Bindings.of(counting).withoutIdentity());
 
     List<Occluded<Note>> parents = new ArrayList<>();
     for (int i = 0; i < 10; i++) {

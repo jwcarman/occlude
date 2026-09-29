@@ -39,7 +39,7 @@ class OccludeEdgeCasesTest {
   @DisplayName("refuses a null value: a store holds values, not nulls")
   void refuses_a_null_value() {
     Occlude<String> source = charter.source("mail", STRING_TYPE, Label.of(TENANT, "acme"));
-    charter.bind(new MemoryStorage(), AccessContextProvider.none());
+    charter.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
 
     assertThatThrownBy(() -> source.occlude(null))
         .isInstanceOf(IllegalArgumentException.class)
@@ -56,7 +56,7 @@ class OccludeEdgeCasesTest {
             (value, ctx) -> {
               throw new IllegalStateException("cannot decide");
             });
-    charter.bind(new MemoryStorage(), AccessContextProvider.none());
+    charter.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
 
     assertThatThrownBy(() -> source.occlude("hello"))
         .isInstanceOf(AccessDeniedException.class)
@@ -67,7 +67,7 @@ class OccludeEdgeCasesTest {
   @DisplayName("refuses a value whose labelling function answered with no label at all")
   void refuses_a_value_whose_labelling_function_answered_with_nothing() {
     Occlude<String> source = charter.source("mail", STRING_TYPE, (value, ctx) -> null);
-    charter.bind(new MemoryStorage(), AccessContextProvider.none());
+    charter.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
 
     assertThatThrownBy(() -> source.occlude("hello"))
         .isInstanceOf(AccessDeniedException.class)

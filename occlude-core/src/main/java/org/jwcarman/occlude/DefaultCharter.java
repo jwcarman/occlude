@@ -32,7 +32,6 @@ import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Label;
 import org.jwcarman.occlude.manifest.Manifest;
-import org.jwcarman.occlude.storage.Storage;
 
 /**
  * Where an application declares its authority, and nothing more.
@@ -74,8 +73,7 @@ public final class DefaultCharter implements Charter {
   }
 
   /**
-   * Brings every portal this charter constituted into force at once, against this storage, with
-   * identity coming from {@code currentAccess}.
+   * Brings every portal this charter constituted into force at once, against what it is bound to.
    *
    * <p>Irreversible. After it returns, nothing further may be declared and everything already
    * declared works. There is no way back: no unbinding, no rebinding, no replacing the storage.
@@ -87,29 +85,21 @@ public final class DefaultCharter implements Charter {
    * <p>Identity is known at the edge -- a request, a message, a session -- and needed at the gate,
    * which may be many layers down. Threading an {@code AccessContext} parameter through all of them
    * would make the safety feature the most annoying thing in the codebase, and annoying safety
-   * features get routed around.
-   *
-   * <p>So the application says once where the answer lives. A {@code ThreadLocal}, a {@code
-   * ScopedValue}, Spring's {@code SecurityContextHolder} -- a store does not care, and has no
-   * opinion about how a request scope works.
-   *
-   * <p>Whatever this returns is taken as fact. It is the one input a caller cannot argue with,
-   * which is why it must come from somewhere a caller does not control.
+   * features get routed around. So the application says once where the answer lives.
    *
    * <pre>{@code
-   * charter.bind(storage, () -> AccessContext.of(Map.of(
+   * charter.bind(Bindings.of(storage).withIdentity(() -> AccessContext.of(Map.of(
    *     "tenant", CurrentTenant.get(),
-   *     "principal", SecurityContextHolder.getContext().getAuthentication().getName()))))
+   *     "principal", SecurityContextHolder.getContext().getAuthentication().getName()))));
    * }</pre>
    *
-   * <p>An application with no notion of identity passes {@link AccessContextProvider#none()}, and
-   * says so where it binds rather than getting it by forgetting.
+   * <p>An application with no notion of identity says so with {@link
+   * Bindings.Store#withoutIdentity()}, rather than getting it by forgetting.
    */
-  public void bind(Storage storage, AccessContextProvider currentAccess) {
-    Objects.requireNonNull(storage, "a charter is bound to a storage");
-    Objects.requireNonNull(currentAccess, "a charter is told where identity comes from");
+  public void bind(Bindings bindings) {
+    Objects.requireNonNull(bindings, "a charter is bound to something");
     synchronized (declarations) {
-      operations.bind(axes, storage, currentAccess);
+      operations.bind(axes, bindings.storage(), bindings.currentAccess());
     }
   }
 

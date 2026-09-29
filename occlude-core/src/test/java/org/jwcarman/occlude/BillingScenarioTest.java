@@ -382,7 +382,7 @@ class BillingScenarioTest {
           d -> d.accepting(reading(Integrity.ENDORSED, Tlp.AMBER, DataClass.PII)));
 
   {
-    config.bind(storage, edge::get);
+    config.bind(Bindings.of(storage).withIdentity(edge::get));
   }
 
   /** Every access in this system is made on behalf of a tenant, established at the edge. */
@@ -1063,7 +1063,7 @@ class BillingScenarioTest {
               String.class,
               (account, sender, ctx) -> true,
               d -> d.accepting(reading(Integrity.ENDORSED, Tlp.CLEAR, DataClass.NONE)));
-      choosyConfig.bind(new MemoryStorage(), edge::get);
+      choosyConfig.bind(Bindings.of(new MemoryStorage()).withIdentity(edge::get));
       Occluded<Account> secret = secretAccounts.occlude(new Account("ACC-2", "x@y.example"));
 
       acme();
@@ -1144,7 +1144,7 @@ class BillingScenarioTest {
                   },
                   STRING_TYPE)
               .reading(STRING_TYPE);
-      fragileConfig.bind(new MemoryStorage(), edge::get);
+      fragileConfig.bind(Bindings.of(new MemoryStorage()).withIdentity(edge::get));
       Occluded<String> held =
           holdAs("acme", Integrity.ENDORSED, Tlp.CLEAR, DataClass.NONE, fragileMail, "x");
 
@@ -1315,7 +1315,7 @@ class BillingScenarioTest {
               return kept.erase(root, lineFor);
             }
           };
-      watchedConfig.bind(broken, edge::get);
+      watchedConfig.bind(Bindings.of(broken).withIdentity(edge::get));
 
       assertThatThrownBy(
               () ->

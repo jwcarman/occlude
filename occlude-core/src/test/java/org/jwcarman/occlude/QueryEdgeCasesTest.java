@@ -68,7 +68,7 @@ class QueryEdgeCasesTest {
           d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
 
   {
-    charter.bind(new MemoryStorage(), AccessContextProvider.none());
+    charter.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
   }
 
   @Test

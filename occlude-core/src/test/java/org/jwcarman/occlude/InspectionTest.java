@@ -70,7 +70,7 @@ class InspectionTest {
           });
 
   {
-    charter.bind(storage, edge::get);
+    charter.bind(Bindings.of(storage).withIdentity(edge::get));
   }
 
   @Test
@@ -140,7 +140,7 @@ class InspectionTest {
     DefaultCharter fixed = new DefaultCharter(TENANT);
     Occlude<String> mail = fixed.source("mail", NOTE, Label.of(TENANT, "acme"));
     Inspection anyTenant = fixed.inspection("any-tenant", Ceiling.of(TENANT, Constraint.any()));
-    fixed.bind(new MemoryStorage(), AccessContextProvider.none());
+    fixed.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
 
     Occluded<String> held = mail.occlude("hello");
 

@@ -81,7 +81,7 @@ class ErasingAcrossTenantsTest {
             ctx -> Label.of(TENANT, "globex").with(LEVEL, Level.HIGH));
 
     MemoryStorage storage = new MemoryStorage();
-    config.bind(storage, edge::get);
+    config.bind(Bindings.of(storage).withIdentity(edge::get));
 
     Occluded<Record> globexRecord = globexRecords.occlude(new Record("globex's records"));
 
@@ -107,7 +107,7 @@ class ErasingAcrossTenantsTest {
     MemoryStorage storage = new MemoryStorage();
     DefaultCharter config = new DefaultCharter(TENANT, LEVEL);
     Erasure erasure = config.erasure("anything", (label, ctx) -> true);
-    config.bind(storage, AccessContextProvider.none());
+    config.bind(Bindings.of(storage).withoutIdentity());
 
     assertThat(erasure.erase(Occluded.of("occ_never-existed")))
         .isInstanceOfSatisfying(
@@ -139,7 +139,7 @@ class ErasingAcrossTenantsTest {
             RECORD_TYPE,
             r -> new Record(r.text() + "-copy"),
             d -> d.accepting(Ceiling.of(TENANT, Constraint.any()).with(LEVEL, Constraint.any())));
-    config.bind(storage, AccessContextProvider.none());
+    config.bind(Bindings.of(storage).withoutIdentity());
 
     Occluded<Record> root = records.occlude(new Record("root"));
     Occluded<Record> child = copy.derive(root).orThrow();
@@ -186,7 +186,7 @@ class ErasingAcrossTenantsTest {
             combinedType,
             branches -> new Combined(branches.size() + " branches"),
             d -> d.accepting(anything));
-    config.bind(storage, AccessContextProvider.none());
+    config.bind(Bindings.of(storage).withoutIdentity());
 
     Occluded<Record> root = records.occlude(new Record("root"));
     Occluded<Branch> leftChild = left.derive(root).orThrow();
@@ -215,7 +215,7 @@ class ErasingAcrossTenantsTest {
     Occlude<Record> records =
         config.source(
             "records", RECORD_TYPE, ctx -> Label.of(TENANT, "acme").with(LEVEL, Level.LOW));
-    config.bind(storage, AccessContextProvider.none());
+    config.bind(Bindings.of(storage).withoutIdentity());
 
     Occluded<Record> root = records.occlude(new Record("root"));
 
@@ -234,7 +234,7 @@ class ErasingAcrossTenantsTest {
             "records", RECORD_TYPE, ctx -> Label.of(TENANT, "acme").with(LEVEL, Level.HIGH));
     Erasure retention = config.erasure("retention", (label, ctx) -> label.says(LEVEL, Level.LOW));
     Erasure compliance = config.erasure("compliance", (label, ctx) -> true);
-    config.bind(storage, AccessContextProvider.none());
+    config.bind(Bindings.of(storage).withoutIdentity());
 
     Occluded<Record> root = records.occlude(new Record("kept for now"));
 
@@ -265,7 +265,7 @@ class ErasingAcrossTenantsTest {
             d -> d.accepting(Ceiling.of(TENANT, Constraint.any()).with(LEVEL, Constraint.any())));
     Erasure nobody = config.erasure("nobody", (label, ctx) -> false);
     Erasure anybody = config.erasure("anybody", (label, ctx) -> true);
-    config.bind(storage, AccessContextProvider.none());
+    config.bind(Bindings.of(storage).withoutIdentity());
     Occluded<Record> root = records.occlude(new Record("root"));
     Occluded<Record> child = copy.derive(root).orThrow();
 
@@ -316,7 +316,7 @@ class ErasingAcrossTenantsTest {
   void throws_from_or_throw_when_refused() {
     DefaultCharter config = new DefaultCharter(TENANT, LEVEL);
     Erasure nobody = config.erasure("nobody", (label, ctx) -> false);
-    config.bind(new MemoryStorage(), AccessContextProvider.none());
+    config.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
 
     Erased erased = nobody.erase(Occluded.of("occ_never-existed"));
 

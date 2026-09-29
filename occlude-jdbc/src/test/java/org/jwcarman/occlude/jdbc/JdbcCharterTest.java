@@ -50,6 +50,7 @@ import org.jwcarman.codec.TypeRef;
 import org.jwcarman.codec.crypto.JceDataKeyProvider;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.occlude.AccessContext;
+import org.jwcarman.occlude.Bindings;
 import org.jwcarman.occlude.DefaultCharter;
 import org.jwcarman.occlude.Derivation;
 import org.jwcarman.occlude.Erased;
@@ -249,7 +250,7 @@ class JdbcCharterTest {
                     .lowering(joined -> joined.with(DATA, DataClass.PII)));
 
     storage = jdbc.storage(c.axes());
-    c.bind(storage, edge::get);
+    c.bind(Bindings.of(storage).withIdentity(edge::get));
   }
 
   /** What was written about a value, read beneath the charter, for assertions about state. */
@@ -734,7 +735,7 @@ class JdbcCharterTest {
     Occlude<Card> early =
         under1.source(
             "cards", CARD, ctx -> labelFor(ctx, Integrity.ENDORSED, DataClass.CARDHOLDER));
-    under1.bind(rooted("r1", Map.of("r1", first), axes), edge::get);
+    under1.bind(Bindings.of(rooted("r1", Map.of("r1", first), axes)).withIdentity(edge::get));
     edge.set(AccessContext.of("tenant", "acme"));
     early.occlude(new Card("4111111111114821", "CARMAN"));
 
@@ -744,7 +745,7 @@ class JdbcCharterTest {
         under2.source(
             "cards", CARD, ctx -> labelFor(ctx, Integrity.ENDORSED, DataClass.CARDHOLDER));
     JdbcStorage rotated = rooted("r2", both, axes);
-    under2.bind(rotated, edge::get);
+    under2.bind(Bindings.of(rotated).withIdentity(edge::get));
     later.occlude(new Card("4111111111119999", "CARMAN"));
 
     // Both eras, one verification, and nothing had to be re-signed.

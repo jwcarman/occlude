@@ -74,7 +74,7 @@ class LabellingWhatArrivesTest {
   private final MemoryStorage storage = new MemoryStorage();
 
   {
-    config.bind(storage, edge::get);
+    config.bind(Bindings.of(storage).withIdentity(edge::get));
   }
 
   // there is no direct way left to ask what a stored label says on a given axis. Label.toString()
