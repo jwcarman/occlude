@@ -15,6 +15,8 @@
  */
 package org.jwcarman.occlude;
 
+import org.jwcarman.occlude.storage.AuditRecord;
+
 /** The authority to ask one question of a value without the value leaving. */
 final class QueryPortal<I, Q> implements Query<I, Q> {
 
@@ -28,7 +30,13 @@ final class QueryPortal<I, Q> implements Query<I, Q> {
 
   @Override
   public Answer ask(Occluded<I> about, Q against) {
-    return operations.querying().ask(spec, about, against);
+    return operations
+        .observing()
+        .observe(
+            AuditRecord.Operation.QUERY,
+            spec.name(),
+            () -> operations.querying().ask(spec, about, against),
+            Observing::answered);
   }
 
   @Override

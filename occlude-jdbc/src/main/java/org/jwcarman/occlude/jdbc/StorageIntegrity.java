@@ -94,6 +94,23 @@ public final class StorageIntegrity {
   }
 
   /**
+   * Every check at once: the trail, the values' digests, what is missing, every ciphertext, and the
+   * head to anchor.
+   *
+   * <p>What a scheduled job runs. The head is read first, so a line written while the checks run is
+   * simply after it, and an anchor taken from this report was verified up to where it points.
+   */
+  public IntegrityReport check() {
+    Optional<TrailHead> head = storage.head();
+    return new IntegrityReport(
+        storage.firstBrokenEntry(),
+        storage.brokenValues(),
+        storage.missingValues(),
+        storage.sweep(),
+        head);
+  }
+
+  /**
    * Re-encrypts everything under the current keys and pipeline, which is what makes a key
    * retirable.
    *

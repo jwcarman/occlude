@@ -160,7 +160,17 @@ storage.missingValues();
 storage.sweep();              // and the ciphertext, which needs the keys
 ```
 
-See [The Record](../concepts/the-record.md).
+Or all of them at once, with the head to anchor:
+
+```java
+IntegrityReport report = storage.integrity().check();
+report.intact();       // nothing provably altered, removed or cut
+report.unreadable();   // something would not decrypt with the keys at hand
+report.head();         // write it down somewhere this database cannot reach
+```
+
+In Spring Boot, `occlude.integrity.interval` runs that check on a schedule — see
+[Spring Boot](spring-boot.md#observability). See also [The Record](../concepts/the-record.md).
 
 ## In tests
 

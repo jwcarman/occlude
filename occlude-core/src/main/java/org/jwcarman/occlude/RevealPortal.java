@@ -15,6 +15,8 @@
  */
 package org.jwcarman.occlude;
 
+import org.jwcarman.occlude.storage.AuditRecord;
+
 /** One type coming out of one sink. A typed view of the sink rather than a grant of its own. */
 final class RevealPortal<T> implements Reveal<T> {
 
@@ -35,7 +37,13 @@ final class RevealPortal<T> implements Reveal<T> {
 
   @Override
   public Revealed<T> reveal(Occluded<T> occluded) {
-    return operations.revealing().reveal(occluded, type, sink);
+    return operations
+        .observing()
+        .observe(
+            AuditRecord.Operation.REVEAL,
+            sink.name(),
+            () -> operations.revealing().reveal(occluded, type, sink),
+            Observing::revealed);
   }
 
   @Override

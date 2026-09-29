@@ -22,6 +22,10 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationHandler;
+import io.micrometer.observation.ObservationRegistry;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -600,6 +604,54 @@ class CharterAutoConfigurationTest {
 
               assertThat(identity.asked).isTrue();
             });
+  }
+
+  /** Telemetry is the application's: its registry, when it has one, sees every operation. */
+  @Test
+  @DisplayName("observes every operation through the application's registry")
+  void observes_through_the_applications_registry() {
+    runner
+        .withUserConfiguration(AnApplication.class, Observed.class)
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              Occlude<String> notes =
+                  context
+                      .<Occlude<String>>getBeanProvider(
+                          ResolvableType.forClassWithGenerics(Occlude.class, String.class))
+                      .getObject();
+
+              notes.occlude("a note");
+
+              assertThat(context.getBean(Observed.class).names)
+                  .containsExactly("occlude.operation");
+            });
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class Observed {
+
+    private final List<String> names = new ArrayList<>();
+
+    @Bean
+    ObservationRegistry observationRegistry() {
+      ObservationRegistry registry = ObservationRegistry.create();
+      registry
+          .observationConfig()
+          .observationHandler(
+              new ObservationHandler<>() {
+                @Override
+                public boolean supportsContext(Observation.Context context) {
+                  return true;
+                }
+
+                @Override
+                public void onStop(Observation.Context context) {
+                  names.add(context.getName());
+                }
+              });
+      return registry;
+    }
   }
 
   @Configuration(proxyBeanMethods = false)

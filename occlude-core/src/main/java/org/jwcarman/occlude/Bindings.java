@@ -15,6 +15,7 @@
  */
 package org.jwcarman.occlude;
 
+import io.micrometer.observation.ObservationRegistry;
 import java.util.Objects;
 import org.jwcarman.occlude.storage.Storage;
 
@@ -36,10 +37,13 @@ public final class Bindings {
 
   private final Storage storage;
   private final AccessContextProvider currentAccess;
+  private final ObservationRegistry observations;
 
-  private Bindings(Storage storage, AccessContextProvider currentAccess) {
+  private Bindings(
+      Storage storage, AccessContextProvider currentAccess, ObservationRegistry observations) {
     this.storage = storage;
     this.currentAccess = currentAccess;
+    this.observations = observations;
   }
 
   /** Binding to this store; identity is decided next. */
@@ -53,6 +57,25 @@ public final class Bindings {
 
   AccessContextProvider currentAccess() {
     return currentAccess;
+  }
+
+  ObservationRegistry observations() {
+    return observations;
+  }
+
+  /**
+   * The same, with every operation observed through this registry.
+   *
+   * <p>One observation per operation, {@code occlude.operation}, tagged with the operation, the
+   * portal, the outcome, the reason for a refusal and the class of anything thrown -- a timer and a
+   * span through whatever handlers the registry has. Nothing a value, a label or an identity could
+   * appear in. Without this, nothing is observed at all.
+   */
+  public Bindings observedBy(ObservationRegistry observations) {
+    return new Bindings(
+        storage,
+        currentAccess,
+        Objects.requireNonNull(observations, "observed by some registry, even a no-op one"));
   }
 
   /** A store chosen, and identity not yet decided. */
@@ -74,7 +97,8 @@ public final class Bindings {
     public Bindings withIdentity(AccessContextProvider currentAccess) {
       return new Bindings(
           storage,
-          Objects.requireNonNull(currentAccess, "a charter is told where identity comes from"));
+          Objects.requireNonNull(currentAccess, "a charter is told where identity comes from"),
+          ObservationRegistry.NOOP);
     }
 
     /**
@@ -84,7 +108,7 @@ public final class Bindings {
      * the context says otherwise" is wider than it looks when the context is always empty.
      */
     public Bindings withoutIdentity() {
-      return new Bindings(storage, AccessContextProvider.none());
+      return new Bindings(storage, AccessContextProvider.none(), ObservationRegistry.NOOP);
     }
   }
 }

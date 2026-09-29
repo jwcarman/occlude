@@ -99,7 +99,7 @@ public final class DefaultCharter implements Charter {
   public void bind(Bindings bindings) {
     Objects.requireNonNull(bindings, "a charter is bound to something");
     synchronized (declarations) {
-      operations.bind(axes, bindings.storage(), bindings.currentAccess());
+      operations.bind(axes, bindings.storage(), bindings.currentAccess(), bindings.observations());
     }
   }
 

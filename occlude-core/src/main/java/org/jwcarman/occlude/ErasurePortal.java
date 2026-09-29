@@ -15,6 +15,8 @@
  */
 package org.jwcarman.occlude;
 
+import org.jwcarman.occlude.storage.AuditRecord;
+
 /** The authority to forget a value and everything made from it, under one declared policy. */
 final class ErasurePortal implements Erasure {
 
@@ -28,7 +30,13 @@ final class ErasurePortal implements Erasure {
 
   @Override
   public Erased erase(Occluded<?> root) {
-    return operations.erasing().erase(root, spec);
+    return operations
+        .observing()
+        .observe(
+            AuditRecord.Operation.ERASE,
+            spec.name(),
+            () -> operations.erasing().erase(root, spec),
+            Observing::erased);
   }
 
   @Override

@@ -15,6 +15,7 @@
  */
 package org.jwcarman.occlude;
 
+import io.micrometer.observation.ObservationRegistry;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.storage.Storage;
@@ -34,6 +35,7 @@ import org.jwcarman.occlude.storage.Storage;
 final class Operations {
 
   private record Bound(
+      Observing observing,
       Occluding occluding,
       Revealing revealing,
       Querying querying,
@@ -48,13 +50,18 @@ final class Operations {
    *
    * <p>Irreversible: there is no unbinding, no rebinding, and no replacing the storage.
    */
-  void bind(Axes axes, Storage storage, AccessContextProvider currentAccess) {
+  void bind(
+      Axes axes,
+      Storage storage,
+      AccessContextProvider currentAccess,
+      ObservationRegistry observations) {
     // Built first, published once. Whoever loses the compare-and-set -- a second bind, or one that
     // raced the first -- is refused the same way, and what it built is never seen by anything.
     Gate gate = new Gate(axes, currentAccess);
     Trail trail = new Trail(storage);
     Bound operations =
         new Bound(
+            new Observing(observations),
             new Occluding(gate, trail, storage),
             new Revealing(gate, trail, storage),
             new Querying(gate, trail, storage),
@@ -69,6 +76,10 @@ final class Operations {
   /** Whether this has been brought into force. */
   boolean bound() {
     return bound.get() != null;
+  }
+
+  Observing observing() {
+    return current().observing();
   }
 
   Occluding occluding() {

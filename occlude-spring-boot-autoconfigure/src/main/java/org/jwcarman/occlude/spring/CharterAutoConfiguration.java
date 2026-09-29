@@ -15,6 +15,7 @@
  */
 package org.jwcarman.occlude.spring;
 
+import io.micrometer.observation.ObservationRegistry;
 import org.jwcarman.occlude.AccessContextProvider;
 import org.jwcarman.occlude.Bindings;
 import org.jwcarman.occlude.Charter;
@@ -23,6 +24,7 @@ import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.storage.Storage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -97,18 +99,28 @@ public class CharterAutoConfiguration {
    * <p>Storage is required, not looked for: an application that declared a charter and supplies
    * none fails to start, with Spring's own report of the missing bean, rather than serving requests
    * that all refuse. It is asked for by name, which is what finds a store no other bean can.
+   *
+   * <p>Every operation is observed through the application's {@link ObservationRegistry} when it
+   * has one -- Spring Boot configures one alongside Actuator -- and through nothing otherwise.
+   * Looked for rather than defaulted with a bean of our own: the registry is the application's, and
+   * a no-op one contributed here could stand in for Spring Boot's and silence every other library's
+   * telemetry with it.
    */
   @Bean
   @ConditionalOnBean(Axes.class)
   public SmartInitializingSingleton charterBinder(
       @Qualifier(STORAGE) Storage storage,
       AccessContextProvider access,
+      ObjectProvider<ObservationRegistry> observations,
       CharterProperties properties) {
     return () -> {
       if (constituted == null) {
         return;
       }
-      constituted.bind(Bindings.of(storage).withIdentity(access));
+      constituted.bind(
+          Bindings.of(storage)
+              .withIdentity(access)
+              .observedBy(observations.getIfAvailable(() -> ObservationRegistry.NOOP)));
       if (properties.isLogManifest()) {
         log.info("\n{}", constituted.manifest());
       }

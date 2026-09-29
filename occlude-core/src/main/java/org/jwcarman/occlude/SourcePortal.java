@@ -17,6 +17,7 @@ package org.jwcarman.occlude;
 
 import java.util.function.BiFunction;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.storage.AuditRecord;
 
 /** A door values enter through: its name, what it accepts, and how it labels what arrives. */
 final class SourcePortal<T> implements Occlude<T> {
@@ -39,7 +40,13 @@ final class SourcePortal<T> implements Occlude<T> {
 
   @Override
   public Occluded<T> occlude(T value) {
-    return operations.occluding().occlude(name, type, labelling, value);
+    return operations
+        .observing()
+        .observe(
+            AuditRecord.Operation.CONCEAL,
+            name,
+            () -> operations.occluding().occlude(name, type, labelling, value),
+            Observing::returned);
   }
 
   @Override

@@ -15,6 +15,7 @@
  */
 package org.jwcarman.occlude.spring;
 
+import io.micrometer.observation.ObservationRegistry;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -31,6 +32,7 @@ import org.jwcarman.occlude.jdbc.JdbcStorage;
 import org.jwcarman.occlude.jdbc.JdbcStorageConfig;
 import org.jwcarman.occlude.jdbc.MacAlgorithm;
 import org.jwcarman.occlude.jdbc.StorageIntegrity;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -161,6 +163,24 @@ public class JdbcCharterAutoConfiguration {
     public StorageIntegrity storageIntegrity(
         @Qualifier(CharterAutoConfiguration.STORAGE) JdbcStorage storage) {
       return storage.integrity();
+    }
+
+    /**
+     * The store checked on a schedule, when {@code occlude.integrity.interval} says how often.
+     *
+     * <p>Each run is observed through the application's registry when it has one, for the same
+     * reason operations are: the registry is the application's.
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "occlude.integrity", name = "interval")
+    public IntegrityMonitor integrityMonitor(
+        StorageIntegrity integrity,
+        CharterProperties properties,
+        ObjectProvider<ObservationRegistry> observations) {
+      return new IntegrityMonitor(
+          integrity,
+          properties.getIntegrity().getInterval(),
+          observations.getIfAvailable(() -> ObservationRegistry.NOOP));
     }
 
     /**

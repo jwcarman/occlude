@@ -53,5 +53,13 @@
       <groupId>com.fasterxml.uuid</groupId>
       <artifactId>java-uuid-generator</artifactId>
     </dependency>
+
+    <!-- Every operation is an observation: a timer and a span through whatever handlers the
+         application has, and nothing at all under the default no-op registry. Micrometer's
+         Observation API rather than an interface of our own, because it is already the facade. -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-observation</artifactId>
+    </dependency>
   </dependencies>
 </project>

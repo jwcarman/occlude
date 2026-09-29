@@ -574,6 +574,10 @@ class TamperingTest {
     assertThat(integrity.firstBrokenEntry()).isEmpty();
     assertThat(integrity.missingValues()).isEmpty();
     assertThat(integrity.brokenValues()).containsExactly(shouted.id());
+    IntegrityReport report = integrity.check();
+    assertThat(report.intact()).isFalse();
+    assertThat(report.brokenValues()).containsExactly(shouted.id());
+    assertThat(report.head()).contains(anchored);
     assertThat(integrity.sweep().alteredValues()).containsExactly(shouted.id());
     assertThatThrownBy(integrity::reencrypt).isInstanceOf(StorageIntegrityException.class);
   }

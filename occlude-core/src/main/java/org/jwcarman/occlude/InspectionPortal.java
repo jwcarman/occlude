@@ -15,6 +15,8 @@
  */
 package org.jwcarman.occlude;
 
+import org.jwcarman.occlude.storage.AuditRecord;
+
 /** The authority to read a value's label and lineage, up to one declared ceiling. */
 final class InspectionPortal implements Inspection {
 
@@ -28,7 +30,13 @@ final class InspectionPortal implements Inspection {
 
   @Override
   public Inspected inspect(Occluded<?> occluded) {
-    return operations.inspecting().inspect(occluded, spec);
+    return operations
+        .observing()
+        .observe(
+            AuditRecord.Operation.INSPECT,
+            spec.name(),
+            () -> operations.inspecting().inspect(occluded, spec),
+            Observing::inspected);
   }
 
   @Override

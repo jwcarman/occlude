@@ -16,6 +16,7 @@
 package org.jwcarman.occlude;
 
 import java.util.List;
+import org.jwcarman.occlude.storage.AuditRecord;
 
 /** The authority to make one value from one other, as it was declared. */
 final class DerivationPortal<I, O> implements Derivation<I, O> {
@@ -30,7 +31,13 @@ final class DerivationPortal<I, O> implements Derivation<I, O> {
 
   @Override
   public Derived<O> derive(Occluded<I> parent) {
-    return operations.deriving().derive(spec, List.of(parent));
+    return operations
+        .observing()
+        .observe(
+            AuditRecord.Operation.DERIVE,
+            spec.name(),
+            () -> operations.deriving().derive(spec, List.of(parent)),
+            Observing::derived);
   }
 
   @Override

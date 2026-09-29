@@ -16,6 +16,7 @@
 package org.jwcarman.occlude;
 
 import java.util.List;
+import org.jwcarman.occlude.storage.AuditRecord;
 
 /** The authority to make one value from many of one type, as it was declared. */
 final class FoldPortal<I, O> implements Fold<I, O> {
@@ -30,7 +31,14 @@ final class FoldPortal<I, O> implements Fold<I, O> {
 
   @Override
   public Derived<O> fold(List<Occluded<I>> parents) {
-    return operations.deriving().derive(spec, List.copyOf(parents));
+    List<Occluded<?>> all = List.copyOf(parents);
+    return operations
+        .observing()
+        .observe(
+            AuditRecord.Operation.DERIVE,
+            spec.name(),
+            () -> operations.deriving().derive(spec, all),
+            Observing::derived);
   }
 
   @Override

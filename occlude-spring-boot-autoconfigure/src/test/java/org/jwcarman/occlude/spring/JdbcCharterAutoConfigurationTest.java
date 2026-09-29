@@ -164,6 +164,23 @@ class JdbcCharterAutoConfigurationTest {
             });
   }
 
+  /** A check reads and decrypts every row, so nothing is scheduled until an interval is set. */
+  @Test
+  @DisplayName("schedules a check only when told how often")
+  void schedules_a_check_only_when_told() {
+    runner
+        .withUserConfiguration(AnApplication.class)
+        .run(context -> assertThat(context).doesNotHaveBean(IntegrityMonitor.class));
+    runner
+        .withUserConfiguration(AnApplication.class)
+        .withPropertyValues("occlude.integrity.interval=1h")
+        .run(
+            context -> {
+              assertThat(context).hasSingleBean(IntegrityMonitor.class);
+              assertThat(context.getBean(IntegrityMonitor.class).isRunning()).isTrue();
+            });
+  }
+
   /**
    * Everything a store keeps is encrypted, so a store without keys is not built -- and an
    * application that put this module on its classpath hears why at startup rather than serving

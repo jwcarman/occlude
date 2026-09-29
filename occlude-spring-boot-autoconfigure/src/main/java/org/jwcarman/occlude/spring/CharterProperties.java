@@ -15,6 +15,7 @@
  */
 package org.jwcarman.occlude.spring;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -51,6 +52,13 @@ public class CharterProperties {
     this.logManifest = logManifest;
   }
 
+  /** Checking the store on a schedule. */
+  private final Integrity integrity = new Integrity();
+
+  public Integrity getIntegrity() {
+    return integrity;
+  }
+
   /** Key-encryption keys for stored values, when the application does not contribute its own. */
   private final Keys keys = new Keys();
 
@@ -63,6 +71,24 @@ public class CharterProperties {
 
   public Roots getRoots() {
     return roots;
+  }
+
+  /** How often the store checks itself; never, unless an interval is set. */
+  public static class Integrity {
+
+    /**
+     * How long between checks. Unset, nothing is scheduled: a check reads and decrypts every row,
+     * and how often that is affordable depends on the store.
+     */
+    private Duration interval;
+
+    public Duration getInterval() {
+      return interval;
+    }
+
+    public void setInterval(Duration interval) {
+      this.interval = interval;
+    }
   }
 
   /**

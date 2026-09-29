@@ -172,6 +172,47 @@ operations endpoint belongs to whoever is looking at it, not to the caller a doo
 
 It is still a map of your security posture. Protect it as you would `/actuator/beans`.
 
+## Observability
+
+With an `ObservationRegistry` bean — Spring Boot configures one alongside Actuator — every
+operation is a Micrometer observation, `occlude.operation`: a timer, and a span if you have a
+tracing bridge, through the handlers you already have. Without one, nothing is observed. Plain Java
+gets the same with `Bindings.of(storage).withIdentity(...).observedBy(registry)`.
+
+| Key | Values |
+|---|---|
+| `operation` | `conceal`, `reveal`, `derive`, `query`, `erase`, `inspect` |
+| `portal` | the declared name |
+| `outcome` | `allowed`, `refused`, `failed` |
+| `reason` | the refusal's code — `ABOVE_CEILING`, `NOT_AS_SIGNED`, `UNREADABLE`... — or `none` |
+| `error` | the simple class name of anything thrown, or `none` |
+
+**Telemetry describes the system, never the data.** No value, identifier, label or identity is on
+an observation, and exceptions are recorded by class name only: their messages can name a value, and
+tracing backends are not protected the way the trail is. Two alerts are worth having from day one:
+any `reason="NOT_AS_SIGNED"` or `"UNREADABLE"`, which means the tables were edited or a key went
+missing, and a jump in `ABOVE_CEILING` at one portal, which is somebody probing or a deploy that
+broke a ceiling. To rename or reshape the observation, register an
+`OccludeObservationConvention` on the registry.
+
+### Checking the store on a schedule
+
+```yaml
+occlude:
+  integrity:
+    interval: 1h
+```
+
+Runs `StorageIntegrity.check()` — the chain, the values, what is missing, every ciphertext — on its
+own thread. Each run is an observation, `occlude.integrity`, tagged `result` = `intact`,
+`unreadable`, `altered` or `failed`; alert on `altered`. What was found is logged as counts, never
+ids, with the trail's head at INFO so shipping that line somewhere the database cannot reach is
+your anchor. Off unless set: a check reads and decrypts every row.
+
+There is deliberately no health indicator. Health drives liveness and readiness probes, and an
+orchestrator restarting every instance because somebody edited one row turns a finding into an
+outage. Tampering is a page, not a restart.
+
 ## Logging the manifest at startup
 
 On by default: the manifest is printed as the charter is bound. Turn it off with
