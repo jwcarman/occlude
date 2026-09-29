@@ -54,7 +54,7 @@ class JdbcStorageWhiteboxTest {
   private Object newPredecessor(byte[] digest, Instant recordedAt)
       throws ReflectiveOperationException {
     Constructor<?> ctor =
-        Class.forName("org.jwcarman.occlude.jdbc.JdbcStorage$Predecessor")
+        Class.forName("org.jwcarman.occlude.jdbc.Transactions$Predecessor")
             .getDeclaredConstructor(byte[].class, Instant.class);
     ctor.setAccessible(true);
     return ctor.newInstance(digest, recordedAt);
@@ -110,12 +110,11 @@ class JdbcStorageWhiteboxTest {
   private Object newValueRow(
       byte[] digest, byte[] payload, byte[] label, String derivation, String type, String rootId)
       throws ReflectiveOperationException {
-    Class<?> commitmentsType =
-        Class.forName("org.jwcarman.occlude.jdbc.JdbcStorage$ValueCommitments");
+    Class<?> commitmentsType = Class.forName("org.jwcarman.occlude.jdbc.Signer$ValueCommitments");
     Constructor<?> commitments = commitmentsType.getDeclaredConstructor(byte[].class, byte[].class);
     commitments.setAccessible(true);
     Constructor<?> ctor =
-        Class.forName("org.jwcarman.occlude.jdbc.JdbcStorage$ValueRow")
+        Class.forName("org.jwcarman.occlude.jdbc.Verification$ValueRow")
             .getDeclaredConstructor(
                 byte[].class,
                 commitmentsType,
@@ -253,12 +252,11 @@ class JdbcStorageWhiteboxTest {
   @DisplayName("a value row is unequal to one signed with a different MAC")
   void value_row_is_unequal_when_the_mac_differs() throws ReflectiveOperationException {
     Object baseline = aValueRow();
-    Class<?> commitmentsType =
-        Class.forName("org.jwcarman.occlude.jdbc.JdbcStorage$ValueCommitments");
+    Class<?> commitmentsType = Class.forName("org.jwcarman.occlude.jdbc.Signer$ValueCommitments");
     Constructor<?> commitments = commitmentsType.getDeclaredConstructor(byte[].class, byte[].class);
     commitments.setAccessible(true);
     Constructor<?> ctor =
-        Class.forName("org.jwcarman.occlude.jdbc.JdbcStorage$ValueRow")
+        Class.forName("org.jwcarman.occlude.jdbc.Verification$ValueRow")
             .getDeclaredConstructor(
                 byte[].class,
                 commitmentsType,
@@ -286,8 +284,7 @@ class JdbcStorageWhiteboxTest {
   @DisplayName("a row's commitments compare by content and print without their bytes")
   void value_commitments_compare_by_content_and_print_nothing()
       throws ReflectiveOperationException {
-    Class<?> commitmentsType =
-        Class.forName("org.jwcarman.occlude.jdbc.JdbcStorage$ValueCommitments");
+    Class<?> commitmentsType = Class.forName("org.jwcarman.occlude.jdbc.Signer$ValueCommitments");
     Constructor<?> ctor = commitmentsType.getDeclaredConstructor(byte[].class, byte[].class);
     ctor.setAccessible(true);
     byte[] payload = "payload".getBytes(StandardCharsets.UTF_8);
