@@ -156,18 +156,8 @@ public final class JdbcStorage implements Storage {
    * noticed. Deriving the answer from the signed structure removes the trusted one rather than
    * protecting it.
    */
-  private static final String DELETE_REACHABLE =
-      """
-      WITH RECURSIVE reachable (value_id) AS (
-        SELECT CAST(? AS TEXT)
-        UNION
-        SELECT lineage.child_id
-          FROM occlude_lineage lineage
-          JOIN reachable ON lineage.parent_id = reachable.value_id
-      )
-      DELETE FROM occlude_value WHERE value_id IN (SELECT value_id FROM reachable)
-      RETURNING value_id
-      """;
+  private static final String DELETE_VERIFIED =
+      "DELETE FROM occlude_value WHERE value_id = ANY(?) RETURNING value_id";
 
   private final DataSource dataSource;
   private final Signer signer;
@@ -475,19 +465,23 @@ public final class JdbcStorage implements Storage {
           // Before anything is destroyed, and under the same lock: every value the walk reaches
           // must still agree with its own digest, which covers its parents. One that does not was
           // given a parent it never had, and the whole erasure is refused rather than widened.
+          List<String> verified = new ArrayList<>();
           try (PreparedStatement statement = connection.prepareStatement(SELECT_REACHABLE)) {
             statement.setString(1, root);
             try (ResultSet rows = statement.executeQuery()) {
               while (rows.next()) {
                 fields.requireSigned(rows);
+                verified.add(rows.getString(Columns.VALUE_ID));
               }
             }
           }
           List<String> removed = new ArrayList<>();
-          // RETURNING, so the identities come back from the same statement that destroys them.
-          // Selecting them first would be a second snapshot and a window to disagree with.
-          try (PreparedStatement statement = connection.prepareStatement(DELETE_REACHABLE)) {
-            statement.setString(1, root);
+          // Exactly what was verified, never a second walk. The lock keeps the library's own
+          // writers out, not somebody writing the tables directly, and under read committed a
+          // second walk would see a lineage row they committed after the check. RETURNING, so a
+          // value already gone gets no line.
+          try (PreparedStatement statement = connection.prepareStatement(DELETE_VERIFIED)) {
+            statement.setArray(1, connection.createArrayOf("text", verified.toArray()));
             try (ResultSet rows = statement.executeQuery()) {
               while (rows.next()) {
                 removed.add(rows.getString(Columns.VALUE_ID));

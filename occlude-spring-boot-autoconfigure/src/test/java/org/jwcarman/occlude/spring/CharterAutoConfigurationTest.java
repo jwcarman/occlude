@@ -18,6 +18,7 @@ package org.jwcarman.occlude.spring;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -220,11 +221,12 @@ class CharterAutoConfigurationTest {
   /**
    * The manifest is meant to be seen -- {@link CharterProperties} says so -- so whether it goes to
    * the log is the property's whole reason to exist, and the only way to prove the property does
-   * anything is to watch the logger it controls.
+   * anything is to watch the logger it controls. The same logger says when identity was left to the
+   * default.
    */
   @Nested
-  @DisplayName("logging the manifest at startup")
-  class LoggingTheManifest {
+  @DisplayName("logging at startup")
+  class LoggingAtStartup {
 
     private Logger binderLog;
     private ListAppender<ILoggingEvent> appender;
@@ -249,7 +251,7 @@ class CharterAutoConfigurationTest {
           .withUserConfiguration(AnApplication.class)
           .run(context -> assertThat(context).hasNotFailed());
 
-      assertThat(appender.list).isNotEmpty();
+      assertThat(appender.list).anyMatch(event -> event.getLevel() == Level.INFO);
     }
 
     @Test
@@ -260,7 +262,31 @@ class CharterAutoConfigurationTest {
           .withPropertyValues("occlude.log-manifest=false")
           .run(context -> assertThat(context).hasNotFailed());
 
-      assertThat(appender.list).isEmpty();
+      assertThat(appender.list).noneMatch(event -> event.getLevel() == Level.INFO);
+    }
+
+    @Test
+    @DisplayName("warns when nothing says where identity comes from")
+    void warns_without_an_access_source() {
+      runner
+          .withUserConfiguration(AnApplication.class)
+          .run(context -> assertThat(context).hasNotFailed());
+
+      assertThat(appender.list)
+          .anyMatch(
+              event ->
+                  event.getLevel() == Level.WARN
+                      && event.getFormattedMessage().contains("AccessContextProvider"));
+    }
+
+    @Test
+    @DisplayName("does not warn when the application says where identity comes from")
+    void stays_quiet_with_an_access_source() {
+      runner
+          .withUserConfiguration(AnApplication.class, AnIdentity.class)
+          .run(context -> assertThat(context).hasNotFailed());
+
+      assertThat(appender.list).noneMatch(event -> event.getLevel() == Level.WARN);
     }
   }
 

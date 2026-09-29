@@ -34,6 +34,7 @@ import java.util.function.Supplier;
 import org.jwcarman.codec.Codec;
 import org.jwcarman.codec.CodecException;
 import org.jwcarman.codec.CodecFactory;
+import org.jwcarman.codec.TransientCodecException;
 import org.jwcarman.codec.TypeRef;
 import org.jwcarman.codec.versioned.VersionedFormatException;
 import org.jwcarman.occlude.lattice.Axes;
@@ -162,11 +163,15 @@ final class Fields {
    *
    * <p>Bytes that are not a frame this store writes are somebody else's, so that is tampering. A
    * frame that will not decrypt is only unreadable: a destroyed key looks exactly like a damaged
-   * ciphertext, and only whoever manages the keys can tell them apart.
+   * ciphertext, and only whoever manages the keys can tell them apart. A key service that could not
+   * be reached says nothing about the row at all: that is an outage, reported like a database that
+   * is down, and never recorded against the value or filed as unreadable by a sweep.
    */
   byte[] opened(byte[] ciphertext, String what) {
     try {
       return storageCodec.decode(ciphertext);
+    } catch (TransientCodecException e) {
+      throw new IllegalStateException(what + " could not be opened: its key was out of reach", e);
     } catch (VersionedFormatException _) {
       throw new StorageIntegrityException(what + " is not a frame this store writes");
     } catch (CodecException e) {

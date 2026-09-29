@@ -103,6 +103,10 @@ guessing. Somebody corrupting a field on purpose can choose which list it lands 
 unreadable fields against the keys you actually destroyed and treat the rest as suspect. Reads of
 either are refused, and recorded with reason `NOT_AS_SIGNED` or `UNREADABLE`.
 
+A key service that cannot be reached is neither. It says nothing about the data, so a read or a sweep
+during the outage fails with an `IllegalStateException`, like a database that is down, and nothing is
+recorded against any value.
+
 Erasure checks every value it would reach against its digest before destroying anything, so a
 lineage row forged into the table cannot widen an erasure to take an unrelated value with it.
 

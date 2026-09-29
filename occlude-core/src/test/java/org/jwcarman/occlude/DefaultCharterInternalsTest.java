@@ -17,7 +17,9 @@ package org.jwcarman.occlude;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -154,6 +156,35 @@ class DefaultCharterInternalsTest {
       assertThat(charter.manifest().erasures())
           .extracting(Manifest.Entry::name)
           .containsExactlyInAnyOrderElementsOf(declared);
+    }
+
+    /**
+     * Rendering a manifest runs the application's ceilings. Holding the charter's lock while they
+     * ran let a slow one hold up binding for as long as it liked.
+     */
+    @Test
+    @DisplayName("binds while a manifest is still waiting on a slow ceiling")
+    void binds_while_a_manifest_waits_on_a_ceiling() throws InterruptedException {
+      DefaultCharter charter = new DefaultCharter(TENANT);
+      CountDownLatch inCeiling = new CountDownLatch(1);
+      CountDownLatch release = new CountDownLatch(1);
+      charter.sink(
+          "slow",
+          context -> {
+            inCeiling.countDown();
+            awaitUninterruptibly(release);
+            return Ceiling.of(TENANT, Constraint.any());
+          },
+          STRING_TYPE);
+      Thread rendering = Thread.ofVirtual().start(charter::manifest);
+      inCeiling.await();
+
+      assertTimeoutPreemptively(
+          Duration.ofSeconds(5),
+          () -> charter.bind(new MemoryStorage(), AccessContextProvider.none()));
+
+      release.countDown();
+      rendering.join();
     }
 
     private void awaitUninterruptibly(CountDownLatch latch) {

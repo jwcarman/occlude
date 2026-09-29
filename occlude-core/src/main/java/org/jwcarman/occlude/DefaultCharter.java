@@ -423,8 +423,10 @@ public final class DefaultCharter implements Charter {
   @Override
   public Manifest manifest(AccessContext as) {
     Objects.requireNonNull(as, "a manifest is rendered for some access, even an empty one");
+    Declarations declared;
     synchronized (declarations) {
-      return Manifests.of(declarations, as);
+      declared = declarations.snapshot();
     }
+    return Manifests.of(declared, as);
   }
 }

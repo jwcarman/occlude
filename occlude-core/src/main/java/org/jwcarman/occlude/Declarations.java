@@ -117,6 +117,25 @@ final class Declarations {
 
   // ------------------------------------------------------------------ reading, for the manifest
 
+  /**
+   * A copy of everything declared so far.
+   *
+   * <p>Taken under the charter's lock so a manifest can render without holding it: rendering calls
+   * the application's ceilings, and a slow one would otherwise hold up every manifest and binding.
+   */
+  Declarations snapshot() {
+    Declarations copy = new Declarations();
+    copy.types.putAll(types);
+    copy.sources.putAll(sources);
+    copy.sinkReads.putAll(sinkReads);
+    copy.sinks.putAll(sinks);
+    copy.derivations.putAll(derivations);
+    copy.queries.putAll(queries);
+    copy.erasures.putAll(erasures);
+    copy.inspections.putAll(inspections);
+    return copy;
+  }
+
   Map<String, OccludedType<?>> sources() {
     return Collections.unmodifiableMap(sources);
   }

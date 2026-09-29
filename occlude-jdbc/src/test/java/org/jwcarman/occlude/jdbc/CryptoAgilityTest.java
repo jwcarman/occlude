@@ -30,8 +30,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.TypeRef;
+import org.jwcarman.codec.crypto.DataKey;
 import org.jwcarman.codec.crypto.DataKeyProvider;
 import org.jwcarman.codec.crypto.JceDataKeyProvider;
+import org.jwcarman.codec.crypto.KeyAccessException;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.occlude.AccessContext;
 import org.jwcarman.occlude.DefaultCharter;
@@ -140,6 +142,35 @@ class CryptoAgilityTest {
     assertThat(storage.firstBrokenEntry()).isEmpty();
     assertThat(storage.brokenValues()).isEmpty();
     assertThat(storage.missingValues()).isEmpty();
+  }
+
+  /** A key service that is down says nothing about the data, so nothing may be filed against it. */
+  @Test
+  @DisplayName("reports an unreachable key service as an outage, not as unreadable data")
+  void reports_an_unreachable_key_service_as_an_outage() {
+    String id = writeThrough(underFirst()).getFirst().id();
+    DataKeyProvider keys = new JceDataKeyProvider("k1", Map.of("k1", first));
+    JdbcStorage duringAnOutage =
+        store(
+            new DataKeyProvider() {
+              @Override
+              public DataKey newDataKey() {
+                return keys.newDataKey();
+              }
+
+              @Override
+              public SecretKey unwrap(String keyId, byte[] wrapped) {
+                throw new KeyAccessException("the key service is down");
+              }
+            },
+            MacAlgorithm.HMAC_SHA256);
+
+    assertThatThrownBy(() -> duringAnOutage.value(id, NOTE_TYPE))
+        .isExactlyInstanceOf(IllegalStateException.class)
+        .hasCauseInstanceOf(KeyAccessException.class);
+    assertThatThrownBy(duringAnOutage::sweep)
+        .isExactlyInstanceOf(IllegalStateException.class)
+        .hasCauseInstanceOf(KeyAccessException.class);
   }
 
   @Test

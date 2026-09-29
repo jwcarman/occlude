@@ -18,6 +18,9 @@ package org.jwcarman.occlude.jdbc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -80,6 +83,7 @@ class TamperingTest {
   private static final Axes AXES = Axes.of(TENANT);
 
   private DataSource dataSource;
+  private Runnable beforeDeleting = () -> {};
   private JdbcStorage storage;
   private Occlude<Note> notes;
   private Occlude<Memo> memos;
@@ -102,7 +106,7 @@ class TamperingTest {
     }
     storage =
         new JdbcStorageConfig()
-            .dataSource(dataSource)
+            .dataSource(interceptingDeletes(dataSource))
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
             .encryptedWith(new JceDataKeyProvider("k1", Map.of("k1", TestKeys.aes256())))
             .rootedIn(TestKeys.ROOT_ID, TestKeys.root())
@@ -129,6 +133,46 @@ class TamperingTest {
     erasure = charter.erasure("erasure", (label, ctx) -> true);
     memoDesk = charter.sink("memo-desk", anything, MEMO).reading(MEMO);
     charter.bind(storage, () -> AccessContext.of("tenant", "acme"));
+  }
+
+  /**
+   * The same data source, running {@link #beforeDeleting} just before any statement that deletes
+   * values is prepared: the moment somebody writing the tables directly would have to win a race.
+   */
+  private DataSource interceptingDeletes(DataSource target) {
+    return (DataSource)
+        Proxy.newProxyInstance(
+            getClass().getClassLoader(),
+            new Class<?>[] {DataSource.class},
+            (proxy, method, args) -> {
+              Object result = invoked(method, target, args);
+              return result instanceof Connection connection
+                  ? interceptingDeletes(connection)
+                  : result;
+            });
+  }
+
+  private Connection interceptingDeletes(Connection target) {
+    return (Connection)
+        Proxy.newProxyInstance(
+            getClass().getClassLoader(),
+            new Class<?>[] {Connection.class},
+            (proxy, method, args) -> {
+              if (method.getName().equals("prepareStatement")
+                  && args[0] instanceof String sql
+                  && sql.contains("DELETE FROM occlude_value")) {
+                beforeDeleting.run();
+              }
+              return invoked(method, target, args);
+            });
+  }
+
+  private static Object invoked(Method method, Object target, Object[] args) throws Throwable {
+    try {
+      return method.invoke(target, args);
+    } catch (InvocationTargetException e) {
+      throw e.getCause();
+    }
   }
 
   private void execute(String sql, Object... parameters) throws SQLException {
@@ -410,6 +454,33 @@ class TamperingTest {
     assertThat(storage.contains(unrelated.id())).isTrue();
     assertThat(storage.contains(parent.id())).isTrue();
     assertThat(linesFor(parent.id())).contains("ERASE REFUSED NOT_AS_SIGNED");
+  }
+
+  /**
+   * The check and the delete are two statements, and the lock keeps out only the library's own
+   * writers. A lineage row committed between them must not be followed.
+   */
+  @Test
+  @DisplayName("erases only what it verified, even if a forged parent lands mid-erasure")
+  void erases_only_what_it_verified() throws SQLException {
+    Occluded<Note> parent = notes.occlude(new Note("parent"));
+    Occluded<Note> unrelated = notes.occlude(new Note("unrelated"));
+    beforeDeleting =
+        () -> {
+          try {
+            execute(
+                "INSERT INTO occlude_lineage (child_id, parent_id, position) VALUES (?, ?, 0)",
+                unrelated.id(),
+                parent.id());
+          } catch (SQLException e) {
+            throw new IllegalStateException(e);
+          }
+        };
+
+    assertThat(erasure.erase(parent).orThrow()).isEqualTo(1);
+    assertThat(storage.contains(parent.id())).isFalse();
+    assertThat(storage.contains(unrelated.id())).isTrue();
+    assertThat(linesFor(unrelated.id())).noneMatch(line -> line.startsWith("ERASE"));
   }
 
   /** A value hanging off a parent that is not there is not what was signed, and blocks erasure. */

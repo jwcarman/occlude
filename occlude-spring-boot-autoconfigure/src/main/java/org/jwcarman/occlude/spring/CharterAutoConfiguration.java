@@ -106,10 +106,18 @@ public class CharterAutoConfiguration {
   /**
    * Nobody in particular, for an application with no notion of identity. Any {@link
    * AccessContextProvider} the application contributes replaces it.
+   *
+   * <p>Said out loud, because a charter's rule is that no identity is something an application
+   * declares rather than gets by forgetting: a ceiling written as "unless the context says
+   * otherwise" is wider than it looks when the context is always empty.
    */
   @Bean
+  @ConditionalOnBean(Axes.class)
   @ConditionalOnMissingBean
   public AccessContextProvider accessContextProvider() {
+    log.warn(
+        "No AccessContextProvider bean, so every access is bound with an empty context. Contribute"
+            + " one if any ceiling or policy depends on who is asking.");
     return AccessContextProvider.none();
   }
 }

@@ -101,6 +101,14 @@ reveal left an allowed line behind (the line is written only once the value is i
 that could not be written replaced the finding (it is attached as suppressed); and parents are read
 in the same query as the row.
 
+A third review, of those fixes and the package and wiring changes after them, found: erasure checked
+what it would reach and then walked the lineage again to delete, so a lineage row committed between
+the two statements was followed unchecked (it now deletes exactly the ids it verified); a key service
+that could not be reached was recorded as `UNREADABLE` and filed by a sweep as suspect (it is now an
+outage, unrecorded, like a database that is down); a manifest ran the application's ceilings while
+holding the charter's lock (it now renders from a copy); and Spring's no-identity default went unsaid
+(it now logs a warning). It confirmed the package split made nothing public that was not already.
+
 Still open: re-signing under a new root (a root, unlike a key, cannot yet be retired). Deferred past 0.1: it rewrites the whole chain and invalidates every published anchor, and deserves its own design. The storage guide states the limitation.
 
 ## Also phase 2
