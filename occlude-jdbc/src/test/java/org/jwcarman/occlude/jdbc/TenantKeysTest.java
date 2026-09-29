@@ -219,8 +219,24 @@ class TenantKeysTest {
     charter.bind(Bindings.of(storage).withoutIdentity());
 
     assertThatThrownBy(() -> notes.occlude("initech's"))
-        .isInstanceOf(NullPointerException.class)
-        .hasMessageContaining("nothing supplies keys for tenant 'initech'");
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("nothing supplies keys")
+        .hasMessageNotContaining("initech");
+  }
+
+  /**
+   * An offboarded tenant whose keys are simply gone reads as unreadable, and stops nothing else.
+   */
+  @Test
+  @DisplayName("treats a tenant nothing supplies keys for any more as unreadable, not as a failure")
+  void treats_a_tenant_without_keys_as_unreadable() {
+    JdbcStorage offboarded = store(tenant -> "acme".equals(tenant) ? null : tenantKeys(tenant));
+
+    assertThatThrownBy(() -> offboarded.value(acmes.id(), TEXT))
+        .isInstanceOf(StorageUnreadableException.class)
+        .hasMessageNotContaining("acme'");
+    assertThat(offboarded.value(globexes.id(), TEXT)).contains("globex's");
+    assertThat(offboarded.sweep().unreadableValues()).containsExactly(acmes.id());
   }
 
   @Test

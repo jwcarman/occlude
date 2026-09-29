@@ -113,11 +113,12 @@ public final class StorageIntegrity {
   /**
    * Re-signs everything under the current root and MAC, which is what makes an old root retirable.
    *
+   * @param anchors heads published earlier, which the trail must still hold
    * @return what was re-signed, and the trail's head before and after
-   * @see JdbcStorage#resign()
+   * @see JdbcStorage#resign(TrailHead...)
    */
-  public Resigned resign() {
-    return storage.resign();
+  public Resigned resign(TrailHead... anchors) {
+    return storage.resign(anchors);
   }
 
   /**

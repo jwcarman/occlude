@@ -22,8 +22,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.function.Function;
 import javax.crypto.SecretKey;
 import javax.sql.DataSource;
@@ -264,6 +266,123 @@ class ResigningTest {
     assertThat(rowsUnder("new")).isEqualTo(untouched + 2);
     assertThat(store("new", ONLY_NEW, MacAlgorithm.HMAC_SHA256).integrity().check().intact())
         .isTrue();
+  }
+
+  /**
+   * The shape that once broke it: a fold naming one parent twice, beside a parent still waiting on
+   * one of its own. Counted twice on release and once on waiting, the fold was re-signed first,
+   * over its sibling's old digest. Several of them, so iteration order cannot hide it.
+   */
+  @Test
+  @DisplayName("re-signs a fold over one value twice after every parent it waits on")
+  void resigns_a_fold_over_one_value_twice() {
+    Portals old = portals(store("old", BOTH, MacAlgorithm.HMAC_SHA256));
+    for (int i = 0; i < 6; i++) {
+      Occluded<String> twice = old.notes().occlude("twice " + i);
+      Occluded<String> waiting = old.shout().derive(old.notes().occlude("waiting " + i)).orThrow();
+      old.join().fold(List.of(twice, twice, waiting)).orThrow();
+    }
+
+    store("new", BOTH, MacAlgorithm.HMAC_SHA256).resign();
+
+    assertThat(store("new", ONLY_NEW, MacAlgorithm.HMAC_SHA256).integrity().check().intact())
+        .isTrue();
+  }
+
+  /**
+   * Graphs of every shape a charter can make -- folds over repeated parents, chains of derivations,
+   * values written under the new root between old ones -- and re-signing must leave each intact
+   * with the old root gone. Seeded, so a failure names the graph that caused it.
+   */
+  @Test
+  @DisplayName("leaves every shape of graph intact, with the old root gone")
+  void leaves_every_shape_of_graph_intact() throws SQLException {
+    for (long seed = 1; seed <= 10; seed++) {
+      execute("DELETE FROM occlude_lineage");
+      execute("DELETE FROM occlude_value");
+      execute("DELETE FROM occlude_audit");
+      Random random = new Random(seed);
+      Portals old = portals(store("old", BOTH, MacAlgorithm.HMAC_SHA256));
+      Portals current = portals(store("new", BOTH, MacAlgorithm.HMAC_SHA256));
+      List<Occluded<String>> made = new ArrayList<>();
+      for (int step = 0; step < 14; step++) {
+        Portals under = random.nextBoolean() ? old : current;
+        if (made.isEmpty() || random.nextInt(3) == 0) {
+          made.add(under.notes().occlude("value " + step));
+        } else if (random.nextBoolean()) {
+          made.add(under.shout().derive(made.get(random.nextInt(made.size()))).orThrow());
+        } else {
+          List<Occluded<String>> parents = new ArrayList<>();
+          for (int p = 0; p < 2 + random.nextInt(3); p++) {
+            parents.add(made.get(random.nextInt(made.size())));
+          }
+          made.add(under.join().fold(parents).orThrow());
+        }
+      }
+
+      store("new", BOTH, MacAlgorithm.HMAC_SHA256).resign();
+
+      assertThat(store("new", ONLY_NEW, MacAlgorithm.HMAC_SHA256).integrity().check().intact())
+          .as("seed %d", seed)
+          .isTrue();
+      assertThat(rowsUnder("old")).as("seed %d", seed).isZero();
+    }
+  }
+
+  /** Afterwards no anchor can hold, so a trail cut back beforehand would come out of it whole. */
+  @Test
+  @DisplayName("refuses when an anchor published earlier no longer holds, and re-signs nothing")
+  void refuses_when_an_anchor_no_longer_holds() throws SQLException {
+    JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
+    TrailHead published = storage.head().orElseThrow();
+    long before = rowsUnder("old");
+    execute("DELETE FROM occlude_audit WHERE entry_id = ?", published.entryId());
+
+    assertThatThrownBy(() -> storage.resign(published))
+        .isInstanceOf(StorageIntegrityException.class)
+        .hasMessageContaining("no longer holds the anchor");
+    assertThat(rowsUnder("old")).isEqualTo(before - 1);
+  }
+
+  @Test
+  @DisplayName("refuses when the line an anchor names now says something else")
+  void refuses_when_an_anchors_line_was_rewritten() {
+    JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
+    TrailHead elsewhere = new TrailHead(storage.head().orElseThrow().entryId(), new byte[32]);
+
+    assertThatThrownBy(() -> storage.resign(elsewhere))
+        .isInstanceOf(StorageIntegrityException.class)
+        .hasMessageContaining("no longer holds the anchor");
+  }
+
+  @Test
+  @DisplayName("re-signs when every anchor given still holds")
+  void resigns_when_every_anchor_holds() {
+    JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
+    TrailHead published = storage.head().orElseThrow();
+
+    assertThat(storage.resign(published).values()).isEqualTo(3);
+  }
+
+  /** Claiming the current root is no way past the check: every row is checked, stale or not. */
+  @Test
+  @DisplayName("refuses a value somebody rewrote to claim the current root")
+  void refuses_a_value_claiming_the_current_root() throws SQLException {
+    execute("UPDATE occlude_value SET root_id = 'new' WHERE value_id = ?", note.id());
+    JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
+
+    assertThatThrownBy(storage::resign).isInstanceOf(StorageIntegrityException.class);
+  }
+
+  @Test
+  @DisplayName("refuses a line somebody rewrote to claim the current root")
+  void refuses_a_line_claiming_the_current_root() throws SQLException {
+    execute(
+        "UPDATE occlude_audit SET root_id = 'new'"
+            + " WHERE entry_id = (SELECT min(entry_id) FROM occlude_audit)");
+    JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
+
+    assertThatThrownBy(storage::resign).isInstanceOf(StorageIntegrityException.class);
   }
 
   @Test

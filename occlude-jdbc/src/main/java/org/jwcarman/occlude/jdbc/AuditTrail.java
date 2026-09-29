@@ -23,6 +23,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -38,18 +39,22 @@ import org.jwcarman.occlude.storage.StorageIntegrityException;
  * guards one value at a time. So it is handed to whoever investigates, and to nothing else; the
  * Spring starter registers it by name and hides it from injection by type, as it does the store.
  *
- * <p>Every line is checked before it is returned: its digest against what it says, and its
- * commitment against what it decrypts to. One that fails is refused rather than reported as a fact.
- * Whether lines are <i>missing</i> -- cut from the middle or the end -- is a question about the
- * chain as a whole, which {@link StorageIntegrity#check()} answers.
+ * <p>Every line is checked before it is returned: its digest against what it says, its commitment
+ * against what it decrypts to, and the line it was signed after against the one actually before it
+ * -- a line's place is not itself signed, so two lines swapped would otherwise each still verify.
+ * One that fails is refused rather than reported as a fact. Whether lines are <i>missing</i> -- cut
+ * from the middle or the end -- is a question about the chain as a whole, which {@link
+ * StorageIntegrity#check()} answers.
  */
 public final class AuditTrail {
 
   private static final String COLUMNS =
       """
       SELECT entry_id, recorded_at, operation, value_id, target, outcome, reason, previous, digest,
-             root_id, mac, commitment, detail, label, context
-        FROM occlude_audit
+             root_id, mac, commitment, detail, label, context,
+             (SELECT p.digest FROM occlude_audit p WHERE p.entry_id < a.entry_id
+               ORDER BY p.entry_id DESC LIMIT 1) AS predecessor
+        FROM occlude_audit a
       """;
 
   private final DataSource dataSource;
@@ -129,6 +134,13 @@ public final class AuditTrail {
         || !MessageDigest.isEqual(expected.get(), rows.getBytes(Columns.DIGEST))) {
       throw new StorageIntegrityException(
           "line " + entry + " of the trail is not what was signed for it");
+    }
+    if (!Arrays.equals(rows.getBytes("previous"), rows.getBytes("predecessor"))) {
+      throw new StorageIntegrityException(
+          "line "
+              + entry
+              + " of the trail is not where it was signed: the line before it is not the one it"
+              + " names");
     }
     Fields.Line line = fields.lineOf(rows);
     return new RecordedLine(

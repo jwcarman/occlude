@@ -29,6 +29,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,12 +45,14 @@ import org.jwcarman.occlude.storage.StorageIntegrityException;
  * line's digest and commitment cover the line before it, so once one line is re-signed, every line
  * after it is too.
  *
- * <p>Nothing is re-signed that has not first been checked under the root it was signed with --
- * otherwise a row somebody had altered would come out the other side signed as though this store
- * wrote it. A row can only be checked against its parents' and its predecessor's digests as they
- * were, so those are kept as the rows are rewritten. It all happens in one transaction holding both
- * locks: nothing can change between a row being checked and being re-signed, and one row that fails
- * leaves the whole store exactly as it was.
+ * <p>Every value and every line is checked under the root it names, not only the ones being
+ * re-signed -- otherwise a row somebody had altered, or rewritten to claim the current root, would
+ * come out the other side looking as though this store wrote it. A row can only be checked against
+ * its parents' and its predecessor's digests as they were, so those are kept as rows are rewritten.
+ * Anchors published earlier must still hold, because afterwards they cannot: a trail cut back
+ * before re-signing would otherwise come out of it whole. It all happens in one transaction holding
+ * both locks: nothing can change between a row being checked and being re-signed, and one row that
+ * fails leaves the whole store exactly as it was.
  *
  * <p>Ciphertext is untouched. What is signed is a commitment to the plaintext, so every field must
  * decrypt for its commitment to be made again -- which means a field whose key was destroyed stops
@@ -67,17 +70,36 @@ final class Resigning {
     this.fields = fields;
   }
 
-  Resigned resign() {
+  Resigned resign(List<TrailHead> anchors) {
     return transactions.inTransactionReturning(
         "could not re-sign the store",
         connection -> {
           Transactions.lockLineageExclusively(connection);
           Transactions.lockTrailHead(connection);
+          for (TrailHead anchor : anchors) {
+            requireHeld(connection, anchor);
+          }
           Optional<TrailHead> before = head(connection);
           int values = resignValues(connection);
           int lines = resignLines(connection);
           return new Resigned(values, lines, before, head(connection));
         });
+  }
+
+  /** Refuses unless the trail still holds a head published earlier, exactly as it was. */
+  private static void requireHeld(Connection connection, TrailHead anchor) throws SQLException {
+    try (PreparedStatement statement =
+        connection.prepareStatement("SELECT digest FROM occlude_audit WHERE entry_id = ?")) {
+      statement.setLong(1, anchor.entryId());
+      try (ResultSet rows = statement.executeQuery()) {
+        if (!rows.next() || !MessageDigest.isEqual(rows.getBytes(1), anchor.digest())) {
+          throw new StorageIntegrityException(
+              "the trail no longer holds the anchor published at line "
+                  + anchor.entryId()
+                  + ": it has been cut back or rewritten since, so nothing was re-signed");
+        }
+      }
+    }
   }
 
   private static Optional<TrailHead> head(Connection connection) throws SQLException {
@@ -123,20 +145,21 @@ final class Resigning {
   private record Node(boolean current, List<String> parents) {}
 
   private int resignValues(Connection connection) throws SQLException {
-    List<String> order = parentsFirst(graph(connection));
+    Map<String, Node> graph = graph(connection);
+    Set<String> stale = stale(graph);
     Map<String, byte[]> wasDigest = new HashMap<>();
     Map<String, byte[]> nowDigest = new HashMap<>();
     try (PreparedStatement select = connection.prepareStatement(VALUE);
         PreparedStatement update = connection.prepareStatement(UPDATE_VALUE)) {
-      for (String id : order) {
+      for (String id : parentsFirst(graph)) {
         select.setString(1, id);
         try (ResultSet rows = select.executeQuery()) {
           rows.next();
-          resignValue(rows, update, wasDigest, nowDigest);
+          resignValue(rows, stale.contains(id) ? update : null, wasDigest, nowDigest);
         }
       }
     }
-    return order.size();
+    return stale.size();
   }
 
   private Map<String, Node> graph(Connection connection) throws SQLException {
@@ -154,16 +177,9 @@ final class Resigning {
     return graph;
   }
 
-  /**
-   * Every value that must be re-signed -- under an old root, or derived from one that is -- with
-   * each after all of its parents. A parent that is not stored is left for the check to refuse.
-   */
-  private static List<String> parentsFirst(Map<String, Node> graph) {
-    Map<String, List<String>> children = new HashMap<>();
-    graph.forEach(
-        (id, node) ->
-            node.parents()
-                .forEach(p -> children.computeIfAbsent(p, k -> new ArrayList<>()).add(id)));
+  /** Every value that must be re-signed: under an old root, or derived from one that is. */
+  private static Set<String> stale(Map<String, Node> graph) {
+    Map<String, Set<String>> children = childrenOf(graph);
     Set<String> stale = new HashSet<>();
     Deque<String> spreading = new ArrayDeque<>();
     graph.forEach(
@@ -175,31 +191,43 @@ final class Resigning {
     while (!spreading.isEmpty()) {
       String id = spreading.removeFirst();
       if (stale.add(id)) {
-        spreading.addAll(children.getOrDefault(id, List.of()));
+        spreading.addAll(children.getOrDefault(id, Set.of()));
       }
     }
+    return stale;
+  }
+
+  /**
+   * Every value, each after all of its parents.
+   *
+   * <p>A parent counts once however many times a child names it -- a fold over the same value twice
+   * names it twice -- both in what a child waits for and in what releases it. Counting it twice in
+   * one and once in the other released a child before a parent it was still waiting on. A parent
+   * that is not stored is not waited for; the check refuses the child instead.
+   */
+  private static List<String> parentsFirst(Map<String, Node> graph) {
+    Map<String, Set<String>> children = childrenOf(graph);
     Map<String, Integer> waitingOn = new HashMap<>();
     Deque<String> ready = new ArrayDeque<>();
-    for (String id : stale) {
-      int waiting =
-          (int) graph.get(id).parents().stream().distinct().filter(stale::contains).count();
-      waitingOn.put(id, waiting);
-      if (waiting == 0) {
-        ready.add(id);
-      }
-    }
+    graph.forEach(
+        (id, node) -> {
+          int waiting = (int) node.parents().stream().distinct().filter(graph::containsKey).count();
+          waitingOn.put(id, waiting);
+          if (waiting == 0) {
+            ready.add(id);
+          }
+        });
     List<String> order = new ArrayList<>();
     while (!ready.isEmpty()) {
       String id = ready.removeFirst();
       order.add(id);
-      for (String child : children.getOrDefault(id, List.of())) {
-        // Every child of a stale value is stale itself: that is how staleness spread.
+      for (String child : children.getOrDefault(id, Set.of())) {
         if (waitingOn.merge(child, -1, Integer::sum) == 0) {
           ready.add(child);
         }
       }
     }
-    if (order.size() != stale.size()) {
+    if (order.size() != graph.size()) {
       throw new StorageIntegrityException(
           "the lineage of this store has a cycle, which nothing this store writes can make;"
               + " nothing was re-signed");
@@ -207,6 +235,20 @@ final class Resigning {
     return order;
   }
 
+  /** Each value's children, once each however many times they name it. */
+  private static Map<String, Set<String>> childrenOf(Map<String, Node> graph) {
+    Map<String, Set<String>> children = new HashMap<>();
+    graph.forEach(
+        (id, node) ->
+            node.parents()
+                .forEach(p -> children.computeIfAbsent(p, k -> new LinkedHashSet<>()).add(id)));
+    return children;
+  }
+
+  /**
+   * Checks one value under the root it names, and re-signs it when {@code update} is given -- which
+   * it is only for a stale value. Every value is checked; only stale ones are rewritten.
+   */
   private void resignValue(
       ResultSet rows,
       PreparedStatement update,
@@ -247,6 +289,9 @@ final class Resigning {
     }
     byte[] payload = fields.payloadOf(rows);
     byte[] label = fields.labelPlaintextOf(rows, parents);
+    if (update == null) {
+      return;
+    }
     Signer.ValueCommitments commitments =
         new Signer.ValueCommitments(
             signer.valueCommitment(
@@ -290,7 +335,7 @@ final class Resigning {
       """
       SELECT entry_id, recorded_at, operation, value_id, target, outcome, reason, previous, digest,
              root_id, mac, commitment, detail, label, context
-        FROM occlude_audit WHERE entry_id >= ? ORDER BY entry_id LIMIT ?
+        FROM occlude_audit WHERE entry_id > ? ORDER BY entry_id LIMIT ?
       """;
 
   private static final String UPDATE_LINE =
@@ -301,25 +346,22 @@ final class Resigning {
       """;
 
   private int resignLines(Connection connection) throws SQLException {
-    Long first = firstStaleLine(connection);
-    if (first == null) {
-      return 0;
-    }
-    Walk walk = new Walk(digestBefore(connection, first));
+    Walk walk = new Walk(null);
     int resigned = 0;
-    long from = first;
+    long after = 0;
     try (PreparedStatement select = connection.prepareStatement(LINES);
         PreparedStatement update = connection.prepareStatement(UPDATE_LINE)) {
       select.setInt(2, PAGE);
       while (true) {
-        select.setLong(1, from);
+        select.setLong(1, after);
         int read = 0;
         try (ResultSet rows = select.executeQuery()) {
           while (rows.next()) {
             read++;
-            from = rows.getLong(Columns.ENTRY_ID) + 1;
-            resignLine(rows, update, walk);
-            resigned++;
+            after = rows.getLong(Columns.ENTRY_ID);
+            if (resignLine(rows, update, walk)) {
+              resigned++;
+            }
           }
         }
         if (read < PAGE) {
@@ -349,32 +391,12 @@ final class Resigning {
     }
   }
 
-  private Long firstStaleLine(Connection connection) throws SQLException {
-    try (PreparedStatement statement =
-        connection.prepareStatement(
-            "SELECT min(entry_id) FROM occlude_audit WHERE root_id <> ? OR mac <> ?")) {
-      statement.setString(1, signer.rootId());
-      statement.setString(2, signer.mac().jcaName());
-      try (ResultSet rows = statement.executeQuery()) {
-        rows.next();
-        long first = rows.getLong(1);
-        return rows.wasNull() ? null : first;
-      }
-    }
-  }
-
-  private static byte[] digestBefore(Connection connection, long entry) throws SQLException {
-    try (PreparedStatement statement =
-        connection.prepareStatement(
-            "SELECT digest FROM occlude_audit WHERE entry_id < ? ORDER BY entry_id DESC LIMIT 1")) {
-      statement.setLong(1, entry);
-      try (ResultSet rows = statement.executeQuery()) {
-        return rows.next() ? rows.getBytes(1) : null;
-      }
-    }
-  }
-
-  private void resignLine(ResultSet rows, PreparedStatement update, Walk walk) throws SQLException {
+  /**
+   * Checks one line against the one before it as it was, and re-signs it when it is under an old
+   * root or anything before it was re-signed -- its predecessor's digest has changed under it.
+   */
+  private boolean resignLine(ResultSet rows, PreparedStatement update, Walk walk)
+      throws SQLException {
     long entry = rows.getLong(Columns.ENTRY_ID);
     byte[] previous = rows.getBytes("previous");
     Instant recordedAt = rows.getTimestamp("recorded_at").toInstant();
@@ -403,6 +425,11 @@ final class Resigning {
               + " of the trail is not what was signed for it, so nothing was re-signed");
     }
     Fields.Line line = fields.lineOf(rows);
+    if (current(rows.getString(Columns.ROOT_ID), rows.getString(Columns.MAC))
+        && Arrays.equals(walk.was, walk.now)) {
+      walk.advance(storedDigest, storedDigest);
+      return false;
+    }
     byte[] commitment =
         signer.lineCommitment(
             signer.rootId(),
@@ -422,5 +449,6 @@ final class Resigning {
     update.setLong(6, entry);
     update.executeUpdate();
     walk.advance(storedDigest, digest);
+    return true;
   }
 }

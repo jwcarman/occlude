@@ -16,11 +16,11 @@
 package org.jwcarman.occlude.jdbc;
 
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import org.jwcarman.codec.Codec;
 import org.jwcarman.codec.crypto.DataKeyProvider;
+import org.jwcarman.codec.crypto.DecryptionException;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Label;
 
@@ -65,22 +65,46 @@ final class PayloadKeys {
     return axis != null;
   }
 
-  /** The codec for a value with this label. */
+  /**
+   * The codec for a value with this label.
+   *
+   * <p>A tenant nothing supplies keys for -- an offboarded one, whose key was destroyed -- gets a
+   * codec that opens nothing and stores nothing. Reading their values is then unreadable, as a
+   * destroyed key is everywhere else, so a sweep files them rather than stopping; and neither
+   * refusal names the tenant, because a label's values are exactly what is kept out of messages.
+   * Not remembered, so a tenant whose keys arrive later needs no restart.
+   */
   Codec<byte[]> forLabel(Label label) {
     if (axis == null) {
       return shared;
     }
-    return label
-        .sole(axis)
-        .map(scope -> byScope.computeIfAbsent(scope, this::pipelineFor))
-        .orElse(shared);
+    return label.sole(axis).map(this::forScope).orElse(shared);
   }
 
-  private Codec<byte[]> pipelineFor(String scope) {
-    DataKeyProvider keys =
-        Objects.requireNonNull(
-            keysFor.apply(scope),
-            () -> "nothing supplies keys for " + axis.name() + " '" + scope + "'");
-    return JdbcStorageConfig.pipeline(keys);
+  private Codec<byte[]> forScope(String scope) {
+    Codec<byte[]> known = byScope.get(scope);
+    if (known != null) {
+      return known;
+    }
+    DataKeyProvider keys = keysFor.apply(scope);
+    if (keys == null) {
+      return NO_KEYS;
+    }
+    return byScope.computeIfAbsent(scope, ignored -> JdbcStorageConfig.pipeline(keys));
   }
+
+  /** For a tenant nothing supplies keys for: opens nothing, stores nothing, names no one. */
+  private static final Codec<byte[]> NO_KEYS =
+      new Codec<>() {
+        @Override
+        public byte[] encode(byte[] plaintext) {
+          throw new IllegalStateException(
+              "nothing supplies keys for this value's payload, so it cannot be stored");
+        }
+
+        @Override
+        public byte[] decode(byte[] ciphertext) {
+          throw new DecryptionException("nothing supplies keys for this value's payload");
+        }
+      };
 }

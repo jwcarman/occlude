@@ -655,10 +655,15 @@ public final class JdbcStorage implements Storage {
    * the lines they name now carry new digests; the result carries the head before and after, so the
    * new one can be published beside the old.
    *
+   * <p>Pass every anchor published so far, or at least the latest: each must still hold, or nothing
+   * is re-signed. Afterwards none of them can -- the lines they name carry new digests -- so a
+   * trail cut back before re-signing would otherwise come out of it looking whole.
+   *
+   * @param anchors heads published earlier, which the trail must still hold
    * @return what was re-signed, and the head before and after
    */
-  public Resigned resign() {
-    return resigning.resign();
+  public Resigned resign(TrailHead... anchors) {
+    return resigning.resign(List.of(anchors));
   }
 
   /**

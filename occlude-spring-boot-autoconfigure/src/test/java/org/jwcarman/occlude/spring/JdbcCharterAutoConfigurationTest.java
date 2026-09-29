@@ -47,6 +47,7 @@ import org.springframework.boot.micrometer.observation.autoconfigure.Observation
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy;
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
@@ -255,6 +256,22 @@ class JdbcCharterAutoConfigurationTest {
                 new TransactionAwareDataSourceProxy(new TransactionAwareDataSourceProxy(raw))))
         .isSameAs(raw);
     assertThat(JdbcCharterAutoConfiguration.outsideAnyTransaction(raw)).isSameAs(raw);
+    DataSource lazy = new LazyConnectionDataSourceProxy(raw);
+    assertThat(JdbcCharterAutoConfiguration.outsideAnyTransaction(lazy)).isSameAs(lazy);
+  }
+
+  /**
+   * Buried inside another wrapper it cannot be removed without losing that wrapper, so: refused.
+   */
+  @Test
+  @DisplayName("refuses a transaction-aware data source buried inside another wrapper")
+  void refuses_a_buried_transaction_aware_proxy() {
+    DataSource raw = new EmbeddedDatabaseBuilder().setType(EmbeddedDatabaseType.H2).build();
+    DataSource buried = new LazyConnectionDataSourceProxy(new TransactionAwareDataSourceProxy(raw));
+
+    assertThatThrownBy(() -> JdbcCharterAutoConfiguration.outsideAnyTransaction(buried))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("inside another wrapper");
   }
 
   /**

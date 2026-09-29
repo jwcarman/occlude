@@ -115,9 +115,11 @@ must never keep one, record the reference in the same place as the rest of its w
 a rolled-back transaction left behind.
 
 The store is never handed the caller's transaction by accident either. The Spring starter builds it
-on what a transaction-aware `DataSource` proxy wraps, never on the proxy; and a connection that
-arrives in the middle of a transaction that has already written is refused, loudly, rather than
-committed early.
+on what a transaction-aware `DataSource` proxy wraps, never on the proxy, and refuses to start when
+one is buried inside another wrapper it cannot remove. A connection that arrives in the middle of a
+transaction that has already written is refused, loudly, rather than committed early; one whose
+transaction has only read is ended before the store's act begins, taking that transaction's snapshot
+and any transaction-scoped locks or settings with it.
 
 ## Every operation costs round trips, and the record is serial
 
@@ -143,7 +145,8 @@ tenant's labels outlive their key. Erase a tenant's values to remove those too.
 
 ## One backend, and no migrations yet
 
-Postgres only — the storage uses advisory locks, recursive CTEs, `FOR SHARE` and `clock_timestamp()`.
+Postgres 13 or later only — the storage uses advisory locks, recursive CTEs, `FOR SHARE`,
+`clock_timestamp()` and `pg_current_xact_id_if_assigned()`.
 Schema creation is `CREATE TABLE IF NOT EXISTS` and nothing alters an existing table, so a database
 written by one pre-release commit is not necessarily readable by the next.
 

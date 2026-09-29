@@ -26,4 +26,14 @@ import org.jwcarman.occlude.storage.AuditRecord;
  * @param recordedAt when the database recorded it
  * @param line what it says, including the label and who was asking
  */
-public record RecordedLine(long entryId, Instant recordedAt, AuditRecord line) {}
+public record RecordedLine(long entryId, Instant recordedAt, AuditRecord line) {
+
+  /**
+   * Where and when, never what: the line carries a label and who was asking, decrypted, and a
+   * record's generated {@code toString} would print both into whatever log this lands in.
+   */
+  @Override
+  public String toString() {
+    return "RecordedLine[entryId=" + entryId + ", recordedAt=" + recordedAt + "]";
+  }
+}

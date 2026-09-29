@@ -112,9 +112,13 @@ holding the charter's lock (it now renders from a copy); and Spring's no-identit
 Re-signing under a new root landed afterwards as `JdbcStorage.resign()`. Both signed structures
 chain -- a value's digest covers its parents', a line's covers its predecessor's -- so re-signing a
 value re-signs everything derived from it, parents first, and re-signing a line re-signs every line
-after it. Each row is checked against its parents' and predecessor's digests as they were, under the
-root it was signed with, before it is signed again; the whole run is one transaction holding both
-locks, so one refusal leaves the store as it was and nothing is laundered. Ciphertext is untouched,
+after it. Every row -- stale or not -- is checked against its parents' and predecessor's digests as
+they were, under the root it names, before anything is signed again, and every anchor passed in must
+still hold, since afterwards none can; the whole run is one transaction holding both locks, so one
+refusal leaves the store as it was and nothing is laundered. (A review found the first version
+counted a parent named twice differently when ordering and releasing, so a fold could be re-signed
+before a sibling it still waited on; the ordering now counts each parent once, and a seeded test
+builds graphs of every shape a charter can make.) Ciphertext is untouched,
 so every field must decrypt for its commitment to be made again, and published anchors stop holding:
 the result carries the head before and after.
 

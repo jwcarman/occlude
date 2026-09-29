@@ -42,6 +42,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.datasource.DelegatingDataSource;
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -228,6 +229,18 @@ public class JdbcCharterAutoConfiguration {
     DataSource unwrapped = dataSource;
     while (unwrapped instanceof TransactionAwareDataSourceProxy proxy) {
       unwrapped = proxy.getTargetDataSource();
+    }
+    // One further in cannot be unwrapped without losing whatever wraps it -- credentials, a lazy
+    // connection -- so it is refused, rather than letting the store be handed the transaction.
+    DataSource inner = unwrapped;
+    while (inner instanceof DelegatingDataSource delegating) {
+      inner = delegating.getTargetDataSource();
+      if (inner instanceof TransactionAwareDataSourceProxy) {
+        throw new IllegalStateException(
+            "the DataSource wraps a TransactionAwareDataSourceProxy inside another wrapper, so"
+                + " occlude would be handed the application's transaction and commit it early."
+                + " Give occlude a DataSource outside any transaction.");
+      }
     }
     return unwrapped;
   }

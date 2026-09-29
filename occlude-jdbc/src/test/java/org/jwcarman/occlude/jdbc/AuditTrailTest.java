@@ -205,6 +205,36 @@ class AuditTrailTest {
         .hasMessageContaining("could not read the trail back");
   }
 
+  /** A line's place is not signed, so two swapped lines would each still verify on their own. */
+  @Test
+  @DisplayName("refuses lines somebody swapped into each other's places")
+  void refuses_swapped_lines() throws SQLException {
+    execute(
+        "UPDATE occlude_audit SET entry_id = -1"
+            + " WHERE entry_id = (SELECT min(entry_id) FROM occlude_audit)");
+    execute(
+        "UPDATE occlude_audit SET entry_id ="
+            + " (SELECT min(entry_id) FROM occlude_audit WHERE entry_id > 0) - 1"
+            + " WHERE entry_id = (SELECT max(entry_id) FROM occlude_audit)");
+    String id = held.id();
+
+    assertThatThrownBy(() -> trail.about(id))
+        .isInstanceOf(StorageIntegrityException.class)
+        .hasMessageContaining("not where it was signed");
+  }
+
+  @Test
+  @DisplayName("prints where and when a line was recorded, and never what it says")
+  void prints_nothing_it_says() {
+    RecordedLine line = trail.about(held.id()).getLast();
+
+    assertThat(line.toString())
+        .contains(String.valueOf(line.entryId()))
+        .doesNotContain("acme")
+        .doesNotContain("dana")
+        .doesNotContain("elsewhere");
+  }
+
   @Test
   @DisplayName("refuses questions it cannot answer")
   void refuses_unanswerable_questions() {

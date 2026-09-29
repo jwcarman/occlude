@@ -79,14 +79,16 @@ JdbcStorage storage = new JdbcStorageConfig()
     .rootedIn("prod-2027", id -> roots.get(id))   // the new root current, the old still supplied
     .storage(axes);
 
-Resigned resigned = storage.resign();             // or storage.integrity().resign()
-publish(resigned.after());                        // anchors to the old head no longer hold
+Resigned resigned = storage.resign(latestAnchor); // every anchor you published must still hold
+publish(resigned.after());                        // and afterwards none of them can
 ```
 
 Once `resign()` returns nothing is signed under the old root, so drop it from the lookup and destroy
-it. Every value and line is checked under the root it was signed with before it is signed again, so
-something altered is refused rather than laundered, and one refusal leaves the whole store as it
-was: the run is a single transaction holding both locks, and every write waits for it. Two things to
+it. Every value and every line — not only the stale ones — is checked under the root it names before
+anything is signed again, so something altered, or rewritten to claim the new root, is refused rather
+than laundered; and one refusal leaves the whole store as it was: the run is a single transaction
+holding both locks, and every write waits for it. Pass the anchors you have published: afterwards
+they cannot hold, so a trail cut back before re-signing would otherwise come out of it whole. Two things to
 know before running it. Every stored field must decrypt, because what is signed is a commitment to
 the plaintext — a key you have destroyed stops the run, naming the row. And every anchor published
 before it stops holding, because the lines it names now carry new digests: keep `before` with the
