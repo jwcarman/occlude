@@ -386,6 +386,25 @@ class ResigningTest {
     assertThatThrownBy(storage::resignWithoutAnchors).isInstanceOf(StorageIntegrityException.class);
   }
 
+  /** A line cannot be erased, so the way forward is the key it was written under. */
+  @Test
+  @DisplayName("says a line that will not decrypt needs its key back, not an erasure")
+  void says_a_line_that_will_not_decrypt_needs_its_key() throws SQLException {
+    execute("DELETE FROM occlude_lineage");
+    execute("DELETE FROM occlude_value");
+    JdbcStorage withoutTheKey =
+        new JdbcStorageConfig()
+            .dataSource(dataSource)
+            .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
+            .encryptedWith(new JceDataKeyProvider("k2", Map.of("k2", TestKeys.aes256())))
+            .rootedIn("new", BOTH)
+            .storage(AXES);
+
+    assertThatThrownBy(withoutTheKey::resignWithoutAnchors)
+        .isInstanceOf(StorageUnreadableException.class)
+        .hasMessageContaining("supply the key it was written under");
+  }
+
   @Test
   @DisplayName("does nothing the second time")
   void does_nothing_the_second_time() {
@@ -479,7 +498,8 @@ class ResigningTest {
             .storage(AXES);
 
     assertThatThrownBy(withoutTheKey::resignWithoutAnchors)
-        .isInstanceOf(StorageUnreadableException.class);
+        .isInstanceOf(StorageUnreadableException.class)
+        .hasMessageContaining("erase the value, then re-sign");
     assertThat(rowsUnder("old")).isEqualTo(before);
   }
 }

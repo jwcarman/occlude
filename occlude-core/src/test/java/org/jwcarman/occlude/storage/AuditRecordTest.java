@@ -51,20 +51,26 @@ class AuditRecordTest {
         context);
   }
 
+  /** Printed into a log, a record must not become a second, unprotected copy of the trail. */
   @Test
-  @DisplayName("says who asked, when the caller contributed something")
-  void says_who_asked_when_the_caller_contributed_something() {
-    AuditRecord entry = allowed(Map.of("tenant", "acme"));
+  @DisplayName("prints what the trail keeps in the clear, and never the label or who asked")
+  void prints_only_what_the_trail_keeps_in_the_clear() {
+    AuditRecord entry =
+        new AuditRecord(
+            AuditRecord.Operation.REVEAL,
+            "occ_1",
+            Optional.of("vendor-llm"),
+            AuditRecord.Outcome.REFUSED,
+            Optional.of("ABOVE_CEILING"),
+            Optional.of("{tenant=acme} is above {tenant=globex}"),
+            Optional.of("{tenant=acme}"),
+            Map.of("tenant", "acme", "principal", "dana"));
 
-    assertThat(entry.toString()).contains("by {tenant=acme}");
-  }
-
-  @Test
-  @DisplayName("says nothing extra when nobody in particular was asking")
-  void says_nothing_extra_when_nobody_was_asking() {
-    AuditRecord entry = allowed(Map.of());
-
-    assertThat(entry.toString()).doesNotContain("by {");
+    assertThat(entry.toString())
+        .isEqualTo("REVEAL occ_1 -> vendor-llm REFUSED: ABOVE_CEILING")
+        .doesNotContain("acme")
+        .doesNotContain("dana");
+    assertThat(allowed(Map.of()).toString()).isEqualTo("REVEAL occ_1 -> vendor-llm ALLOWED");
   }
 
   /** A line names who asked the way the edge said it, not in a hash order that varies by run. */
@@ -75,9 +81,5 @@ class AuditRecordTest {
 
     assertThat(entry.context().keySet())
         .containsExactly("tenant", "role", "user", "clearance", "region", "approver");
-    assertThat(entry.toString())
-        .contains(
-            "by {tenant=acme, role=compliance, user=jwcarman, clearance=cardholder,"
-                + " region=us-east, approver=yes}");
   }
 }

@@ -89,21 +89,23 @@ public record AuditRecord(
   }
 
   /**
-   * One readable line, including who asked.
+   * One readable line: what the trail keeps in the clear, and nothing it encrypts.
    *
-   * <p>It used to drop the label and the context, so an application whose auditor simply logged the
-   * record kept a trail that never said who did anything -- which is most of what an audit is for.
+   * <p>The label, the detail and who was asking are left out. They are encrypted at rest because
+   * they are sensitive -- a label names a tenant, the context whoever asked -- and a record handed
+   * out by reading the trail back, printed into an ordinary log, would be a second copy of them
+   * with none of the trail's protection. It once printed both, for an auditor that simply logged
+   * each record; the trail is that record now, and reading it back is how an auditor sees who did
+   * what. Anyone who means to log them can still ask for them by name.
    */
   @Override
   public String toString() {
-    return "%s %s%s %s%s%s%s"
+    return "%s %s%s %s%s"
         .formatted(
             operation,
             value,
             target.map(" -> "::concat).orElse(""),
             outcome,
-            reason.map(": "::concat).orElse(""),
-            label.map(" [%s]"::formatted).orElse(""),
-            context.isEmpty() ? "" : " by " + context);
+            reason.map(": "::concat).orElse(""));
   }
 }

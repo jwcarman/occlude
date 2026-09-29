@@ -36,6 +36,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.jwcarman.occlude.storage.StorageIntegrityException;
+import org.jwcarman.occlude.storage.StorageUnreadableException;
 
 /**
  * Re-signs everything a store holds under its current root and MAC, so an old root can be retired.
@@ -287,8 +288,19 @@ final class Resigning {
       throw new StorageIntegrityException(
           id + " is not what was signed for it, so nothing was re-signed");
     }
-    byte[] payload = fields.payloadOf(rows);
-    byte[] label = fields.labelPlaintextOf(rows, parents);
+    byte[] payload;
+    byte[] label;
+    try {
+      payload = fields.payloadOf(rows);
+      label = fields.labelPlaintextOf(rows, parents);
+    } catch (StorageUnreadableException e) {
+      throw new StorageUnreadableException(
+          id
+              + " no longer decrypts with the keys at hand -- usually a key that was destroyed, a"
+              + " tenant offboarded. A commitment to its plaintext cannot be made again without it,"
+              + " so erase the value, then re-sign. Nothing was re-signed.",
+          e);
+    }
     if (update == null) {
       return;
     }
@@ -424,7 +436,17 @@ final class Resigning {
               + entry
               + " of the trail is not what was signed for it, so nothing was re-signed");
     }
-    Fields.Line line = fields.lineOf(rows);
+    Fields.Line line;
+    try {
+      line = fields.lineOf(rows);
+    } catch (StorageUnreadableException e) {
+      throw new StorageUnreadableException(
+          "line "
+              + entry
+              + " of the trail no longer decrypts with the keys at hand. Lines cannot be erased,"
+              + " so supply the key it was written under, then re-sign. Nothing was re-signed.",
+          e);
+    }
     if (current(rows.getString(Columns.ROOT_ID), rows.getString(Columns.MAC))
         && Arrays.equals(walk.was, walk.now)) {
       walk.advance(storedDigest, storedDigest);
