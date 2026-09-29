@@ -87,7 +87,8 @@ class AuditThroughputTest {
         new JdbcStorageConfig()
             .dataSource(pg)
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-            .storedPlainly()
+            .encryptedWith(TestKeys.dataKeys())
+            .rootedIn(TestKeys.ROOT_ID, TestKeys.root())
             .storage(charter.axes());
     charter.bind(storage, AccessContextProvider.none());
   }

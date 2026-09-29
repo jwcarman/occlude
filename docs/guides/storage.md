@@ -1,45 +1,36 @@
 # Storage
 
-Postgres. `occlude-jdbc` contains **no cryptography and no compression of its own** — it depends on
-`occlude-core` and the codec *contract*, and applies whatever pipeline you hand it.
+Postgres. Everything a store keeps is **encrypted, and signed under a secret root** — neither is
+optional, and a store refuses to be built without both:
 
 ```java
 JdbcStorage storage = new JdbcStorageConfig()
     .dataSource(dataSource)
-    .codecs(new JacksonCodecFactory(objectMapper))      // serialise
-    .storedThrough(StorageCodec.of(                     // then your byte pipeline
-        Compression.whenItHelps(new GzipCodec())
-            .andThen(EnvelopeCodec.builder(keys).build())))
-    .rootedIn("prod-2026", secret)                      // the key the digests are under
+    .codecs(new JacksonCodecFactory(objectMapper))      // how values become bytes
+    .encryptedWith(dataKeys)                            // a codec-crypto DataKeyProvider
+    .rootedIn("prod-2026", secret)                      // what the digests are signed under
     .storage(axes);
 ```
 
-Jackson or fory or protobuf; gzip or zstd or lz4; envelope encryption or your own KMS. For tests,
-`.storedPlainly()` skips the pipeline entirely.
+`occlude-jdbc` contains no cryptography of its own. Every value, label, audit detail and audit
+context goes through codec's `EnvelopeCodec` — a fresh AES-256-GCM data key per payload, wrapped
+under your key-encryption key and recorded with its id — inside codec's `VersionedCodec`, so each
+payload names the pipeline that wrote it and a later one can be introduced without rewriting what is
+stored.
 
-## Composing the pipeline
+`dataKeys` is yours: a `JceDataKeyProvider` over keys you hold, or a provider backed by your KMS.
+Rotating is adding a key and making it current; what the older one wrapped still decrypts under the
+id recorded in its envelope.
 
-**Compression before encryption**, always. Ciphertext does not compress, so the other order costs
-the same and saves nothing.
-
-**Compression should be conditional**, because measurement says so. Most of what a charter holds is
-small, and a compressor's framing costs more than a short payload saves:
-
-```
-{"number":"4111111111114821","holder":"J CARMAN"}   49 bytes -> gzip 57   BIGGER
-{"v":"4821"}                                        12 bytes -> gzip 32   BIGGER
-an email body                                      851 bytes -> gzip 79   smaller
-```
-
-`Compression.whenItHelps(...)` keeps the result only when it actually shrank, and records which
-with one leading byte. Worst case is one byte instead of a threefold expansion.
-
-**Bound your decompression.** The bytes come from a database, and a corrupt or hostile row should
-not expand into an out-of-memory error. That is a property of the compressor you supply.
+**No compression**, deliberately. Compressing before encrypting makes a ciphertext's length depend
+on what its plaintext says — the side channel CRIME and BREACH exploit — and a security library has
+no size to save that is worth it.
 
 ## Roots
 
-`rootedIn(name, secret)` names the key the digests are computed under. The name is stored with
+`rootedIn(name, secret)` names the secret the digests are computed under. There is no default: a
+store used to be rooted in a published constant unless told otherwise, which made its record
+forgeable by anyone who could write its tables. The name is stored with
 each row, so rotating a root does not invalidate what was written under the last one — supply both
 and old rows still verify.
 
@@ -51,9 +42,9 @@ naming a root nobody supplies is reported as broken rather than crashing the ver
 
 | column | stored |
 |---|---|
-| `occlude_value.payload` | through your pipeline |
-| `occlude_value.label` | through your pipeline — a label can name a tenant |
-| `occlude_audit.label`, `detail`, `context` | through your pipeline |
+| `occlude_value.payload` | encrypted |
+| `occlude_value.label` | encrypted — a label can name a tenant |
+| `occlude_audit.label`, `detail`, `context` | encrypted |
 | `occlude_audit.operation`, `outcome`, `reason`, `value_id` | in the clear |
 
 The clear columns are the ones that name rules rather than values, so the trail stays queryable. An

@@ -62,12 +62,11 @@ import org.jwcarman.occlude.lattice.Label;
 /**
  * Storage in a database, with every payload encrypted.
  *
- * <p>A value is serialised by whatever {@link CodecFactory} the application chose, then passed
- * through whatever {@link StorageCodec} it composed. This module contains no cryptography and no
- * compression of its own; it applies what it was handed, so this class contains no cryptography of
- * its own -- {@code EnvelopeCodec} constitutes a fresh data key per payload and wraps it with a key
- * named by id, which is what makes key rotation a matter of adding a key rather than rewriting a
- * table.
+ * <p>A value is serialised by whatever {@link CodecFactory} the application chose, then encrypted
+ * by codec's {@code EnvelopeCodec} inside a {@code VersionedCodec} -- see {@link
+ * JdbcStorageConfig}. This module contains no cryptography of its own: the envelope constitutes a
+ * fresh data key per payload and wraps it with a key named by id, which is what makes key rotation
+ * a matter of adding a key rather than rewriting a table.
  *
  * <p><b>The label is encrypted too.</b> A label can be as sensitive as the value: a tenant's name
  * or a project codeword sitting in the clear beside the ciphertext describes what the ciphertext is
@@ -87,7 +86,7 @@ public final class JdbcStorage implements Storage {
   static JdbcStorage of(
       DataSource dataSource,
       CodecFactory codecs,
-      StorageCodec storageCodec,
+      Codec<byte[]> storageCodec,
       Axes axes,
       String rootId,
       Function<String, byte[]> roots) {
@@ -160,7 +159,7 @@ public final class JdbcStorage implements Storage {
 
   private final DataSource dataSource;
   private final CodecFactory codecs;
-  private final StorageCodec storageCodec;
+  private final Codec<byte[]> storageCodec;
 
   /**
    * Serialisation then encryption, for the two things stored as a map of strings that must not be
@@ -176,7 +175,7 @@ public final class JdbcStorage implements Storage {
   private JdbcStorage(
       DataSource dataSource,
       CodecFactory codecs,
-      StorageCodec storageCodec,
+      Codec<byte[]> storageCodec,
       Axes axes,
       String rootId,
       Function<String, byte[]> roots) {
@@ -323,7 +322,7 @@ public final class JdbcStorage implements Storage {
     byte[] previous = head.digest();
     byte[] detail = protect(entry.detail());
     byte[] label = protect(entry.label());
-    // Encrypted ONCE, then both signed and stored. A StorageCodec is free to be non-deterministic
+    // Encrypted ONCE, then both signed and stored. The envelope is deliberately non-deterministic
     // -- an authenticated cipher uses a fresh nonce every time -- so encrypting a second copy for
     // the digest signs bytes no column ever held, and every line fails its own check on read-back.
     byte[] context = protectedMap.encode(entry.context());

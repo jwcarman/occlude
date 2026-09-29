@@ -15,6 +15,8 @@
  */
 package org.jwcarman.occlude.spring;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /** What the store needs told that is not policy. */
@@ -47,5 +49,76 @@ public class CharterProperties {
 
   public void setLogManifest(boolean logManifest) {
     this.logManifest = logManifest;
+  }
+
+  /** Key-encryption keys for stored values, when the application does not contribute its own. */
+  private final Keys keys = new Keys();
+
+  public Keys getKeys() {
+    return keys;
+  }
+
+  /** Secrets the record and the values are signed under. */
+  private final Roots roots = new Roots();
+
+  public Roots getRoots() {
+    return roots;
+  }
+
+  /**
+   * AES-256 key-encryption keys by id, base64-encoded, and which one new values are wrapped under.
+   *
+   * <p>A convenience for an application without a KMS: a {@code DataKeyProvider} bean replaces it
+   * entirely. Keys belong in the environment or a secret store, never in a committed file. Rotating
+   * is adding one and making it current; what the others wrapped still decrypts.
+   */
+  public static class Keys {
+
+    private String current;
+    private Map<String, String> keks = new LinkedHashMap<>();
+
+    public String getCurrent() {
+      return current;
+    }
+
+    public void setCurrent(String current) {
+      this.current = current;
+    }
+
+    public Map<String, String> getKeks() {
+      return keks;
+    }
+
+    public void setKeks(Map<String, String> keks) {
+      this.keks = keks;
+    }
+  }
+
+  /**
+   * Root secrets by id, base64-encoded, and which one new values and lines are signed under.
+   *
+   * <p>Each value and line records the root it was written under, so a new one takes over without
+   * invalidating what the others signed -- supply them all.
+   */
+  public static class Roots {
+
+    private String current;
+    private Map<String, String> secrets = new LinkedHashMap<>();
+
+    public String getCurrent() {
+      return current;
+    }
+
+    public void setCurrent(String current) {
+      this.current = current;
+    }
+
+    public Map<String, String> getSecrets() {
+      return secrets;
+    }
+
+    public void setSecrets(Map<String, String> secrets) {
+      this.secrets = secrets;
+    }
   }
 }

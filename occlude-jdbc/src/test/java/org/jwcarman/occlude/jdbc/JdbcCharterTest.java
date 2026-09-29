@@ -47,10 +47,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.TypeRef;
-import org.jwcarman.codec.crypto.EnvelopeCodec;
 import org.jwcarman.codec.crypto.JceDataKeyProvider;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
-import org.jwcarman.codec.transform.compress.GzipCodec;
 import org.jwcarman.occlude.AccessContext;
 import org.jwcarman.occlude.AuditRecord;
 import org.jwcarman.occlude.DefaultCharter;
@@ -187,17 +185,13 @@ class JdbcCharterTest {
     OccludedType<List<Last4>> last4List =
         OccludedType.of("last4-list", TypeRef.listOf(TypeRef.of(Last4.class)));
 
-    // The application composes its own pipeline: squeeze, then seal.
+    // The application supplies its keys and its root; what happens to the bytes is not its choice.
     JdbcStorageConfig jdbc =
         new JdbcStorageConfig()
             .dataSource(dataSource)
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-            .storedThrough(
-                StorageCodec.of(
-                    Compression.whenItHelps(new GzipCodec())
-                        .andThen(
-                            EnvelopeCodec.builder(new JceDataKeyProvider("k1", Map.of("k1", kek)))
-                                .build())));
+            .encryptedWith(new JceDataKeyProvider("k1", Map.of("k1", kek)))
+            .rootedIn(TestKeys.ROOT_ID, TestKeys.root());
 
     // Erasure is the one operation a label cannot decide, so its policy is named here.
     compliance =
@@ -653,7 +647,7 @@ class JdbcCharterTest {
         new JdbcStorageConfig()
             .dataSource(dataSource)
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-            .storedPlainly()
+            .encryptedWith(TestKeys.dataKeys())
             .rootedIn("open", "somebody else's key".getBytes(StandardCharsets.UTF_8))
             .withoutMigration()
             .storage(Axes.of(TENANT, INTEGRITY, DATA));
@@ -702,7 +696,7 @@ class JdbcCharterTest {
     return new JdbcStorageConfig()
         .dataSource(dataSource)
         .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-        .storedPlainly()
+        .encryptedWith(TestKeys.dataKeys())
         .rootedIn(id, roots::get)
         .withoutMigration()
         .storage(axes);
@@ -815,17 +809,34 @@ class JdbcCharterTest {
   }
 
   @Test
-  @DisplayName("what happens to the bytes is a decision, not a default")
-  void protection_is_a_decision() {
+  @DisplayName("refuses to be built without keys to encrypt with")
+  void refuses_to_be_built_without_keys() {
     assertThat(
             Assertions.catchThrowable(
                 () ->
                     new JdbcStorageConfig()
                         .dataSource(dataSource)
                         .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
+                        .rootedIn(TestKeys.ROOT_ID, TestKeys.root())
                         .storage(Axes.of(TENANT, INTEGRITY, DATA))))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("storedPlainly");
+        .hasMessageContaining("encryptedWith");
+  }
+
+  /** A store used to be rooted in a published constant unless told otherwise, and forgeable. */
+  @Test
+  @DisplayName("refuses to be built without a secret root")
+  void refuses_to_be_built_without_a_root() {
+    assertThat(
+            Assertions.catchThrowable(
+                () ->
+                    new JdbcStorageConfig()
+                        .dataSource(dataSource)
+                        .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
+                        .encryptedWith(TestKeys.dataKeys())
+                        .storage(Axes.of(TENANT, INTEGRITY, DATA))))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("rootedIn");
   }
 
   /** A different tenant, established at the edge rather than claimed by the caller. */
@@ -925,38 +936,33 @@ class JdbcCharterTest {
     assertThat(lineageOf(card()).parents()).isEmpty();
   }
 
-  /** Serialise, squeeze, seal. Reversing the last two would cost the same and save nothing. */
-  @Test
-  @DisplayName("compresses a big repetitive value before encrypting it")
-  void compresses_a_big_value_before_encrypting() throws SQLException {
-    Occluded<Card> small = card();
-    acme();
-    Occluded<Card> repetitive =
-        cards.occlude(new Card("4111111111114821", "J CARMAN ".repeat(200)));
-
-    // 1800 characters of a repeated name, stored in nothing like 1800 bytes.
-    assertThat(payloadLength(repetitive)).isLessThan(payloadLength(small) + 300);
-  }
-
   /**
-   * The measured reason compression is conditional: a card record gzips to more than it started as,
-   * so applying it unconditionally would cost space on nearly everything a store holds.
+   * Nothing about what a value says reaches its stored length, beyond how long it is.
+   *
+   * <p>A store used to compress before encrypting, so a repetitive value was stored far smaller
+   * than a varied one of the same length -- the length leak CRIME and BREACH exploit. Encrypted
+   * without compression, every payload is its plaintext plus the same fixed overhead.
    */
   @Test
-  @DisplayName("does not make a small value bigger by compressing it")
-  void does_not_make_a_small_value_bigger() throws SQLException {
-    Occluded<Card> card = card();
+  @DisplayName("stores every value at its plaintext length plus the same fixed overhead")
+  void stores_every_value_at_its_length_plus_a_fixed_overhead() throws SQLException {
+    Card ordinary = new Card("4111111111114821", "J CARMAN");
+    Card repetitive = new Card("4111111111114821", "J CARMAN ".repeat(200));
+    acme();
+    Occluded<Card> small = cards.occlude(ordinary);
+    Occluded<Card> large = cards.occlude(repetitive);
 
-    int stored = payloadLength(card);
-    int plain =
-        new JacksonCodecFactory(JsonMapper.builder().build())
-            .create(Card.class)
-            .encode(new Card("4111111111114821", "J CARMAN"))
-            .length;
+    int smallOverhead = payloadLength(small) - serialised(ordinary);
+    int largeOverhead = payloadLength(large) - serialised(repetitive);
 
-    // One marker byte plus whatever the envelope adds, and nothing for compression that did not
-    // help. Gzip alone would have added eight bytes to this payload before encryption.
-    assertThat(stored).isLessThan(plain + 100);
+    assertThat(smallOverhead).isPositive().isEqualTo(largeOverhead);
+  }
+
+  private static int serialised(Card card) {
+    return new JacksonCodecFactory(JsonMapper.builder().build())
+        .create(Card.class)
+        .encode(card)
+        .length;
   }
 
   private int payloadLength(Occluded<?> held) throws SQLException {
@@ -1062,7 +1068,8 @@ class JdbcCharterTest {
         new JdbcStorageConfig()
             .dataSource(unreachableDataSource())
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-            .storedPlainly();
+            .encryptedWith(TestKeys.dataKeys())
+            .rootedIn(TestKeys.ROOT_ID, TestKeys.root());
     Axes axes = Axes.of(TENANT, INTEGRITY, DATA);
 
     assertThatThrownBy(() -> unreachableConfig.storage(axes))
@@ -1077,7 +1084,8 @@ class JdbcCharterTest {
         new JdbcStorageConfig()
             .dataSource(unreachableDataSource())
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-            .storedPlainly()
+            .encryptedWith(TestKeys.dataKeys())
+            .rootedIn(TestKeys.ROOT_ID, TestKeys.root())
             .withoutMigration()
             .storage(Axes.of(TENANT, INTEGRITY, DATA));
     AuditRecord line = aQueryLine("x");
@@ -1187,7 +1195,8 @@ class JdbcCharterTest {
         new JdbcStorageConfig()
             .dataSource(dataSourceWhoseRollbackFails())
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-            .storedPlainly()
+            .encryptedWith(TestKeys.dataKeys())
+            .rootedIn(TestKeys.ROOT_ID, TestKeys.root())
             .withoutMigration()
             .storage(Axes.of(TENANT, INTEGRITY, DATA));
     AuditRecord line = aQueryLine("x");
@@ -1329,7 +1338,8 @@ class JdbcCharterTest {
         new JdbcStorageConfig()
             .dataSource(dataSourceWhoseCloseFails())
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-            .storedPlainly()
+            .encryptedWith(TestKeys.dataKeys())
+            .rootedIn(TestKeys.ROOT_ID, TestKeys.root())
             .withoutMigration()
             .storage(Axes.of(TENANT, INTEGRITY, DATA));
 
@@ -1396,7 +1406,8 @@ class JdbcCharterTest {
         new JdbcStorageConfig()
             .dataSource(dataSourceWhoseCloseFails())
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-            .storedPlainly()
+            .encryptedWith(TestKeys.dataKeys())
+            .rootedIn(TestKeys.ROOT_ID, TestKeys.root())
             .withoutMigration()
             .storage(Axes.of(TENANT, INTEGRITY, DATA));
 
@@ -1503,7 +1514,8 @@ class JdbcCharterTest {
         new JdbcStorageConfig()
             .dataSource(dataSourceWhoseCloseFails())
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-            .storedPlainly()
+            .encryptedWith(TestKeys.dataKeys())
+            .rootedIn(TestKeys.ROOT_ID, TestKeys.root())
             .withoutMigration()
             .storage(Axes.of(TENANT, INTEGRITY, DATA));
     String id = card.id();
@@ -1537,7 +1549,7 @@ class JdbcCharterTest {
         new JdbcStorageConfig()
             .dataSource(dataSource)
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-            .storedPlainly()
+            .encryptedWith(TestKeys.dataKeys())
             .rootedIn("r1", secret)
             .withoutMigration()
             .storage(axes);
@@ -1550,7 +1562,7 @@ class JdbcCharterTest {
         new JdbcStorageConfig()
             .dataSource(dataSource)
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-            .storedPlainly()
+            .encryptedWith(TestKeys.dataKeys())
             .rootedIn("r2", secret)
             .withoutMigration()
             .storage(axes);
@@ -1565,7 +1577,8 @@ class JdbcCharterTest {
         new JdbcStorageConfig()
             .dataSource(dataSource)
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-            .storedPlainly()
+            .encryptedWith(TestKeys.dataKeys())
+            .rootedIn(TestKeys.ROOT_ID, TestKeys.root())
             .withoutMigration()
             .storage(Axes.of(TENANT, INTEGRITY, DATA));
     StoredValue value =

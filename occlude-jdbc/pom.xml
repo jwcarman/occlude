@@ -49,15 +49,15 @@
       <artifactId>codec-jackson</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>org.jwcarman.codec</groupId>
-      <artifactId>codec-transforms</artifactId>
-      <scope>test</scope>
-    </dependency>
+    <!-- Every payload is envelope-encrypted, and the pipeline is versioned so it can change without
+         rewriting what is stored. The cryptography is codec's; this module has none of its own. -->
     <dependency>
       <groupId>org.jwcarman.codec</groupId>
       <artifactId>codec-crypto</artifactId>
-      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jwcarman.codec</groupId>
+      <artifactId>codec-versioned</artifactId>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>

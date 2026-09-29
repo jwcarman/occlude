@@ -6,10 +6,20 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:occlude}
     password: ${SPRING_DATASOURCE_PASSWORD:occlude}
 
-# A DEMO key, and the only one. Real deployments wrap data keys with a KMS-held key and rotate by
-# adding a new one beside it -- EnvelopeCodec names the wrapping key by id for exactly that reason.
-billing:
-  key: ${BILLING_KEY:c2hoLXRoaXMtaXMtYS1kZW1vLWtleS0zMi1ieXRlcyE=}
+# DEMO secrets, so the example runs as checked out. Never do this outside a demo: a key or root in a
+# committed file protects nothing from anyone who can read the repository. Real deployments supply
+# both from the environment or a secret store, or contribute a DataKeyProvider bean backed by a KMS.
+# Everything stored is encrypted under the current key and signed under the current root; rotate
+# either by adding a new id beside the old one and making it current.
+occlude:
+  keys:
+    current: demo
+    keks:
+      demo: ${OCCLUDE_DEMO_KEK:c2hoLXRoaXMtaXMtYS1kZW1vLWtleS0zMi1ieXRlcyE=}
+  roots:
+    current: demo
+    secrets:
+      demo: ${OCCLUDE_DEMO_ROOT:ZGVtby1yb290LW5vdC1hLXNlY3JldC1hdC1hbGwh}
 
 management:
   endpoints:

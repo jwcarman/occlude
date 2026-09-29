@@ -15,18 +15,26 @@
  */
 package org.jwcarman.occlude.spring;
 
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import javax.sql.DataSource;
 import org.jwcarman.codec.CodecFactory;
+import org.jwcarman.codec.crypto.DataKeyProvider;
+import org.jwcarman.codec.crypto.JceDataKeyProvider;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.Storage;
 import org.jwcarman.occlude.jdbc.JdbcStorage;
 import org.jwcarman.occlude.jdbc.JdbcStorageConfig;
-import org.jwcarman.occlude.jdbc.StorageCodec;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -43,7 +51,9 @@ import tools.jackson.databind.json.JsonMapper;
  * builds the store once the context has finished making singletons.
  *
  * <p>Everything it supplies is {@link ConditionalOnMissingBean}, so any of it can be replaced by
- * declaring your own: the serialisation, the encryption, or the data source itself.
+ * declaring your own: the serialisation, the keys, or the data source itself. What cannot be
+ * replaced is that everything is encrypted and signed: a store is not built without keys and a
+ * root, and startup says which is missing.
  */
 @AutoConfiguration(
     after = CharterAutoConfiguration.class,
@@ -53,11 +63,30 @@ import tools.jackson.databind.json.JsonMapper;
 @ConditionalOnClass({JdbcStorage.class, DataSource.class})
 public class JdbcCharterAutoConfiguration {
 
-  /** How values are serialised, before they are compressed and sealed. */
+  /** How values are serialised, before they are encrypted. */
   @Bean
   @ConditionalOnMissingBean
   public CodecFactory occludedCodecFactory() {
     return new JacksonCodecFactory(JsonMapper.builder().build());
+  }
+
+  /**
+   * Key-encryption keys from configuration, for an application that has no KMS.
+   *
+   * <p>Only when {@code occlude.keys.current} is set, and never when the application contributes
+   * its own {@link DataKeyProvider}: a KMS or Vault replaces this entirely. Nothing here generates
+   * a key or has one to fall back on.
+   */
+  @Bean
+  @ConditionalOnMissingBean(DataKeyProvider.class)
+  @ConditionalOnProperty(prefix = "occlude.keys", name = "current")
+  public DataKeyProvider occludedDataKeys(CharterProperties properties) {
+    CharterProperties.Keys keys = properties.getKeys();
+    Map<String, SecretKey> keks = new LinkedHashMap<>();
+    keys.getKeks()
+        .forEach(
+            (id, encoded) -> keks.put(id, new SecretKeySpec(decoded(encoded, "key", id), "AES")));
+    return new JceDataKeyProvider(keys.getCurrent(), keks);
   }
 
   /**
@@ -66,21 +95,59 @@ public class JdbcCharterAutoConfiguration {
    * <p>This module's whole job. It supplies somewhere to keep values and lines; it does not
    * construct a charter and it does not bring one into force, so nothing here decides what an
    * application is allowed to do.
+   *
+   * <p>It refuses to start without keys and a root rather than contributing nothing, because an
+   * application that put this module on its classpath meant to keep values in a database, and the
+   * alternative is every portal refusing at request time.
    */
   @Bean
-  @ConditionalOnBean({Charter.class, StorageCodec.class})
+  @ConditionalOnBean(Charter.class)
   @ConditionalOnMissingBean(Storage.class)
   public JdbcStorage jdbcStorage(
       Charter charter,
       DataSource dataSource,
       CodecFactory codecs,
-      StorageCodec storageCodec,
+      ObjectProvider<DataKeyProvider> dataKeys,
       CharterProperties properties) {
+    DataKeyProvider keys = dataKeys.getIfAvailable();
+    if (keys == null) {
+      throw new IllegalStateException(
+          "occlude-jdbc encrypts everything it keeps and has no keys to do it with: set"
+              + " occlude.keys.current and occlude.keys.keks.<id>, or contribute a DataKeyProvider"
+              + " bean");
+    }
+    CharterProperties.Roots roots = properties.getRoots();
+    if (roots.getCurrent() == null) {
+      throw new IllegalStateException(
+          "occlude-jdbc signs its record and its values under a secret root and has none: set"
+              + " occlude.roots.current and occlude.roots.secrets.<id>");
+    }
+    Map<String, byte[]> secrets = new LinkedHashMap<>();
+    roots.getSecrets().forEach((id, encoded) -> secrets.put(id, decoded(encoded, "root", id)));
+    if (!secrets.containsKey(roots.getCurrent())) {
+      throw new IllegalStateException(
+          "occlude.roots.current is '"
+              + roots.getCurrent()
+              + "', but occlude.roots.secrets has no secret by that name");
+    }
     JdbcStorageConfig jdbc =
-        new JdbcStorageConfig().dataSource(dataSource).codecs(codecs).storedThrough(storageCodec);
+        new JdbcStorageConfig()
+            .dataSource(dataSource)
+            .codecs(codecs)
+            .encryptedWith(keys)
+            .rootedIn(roots.getCurrent(), secrets::get);
     if (!properties.isMigrate()) {
       jdbc.withoutMigration();
     }
     return jdbc.storage(charter.axes());
+  }
+
+  /** Base64, and a message naming which entry was not, rather than a bare decoder exception. */
+  private static byte[] decoded(String encoded, String what, String id) {
+    try {
+      return Base64.getDecoder().decode(encoded);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalStateException(what + " '" + id + "' is not valid base64", e);
+    }
   }
 }

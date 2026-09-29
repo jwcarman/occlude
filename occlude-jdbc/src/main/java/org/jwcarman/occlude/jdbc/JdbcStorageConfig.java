@@ -15,11 +15,14 @@
  */
 package org.jwcarman.occlude.jdbc;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.function.Function;
 import javax.sql.DataSource;
+import org.jwcarman.codec.Codec;
 import org.jwcarman.codec.CodecFactory;
+import org.jwcarman.codec.crypto.DataKeyProvider;
+import org.jwcarman.codec.crypto.EnvelopeCodec;
+import org.jwcarman.codec.versioned.VersionedCodec;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.lattice.Axes;
 
@@ -29,21 +32,28 @@ import org.jwcarman.occlude.lattice.Axes;
  * <p>Deliberately not a kind of {@link Charter}. An application declares what it allows -- the
  * labels, the doors, who may reach them -- without knowing or caring where the values end up, and
  * the code declaring portals should compile against the generic thing. This is the other half:
- * where the tables are, how bytes are serialised, and how they are sealed. Both are asked for the
- * {@link JdbcStorage} a charter is bound to.
+ * where the tables are, how values are serialised, whose keys encrypt them, and what the record is
+ * signed under. Both are asked for the {@link JdbcStorage} a charter is bound to.
  *
- * @param <A> the application's label type, which is stored encrypted like any other value
+ * <p><b>Nothing here is optional that protects anything.</b> Every value, label, audit detail and
+ * audit context is encrypted, and the record and the values are signed under a secret root. There
+ * is no plaintext mode and no default secret, because a store that could be built without either
+ * would be built without either.
  */
 public final class JdbcStorageConfig {
 
-  /** The root of a graph nobody has rooted: tamper-evident, and forgeable by whoever can write. */
-  private static final byte[] ROOTED_IN_THE_OPEN = "occlude".getBytes(StandardCharsets.UTF_8);
+  /**
+   * The pipeline version every payload is written under. Fixed forever: version 1 is codec's
+   * envelope over the configured keys and nothing else. A later pipeline -- padding, a new
+   * algorithm -- is added as 2 beside it, so what is already stored still reads.
+   */
+  static final int ENVELOPE = 1;
 
   private DataSource dataSource;
   private CodecFactory codecs;
-  private String rootId = "open";
-  private Function<String, byte[]> roots = id -> ROOTED_IN_THE_OPEN;
-  private StorageCodec storageCodec;
+  private DataKeyProvider dataKeys;
+  private String rootId;
+  private Function<String, byte[]> roots;
   private boolean migrate = true;
 
   /** Where the tables are. */
@@ -58,32 +68,21 @@ public final class JdbcStorageConfig {
     return this;
   }
 
-  /** What happens to those bytes before they are written: compression, encryption, both. */
-  public JdbcStorageConfig storedThrough(StorageCodec storageCodec) {
-    this.storageCodec = Objects.requireNonNull(storageCodec, "a storage codec must not be null");
-    return this;
-  }
-
   /**
-   * Writes bytes as they are.
+   * Whose keys encrypt what this stores.
    *
-   * <p>Said out loud rather than fallen into. Everything this keeps is something somebody decided
-   * was worth keeping behind a door, so storing it in the clear is a decision.
+   * <p>Each payload gets a fresh AES-256-GCM data key, wrapped under the provider's current
+   * key-encryption key and recorded with that key's id, so rotating keys is adding one and making
+   * it current: what is already stored still decrypts under the id it names. The provider is the
+   * application's -- {@code JceDataKeyProvider} over keys it holds, or a KMS -- and this module
+   * never reads, generates or stores key material.
+   *
+   * <p>No compression, deliberately. Compressing before encrypting makes the ciphertext's length
+   * depend on what the plaintext says, which is the side channel CRIME and BREACH exploit, and a
+   * security library has no size to save that is worth it.
    */
-  public JdbcStorageConfig storedPlainly() {
-    this.storageCodec =
-        StorageCodec.of(
-            new StorageCodec() {
-              @Override
-              public byte[] encode(byte[] bytes) {
-                return bytes;
-              }
-
-              @Override
-              public byte[] decode(byte[] bytes) {
-                return bytes;
-              }
-            });
+  public JdbcStorageConfig encryptedWith(DataKeyProvider dataKeys) {
+    this.dataKeys = Objects.requireNonNull(dataKeys, "a durable store needs keys to encrypt with");
     return this;
   }
 
@@ -93,58 +92,16 @@ public final class JdbcStorageConfig {
     return this;
   }
 
-  DataSource dataSourceOrFail() {
-    return require(dataSource, "a durable store needs a data source: call dataSource(...)");
-  }
-
-  CodecFactory codecsOrFail() {
-    return require(
-        codecs, "a durable store needs codecs: give it a CodecFactory that can serialise values");
-  }
-
-  StorageCodec storageCodecOrFail() {
-    return require(
-        storageCodec,
-        "a durable store needs to say what happens to bytes on the way to disk: call"
-            + " storedThrough(...) with your compression and encryption, or storedPlainly() if you"
-            + " really mean to write them as they are");
-  }
-
-  boolean migrates() {
-    return migrate;
-  }
-
-  private static <T> T require(T value, String said) {
-    if (value == null) {
-      throw new IllegalStateException(said);
-    }
-    return value;
-  }
-
-  /**
-   * The storage a charter with these axes is bound to.
-   *
-   * <p>The only way to build one, so that what happens to the bytes on the way to disk stays a
-   * decision somebody made rather than a default they inherited.
-   */
-  public JdbcStorage storage(Axes axes) {
-    JdbcStorage storage =
-        JdbcStorage.of(
-            dataSourceOrFail(), codecsOrFail(), storageCodecOrFail(), axes, rootId, roots);
-    if (migrates()) {
-      storage.migrate();
-    }
-    return storage;
-  }
-
   /**
    * What a fresh value hashes from, having no parents of its own.
    *
    * <p>Every value carries a digest over its own bytes and its parents', so editing one breaks
-   * everything derived from it. Where that stops being merely expensive is here. Left alone, the
-   * root is a published constant and somebody with write access can recompute a graph after editing
-   * it -- an edit is still visible to anyone holding an earlier copy of a digest, but it can be
-   * covered up. Given a secret this database does not hold, no node can be forged at all.
+   * everything derived from it. Where that stops being merely expensive is here. Rooted in a
+   * published constant, somebody with write access could recompute a graph after editing it -- an
+   * edit still visible to anyone holding an earlier copy of a digest, but one that could be covered
+   * up. Given a secret this database does not hold, no node can be forged at all. That is why there
+   * is no default: a store used to be rooted in the constant {@code "occlude"} unless told
+   * otherwise, and was forgeable by anyone who could write its tables.
    *
    * <p>A lookup rather than a value, so the secret can come from wherever secrets come from and
    * need never be written down beside the thing it protects.
@@ -163,7 +120,60 @@ public final class JdbcStorageConfig {
 
   /** The same, for an application that has only ever had one root. */
   public JdbcStorageConfig rootedIn(String id, byte[] secret) {
+    Objects.requireNonNull(secret, "a root needs a secret");
     byte[] only = secret.clone();
     return rootedIn(id, asked -> id.equals(asked) ? only : null);
+  }
+
+  /**
+   * The storage a charter with these axes is bound to.
+   *
+   * <p>The only way to build one, and it refuses until it has been told where the tables are, how
+   * values are serialised, whose keys encrypt them and what they are signed under.
+   */
+  public JdbcStorage storage(Axes axes) {
+    Objects.requireNonNull(axes, "a durable store needs the charter's axes");
+    JdbcStorage storage =
+        JdbcStorage.of(
+            require(dataSource, "a durable store needs a data source: call dataSource(...)"),
+            require(
+                codecs,
+                "a durable store needs codecs: give it a CodecFactory that can serialise values"),
+            pipeline(
+                require(
+                    dataKeys,
+                    "a durable store encrypts everything it keeps: call encryptedWith(...) with a"
+                        + " DataKeyProvider -- a JceDataKeyProvider over keys you hold, or your"
+                        + " KMS")),
+            axes,
+            require(
+                rootId,
+                "a durable store signs its record and its values under a secret it does not hold:"
+                    + " call rootedIn(...)"),
+            roots);
+    if (migrate) {
+      storage.migrate();
+    }
+    return storage;
+  }
+
+  /**
+   * Every byte on its way to disk: the envelope, inside a version header naming it.
+   *
+   * <p>The header is outermost so that everything inside it may change: a payload says which
+   * pipeline wrote it, and a later one is introduced beside it rather than over it.
+   */
+  static Codec<byte[]> pipeline(DataKeyProvider dataKeys) {
+    return VersionedCodec.<byte[]>builder()
+        .version(ENVELOPE, EnvelopeCodec.builder(dataKeys).build())
+        .writing(ENVELOPE)
+        .build();
+  }
+
+  private static <T> T require(T value, String said) {
+    if (value == null) {
+      throw new IllegalStateException(said);
+    }
+    return value;
   }
 }

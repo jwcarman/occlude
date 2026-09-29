@@ -265,7 +265,8 @@ class JdbcStorageWhiteboxTest {
         new JdbcStorageConfig()
             .dataSource(unusedDataSource())
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
-            .storedPlainly()
+            .encryptedWith(TestKeys.dataKeys())
+            .rootedIn(TestKeys.ROOT_ID, TestKeys.root())
             .withoutMigration()
             .storage(Axes.of(TENANT));
 

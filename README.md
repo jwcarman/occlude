@@ -220,37 +220,31 @@ cascades into it: the record that you erased somebody has to survive erasing the
 
 ## Storage
 
-Postgres. `occlude-jdbc` contains **no cryptography and no compression of its own** — you compose the
-pipeline and it applies what it is handed:
+Postgres. Everything a store keeps is **encrypted, and signed under a secret root** — neither is
+optional, and a store refuses to be built without both:
 
 ```java
 JdbcStorage storage = new JdbcStorageConfig()
     .dataSource(dataSource)
-    .codecs(new JacksonCodecFactory(objectMapper))      // serialise
-    .storedThrough(StorageCodec.of(                     // then your byte pipeline
-        Compression.whenItHelps(new GzipCodec())
-            .andThen(EnvelopeCodec.builder(keys).build())))
-    .rootedIn("prod-2026", secret)                      // the key the digests are under
+    .codecs(new JacksonCodecFactory(objectMapper))      // how values become bytes
+    .encryptedWith(dataKeys)                            // a codec-crypto DataKeyProvider
+    .rootedIn("prod-2026", secret)                      // what the digests are signed under
     .storage(axes);
 ```
 
-So it depends on `occlude-core` and the codec *contract*, and nothing else. Jackson or fory or
-protobuf; gzip or zstd or lz4; envelope encryption or your own KMS.
+`occlude-jdbc` contains no cryptography of its own. Every value, label, audit detail and audit
+context goes through codec's `EnvelopeCodec` — a fresh AES-256-GCM data key per payload, wrapped
+under your key-encryption key and recorded with its id — inside codec's `VersionedCodec`, so each
+payload names the pipeline that wrote it and a later one can be introduced without rewriting what is
+stored.
 
-**Compression before encryption**, always: ciphertext does not compress, so the other order costs
-the same and saves nothing.
+`dataKeys` is yours: a `JceDataKeyProvider` over keys you hold, or a provider backed by your KMS.
+Rotating is adding a key and making it current; what the older one wrapped still decrypts under the
+id recorded in its envelope.
 
-**Compression should be conditional**, because measurement says so — most of what a charter holds
-is small, and a compressor's framing costs more than a short payload saves:
-
-```
-{"number":"4111111111114821","holder":"J CARMAN"}   49 bytes -> gzip 57   BIGGER
-{"v":"4821"}                                        12 bytes -> gzip 32   BIGGER
-an email body                                      851 bytes -> gzip 79   smaller
-```
-
-**Bound your decompression.** The bytes come from a database, and a corrupt or hostile row should
-not expand into an out-of-memory error. That is a property of the compressor you supply.
+**No compression**, deliberately. Compressing before encrypting makes a ciphertext's length depend
+on what its plaintext says — the side channel CRIME and BREACH exploit — and a security library has
+no size to save that is worth it.
 
 A `MemoryStorage` exists for tests and for proving a policy before a database is involved.
 

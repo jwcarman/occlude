@@ -18,17 +18,21 @@ package org.jwcarman.occlude.spring;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.util.Base64;
+import java.util.Map;
+import javax.crypto.spec.SecretKeySpec;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.jwcarman.codec.Codec;
+import org.jwcarman.codec.crypto.DataKeyProvider;
+import org.jwcarman.codec.crypto.JceDataKeyProvider;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.MemoryStorage;
 import org.jwcarman.occlude.Storage;
 import org.jwcarman.occlude.jdbc.JdbcStorage;
-import org.jwcarman.occlude.jdbc.StorageCodec;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Axis;
 import org.postgresql.ds.PGSimpleDataSource;
@@ -70,7 +74,24 @@ class JdbcCharterAutoConfigurationTest {
           // The schema is Postgres -- TIMESTAMPTZ is not H2 -- and it is exercised against a real
           // Postgres in occlude-jdbc. What is under test here is which beans appear and in what
           // order.
-          .withPropertyValues("occlude.migrate=false");
+          .withPropertyValues("occlude.migrate=false")
+          .withPropertyValues(KEYS_AND_ROOT);
+
+  /**
+   * A key and a root generated for this run, the way an application's environment supplies them.
+   */
+  private static final String[] KEYS_AND_ROOT = {
+    "occlude.keys.current=k1",
+    "occlude.keys.keks.k1=" + base64(32),
+    "occlude.roots.current=r1",
+    "occlude.roots.secrets.r1=" + base64(32)
+  };
+
+  private static String base64(int bytes) {
+    byte[] random = new byte[bytes];
+    new SecureRandom().nextBytes(random);
+    return Base64.getEncoder().encodeToString(random);
+  }
 
   @Configuration(proxyBeanMethods = false)
   static class AnApplication {
@@ -83,23 +104,6 @@ class JdbcCharterAutoConfigurationTest {
     @Bean
     DataSource dataSource() {
       return new EmbeddedDatabaseBuilder().setType(EmbeddedDatabaseType.H2).build();
-    }
-
-    @Bean
-    StorageCodec storageCodec() {
-      // Nothing to hide in a test; the point here is the wiring, not the bytes.
-      return StorageCodec.of(
-          new Codec<byte[]>() {
-            @Override
-            public byte[] encode(byte[] value) {
-              return value;
-            }
-
-            @Override
-            public byte[] decode(byte[] encoded) {
-              return encoded;
-            }
-          });
     }
   }
 
@@ -120,37 +124,86 @@ class JdbcCharterAutoConfigurationTest {
   }
 
   /**
-   * Bytes reaching disk untouched is a decision somebody makes, never one they inherit.
-   *
-   * <p>So without a {@link StorageCodec} this module contributes nothing -- and an application that
-   * declared a charter with nowhere to keep anything fails at startup rather than serving requests
-   * that all refuse.
+   * Everything a store keeps is encrypted, so a store without keys is not built -- and an
+   * application that put this module on its classpath hears why at startup rather than serving
+   * requests that all refuse.
    */
   @Test
-  @DisplayName("contributes nothing when nobody said what happens to the bytes")
-  void contributes_nothing_without_a_storage_codec() {
-    runner
-        .withUserConfiguration(NoCodec.class)
+  @DisplayName("refuses to start without keys, and says how to supply them")
+  void refuses_to_start_without_keys() {
+    new ApplicationContextRunner()
+        .withConfiguration(
+            AutoConfigurations.of(
+                CharterAutoConfiguration.class, JdbcCharterAutoConfiguration.class))
+        .withPropertyValues(
+            "occlude.migrate=false",
+            "occlude.roots.current=r1",
+            "occlude.roots.secrets.r1=" + base64(32))
+        .withUserConfiguration(AnApplication.class)
         .run(
             context ->
                 assertThat(context)
                     .hasFailed()
                     .getFailure()
-                    .hasMessageContaining("nothing supplies storage"));
+                    .rootCause()
+                    .hasMessageContaining("occlude.keys.current")
+                    .hasMessageContaining("DataKeyProvider"));
   }
 
-  @Configuration(proxyBeanMethods = false)
-  static class NoCodec {
+  /**
+   * A store used to be rooted in a published constant, which anyone who could write could forge.
+   */
+  @Test
+  @DisplayName("refuses to start without a secret root")
+  void refuses_to_start_without_a_root() {
+    new ApplicationContextRunner()
+        .withConfiguration(
+            AutoConfigurations.of(
+                CharterAutoConfiguration.class, JdbcCharterAutoConfiguration.class))
+        .withPropertyValues(
+            "occlude.migrate=false",
+            "occlude.keys.current=k1",
+            "occlude.keys.keks.k1=" + base64(32))
+        .withUserConfiguration(AnApplication.class)
+        .run(
+            context ->
+                assertThat(context)
+                    .hasFailed()
+                    .getFailure()
+                    .rootCause()
+                    .hasMessageContaining("occlude.roots.current"));
+  }
 
-    @Bean
-    Axes axes() {
-      return Axes.of(TENANT);
-    }
+  @Test
+  @DisplayName("refuses a current root it has no secret for")
+  void refuses_a_current_root_without_a_secret() {
+    runner
+        .withPropertyValues("occlude.roots.current=r2")
+        .withUserConfiguration(AnApplication.class)
+        .run(
+            context ->
+                assertThat(context)
+                    .hasFailed()
+                    .getFailure()
+                    .rootCause()
+                    .hasMessageContaining("no secret by that name"));
+  }
 
-    @Bean
-    DataSource dataSource() {
-      return new EmbeddedDatabaseBuilder().setType(EmbeddedDatabaseType.H2).build();
-    }
+  /** A KMS replaces the configured keys entirely, and nothing here second-guesses it. */
+  @Test
+  @DisplayName("uses the application's own DataKeyProvider over configured keys")
+  void uses_the_applications_own_keys() {
+    DataKeyProvider kms =
+        new JceDataKeyProvider(
+            "kms", Map.of("kms", new SecretKeySpec(Base64.getDecoder().decode(base64(32)), "AES")));
+    runner
+        .withUserConfiguration(AnApplication.class)
+        .withBean(DataKeyProvider.class, () -> kms)
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              assertThat(context.getBean(DataKeyProvider.class)).isSameAs(kms);
+            });
   }
 
   /** An application that brought its own storage keeps it, and this module stays out of the way. */
@@ -178,6 +231,7 @@ class JdbcCharterAutoConfigurationTest {
         .withConfiguration(
             AutoConfigurations.of(
                 CharterAutoConfiguration.class, JdbcCharterAutoConfiguration.class))
+        .withPropertyValues(KEYS_AND_ROOT)
         .withUserConfiguration(AnApplicationOnPostgres.class)
         .run(context -> assertThat(context).hasNotFailed());
 
@@ -208,22 +262,6 @@ class JdbcCharterAutoConfigurationTest {
     @Bean
     DataSource dataSource() {
       return postgresDataSource();
-    }
-
-    @Bean
-    StorageCodec storageCodec() {
-      return StorageCodec.of(
-          new Codec<byte[]>() {
-            @Override
-            public byte[] encode(byte[] value) {
-              return value;
-            }
-
-            @Override
-            public byte[] decode(byte[] encoded) {
-              return encoded;
-            }
-          });
     }
   }
 }

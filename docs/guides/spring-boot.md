@@ -72,8 +72,25 @@ access is nobody in particular.
 
 ## Storage
 
-Contribute a `Storage` bean, or put `occlude-jdbc` on the classpath and give it a `DataSource`, a
-`CodecFactory` and a `StorageCodec`. See [Storage](storage.md).
+Contribute a `Storage` bean, or put `occlude-jdbc` on the classpath and give it a `DataSource`, keys
+and a root. See [Storage](storage.md).
+
+```yaml
+occlude:
+  keys:
+    current: k2
+    keks:
+      k1: ${OCCLUDE_KEK_1}   # base64 AES-256 key-encryption keys
+      k2: ${OCCLUDE_KEK_2}
+  roots:
+    current: r1
+    secrets:
+      r1: ${OCCLUDE_ROOT_1}  # base64
+```
+
+Keys and roots come from the environment or a secret store, never a committed file. A
+`DataKeyProvider` bean — a KMS, Vault — replaces the configured keys entirely. Without keys, or
+without a root, startup fails naming what is missing.
 
 If an application declares a charter and nothing supplies storage, startup fails with a message
 saying so. It used to carry on silently and every portal refused at request time instead.
