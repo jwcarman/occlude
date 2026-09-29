@@ -29,9 +29,9 @@ import java.util.Set;
  * manifest has to say what the whole charter permits, and because two doors under one name or two
  * types under one stored name are mistakes worth refusing at startup.
  *
- * <p>Written only while a charter is being declared, which is single-threaded by contract. A
- * manifest rendered from a request thread after binding reads it unchanged, since binding refuses
- * every further declaration and the binding itself is published through an atomic.
+ * <p>Not thread-safe on its own. {@link DefaultCharter} reads and writes it only under one lock,
+ * the same one binding takes, so a manifest rendered on a request thread sees everything declared
+ * and a declaration cannot slip in after binding.
  */
 final class Declarations {
 

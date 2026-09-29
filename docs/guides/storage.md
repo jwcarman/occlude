@@ -35,6 +35,12 @@ otherwise, which made its record forgeable by anyone who could write its tables.
 each row, so rotating a root does not invalidate what was written under the last one — supply both
 and old rows still verify.
 
+**Rotating a root is not yet retiring one.** A new root signs what comes next; every row keeps the
+root it was signed under, and verifying it needs that root for as long as the row exists. Nothing
+re-signs old rows under a new root yet, so a root that has leaked leaves what it signed forgeable by
+whoever holds it: choose roots to be long-lived, keep them where the database cannot reach, and treat
+a leaked one as an incident to recover from by exporting and re-importing. Re-signing is planned.
+
 **The secret is not in the database.** That is the whole point: an unkeyed chain catches a careless
 edit and nothing else, because whoever removed a line could recompute everything after it. A row
 naming a root nobody supplies is reported as broken rather than crashing the verifier.

@@ -101,7 +101,7 @@ reveal left an allowed line behind (the line is written only once the value is i
 that could not be written replaced the finding (it is attached as suppressed); and parents are read
 in the same query as the row.
 
-Still open: re-signing under a new root (a root, unlike a key, cannot yet be retired).
+Still open: re-signing under a new root (a root, unlike a key, cannot yet be retired). Deferred past 0.1: it rewrites the whole chain and invalidates every published anchor, and deserves its own design. The storage guide states the limitation.
 
 ## Also phase 2
 

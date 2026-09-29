@@ -29,6 +29,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -38,6 +39,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 /** The support desk, driven the way a client drives it. */
 @Testcontainers
 @AutoConfigureTestRestTemplate
+@ActiveProfiles("demo")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DisplayName("The billing support desk")
 class BillingSupportTest {

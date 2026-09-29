@@ -106,20 +106,32 @@ public final class DefaultCharter implements Charter {
   public void bind(Storage storage, AccessContextProvider currentAccess) {
     Objects.requireNonNull(storage, "a charter is bound to a storage");
     Objects.requireNonNull(currentAccess, "a charter is told where identity comes from");
-    operations.bind(axes, storage, currentAccess);
+    synchronized (declarations) {
+      operations.bind(axes, storage, currentAccess);
+    }
   }
 
   /**
-   * Refuses anything further once this charter is in force.
+   * Records a declaration, unless this charter is already in force.
    *
    * <p>A security invariant rather than an ergonomic one: an authority graph that can still grow is
    * not one anybody can reason about.
+   *
+   * <p>Under the same lock as {@link #bind} and {@link #manifest(AccessContext)}. Declaring is
+   * single-threaded by contract, but the contract used to be all that held: a declaration racing
+   * bind on another thread could pass the check, lose the race, and mint a live portal no manifest
+   * listed, and a manifest rendered on a request thread had nothing guaranteeing it saw what the
+   * declaring thread wrote. Now a declaration either lands before binding, where the manifest sees
+   * it, or is refused.
    */
-  private void stillWriting() {
-    if (operations.bound()) {
-      throw new IllegalStateException(
-          "nothing further can be declared: this charter has been bound, and an authority graph"
-              + " that can still grow is not one anybody can reason about");
+  private void declaring(Runnable record) {
+    synchronized (declarations) {
+      if (operations.bound()) {
+        throw new IllegalStateException(
+            "nothing further can be declared: this charter has been bound, and an authority graph"
+                + " that can still grow is not one anybody can reason about");
+      }
+      record.run();
     }
   }
 
@@ -152,8 +164,7 @@ public final class DefaultCharter implements Charter {
     Objects.requireNonNull(name, "a source needs a name");
     Objects.requireNonNull(type, "a source needs to know what it accepts");
     Objects.requireNonNull(labelling, "a source needs to say how it labels what arrives");
-    stillWriting();
-    declarations.source(name, type);
+    declaring(() -> declarations.source(name, type));
     return portals.source(name, type, labelling);
   }
 
@@ -186,9 +197,8 @@ public final class DefaultCharter implements Charter {
         Arrays.stream(reads)
             .map(OccludedType::name)
             .collect(Collectors.toCollection(LinkedHashSet::new));
-    stillWriting();
     SinkSpec sink = Sinks.varying(name, ceiling);
-    declarations.sink(sink, names, reads);
+    declaring(() -> declarations.sink(sink, names, reads));
     return portals.sink(sink, Collections.unmodifiableSet(names));
   }
 
@@ -313,8 +323,7 @@ public final class DefaultCharter implements Charter {
             settings.relabel(),
             settings.availableTo(),
             fold);
-    stillWriting();
-    declarations.derivation(spec);
+    declaring(() -> declarations.derivation(spec));
     return capability.apply(spec);
   }
 
@@ -346,8 +355,7 @@ public final class DefaultCharter implements Charter {
     }
     QuerySpec<I, Q> spec =
         new QuerySpec<>(name, input, asking, settings.ceiling(), settings.availableTo());
-    stillWriting();
-    declarations.query(spec);
+    declaring(() -> declarations.query(spec));
     return portals.query(spec);
   }
 
@@ -371,8 +379,7 @@ public final class DefaultCharter implements Charter {
     Objects.requireNonNull(name, "an erasure needs a name");
     Objects.requireNonNull(mayErase, "an erasure needs a policy");
     ErasureSpec spec = new ErasureSpec(name, mayErase);
-    stillWriting();
-    declarations.erasure(spec);
+    declaring(() -> declarations.erasure(spec));
     return portals.erasure(spec);
   }
 
@@ -387,8 +394,7 @@ public final class DefaultCharter implements Charter {
     Objects.requireNonNull(name, "an inspection needs a name");
     Objects.requireNonNull(ceiling, "an inspection needs a ceiling");
     InspectionSpec spec = new InspectionSpec(name, ceiling);
-    stillWriting();
-    declarations.inspection(spec);
+    declaring(() -> declarations.inspection(spec));
     return portals.inspection(spec);
   }
 
@@ -415,6 +421,8 @@ public final class DefaultCharter implements Charter {
   @Override
   public Manifest manifest(AccessContext as) {
     Objects.requireNonNull(as, "a manifest is rendered for some access, even an empty one");
-    return Manifests.of(declarations, as);
+    synchronized (declarations) {
+      return Manifests.of(declarations, as);
+    }
   }
 }

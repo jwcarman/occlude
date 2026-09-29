@@ -18,7 +18,12 @@ package org.jwcarman.occlude;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -106,6 +111,47 @@ class DefaultCharterInternalsTest {
       assertThatThrownBy(() -> charter.erasure("late", (label, ctx) -> true))
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("has been bound");
+    }
+
+    /**
+     * A declaration racing a bind either lands before it -- and the manifest lists it -- or is
+     * refused. What must never happen is the third outcome: a portal minted after binding that no
+     * manifest knows about.
+     */
+    @Test
+    @DisplayName("lists every declaration that won a race with binding, and refuses the rest")
+    void lists_every_declaration_that_won_the_race() throws Exception {
+      DefaultCharter charter = new DefaultCharter(TENANT);
+      List<String> declared = Collections.synchronizedList(new ArrayList<>());
+      List<Throwable> unexpected = Collections.synchronizedList(new ArrayList<>());
+      CountDownLatch go = new CountDownLatch(1);
+      try (ExecutorService pool = Executors.newFixedThreadPool(4)) {
+        for (int writer = 0; writer < 4; writer++) {
+          int w = writer;
+          pool.submit(
+              () -> {
+                awaitUninterruptibly(go);
+                for (int i = 0; i < 200; i++) {
+                  String name = "erasure-" + w + "-" + i;
+                  try {
+                    charter.erasure(name, (label, ctx) -> true);
+                    declared.add(name);
+                  } catch (IllegalStateException refused) {
+                    if (!refused.getMessage().contains("has been bound")) {
+                      unexpected.add(refused);
+                    }
+                  }
+                }
+              });
+        }
+        go.countDown();
+        charter.bind(new MemoryStorage(), AccessContextProvider.none());
+      }
+
+      assertThat(unexpected).isEmpty();
+      assertThat(charter.manifest().erasures())
+          .extracting(Manifest.Entry::name)
+          .containsExactlyInAnyOrderElementsOf(declared);
     }
 
     private void awaitUninterruptibly(CountDownLatch latch) {

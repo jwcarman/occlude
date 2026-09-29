@@ -6,21 +6,12 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:occlude}
     password: ${SPRING_DATASOURCE_PASSWORD:occlude}
 
-# DEMO secrets, so the example runs as checked out. Never do this outside a demo: a key or root in a
-# committed file protects nothing from anyone who can read the repository. Real deployments supply
-# both from the environment or a secret store, or contribute a DataKeyProvider bean backed by a KMS.
-# Everything stored is encrypted under the current key and signed under the current root; rotate
-# either by adding a new id beside the old one and making it current.
-occlude:
-  keys:
-    current: demo
-    keks:
-      demo: ${OCCLUDE_DEMO_KEK:c2hoLXRoaXMtaXMtYS1kZW1vLWtleS0zMi1ieXRlcyE=}
-  roots:
-    current: demo
-    secrets:
-      demo: ${OCCLUDE_DEMO_ROOT:ZGVtby1yb290LW5vdC1hLXNlY3JldC1hdC1hbGwtZG8tbm90LWRlcGxveQ==}
-
+# No keys and no root here. Real deployments supply both from the environment or a secret store,
+# or contribute a DataKeyProvider bean backed by a KMS; without either, the application refuses to
+# start and says what is missing. To run the example as checked out, activate the demo profile:
+#
+#   ./mvnw -pl occlude-example spring-boot:run -Dspring-boot.run.profiles=demo
+#
 management:
   endpoints:
     web:

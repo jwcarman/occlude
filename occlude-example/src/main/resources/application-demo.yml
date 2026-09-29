@@ -1,0 +1,16 @@
+# DEMO secrets, active only under the demo profile, so the example runs as checked out and nothing
+# else can pick them up by accident. Never do this outside a demo: a key or root in a committed file
+# protects nothing from anyone who can read the repository. Real deployments supply
+# both from the environment or a secret store, or contribute a DataKeyProvider bean backed by a KMS.
+# Everything stored is encrypted under the current key and signed under the current root; rotate
+# either by adding a new id beside the old one and making it current.
+occlude:
+  keys:
+    current: demo
+    keks:
+      demo: ${OCCLUDE_DEMO_KEK:c2hoLXRoaXMtaXMtYS1kZW1vLWtleS0zMi1ieXRlcyE=}
+  roots:
+    current: demo
+    secrets:
+      demo: ${OCCLUDE_DEMO_ROOT:ZGVtby1yb290LW5vdC1hLXNlY3JldC1hdC1hbGwtZG8tbm90LWRlcGxveQ==}
+
