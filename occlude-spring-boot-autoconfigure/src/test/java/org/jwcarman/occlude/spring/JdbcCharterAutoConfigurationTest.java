@@ -189,6 +189,21 @@ class JdbcCharterAutoConfigurationTest {
                     .hasMessageContaining("no secret by that name"));
   }
 
+  @Test
+  @DisplayName("refuses a signing algorithm it does not know, naming the ones it does")
+  void refuses_an_unknown_mac() {
+    runner
+        .withPropertyValues("occlude.roots.mac=HMAC_MD5")
+        .withUserConfiguration(AnApplication.class)
+        .run(
+            context ->
+                assertThat(context)
+                    .hasFailed()
+                    .getFailure()
+                    .rootCause()
+                    .hasMessageContaining("HMAC_SHA512"));
+  }
+
   /** A KMS replaces the configured keys entirely, and nothing here second-guesses it. */
   @Test
   @DisplayName("uses the application's own DataKeyProvider over configured keys")

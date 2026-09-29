@@ -1,6 +1,6 @@
 # Storage, secure by default
 
-Status: phase 1 landed; phase 2 (the record signed over plaintext commitments, algorithm agility, signed heads) agreed, not started.
+Status: phase 1 and phase 2 landed. Row binding of ciphertext (beyond what commitments give), length padding, forward-secure keys and Merkle proofs remain future work.
 
 ## What prompted this
 
@@ -76,9 +76,9 @@ can change the whole pipeline. Two gaps are occlude's, and are phase 2:
 
 ## Also phase 2
 
-- **Binding a ciphertext to its row.** `EnvelopeCodec` supports associated data; binding each
-  payload to its value id would make a ciphertext copied onto another row fail to decrypt rather
-  than wait for a digest check to notice.
+- **Binding a ciphertext to its row.** Commitments bound to the row already refuse a copied
+  ciphertext at read time; `EnvelopeCodec`'s associated data would additionally make it fail to
+  decrypt at all.
 - **Length padding.** Ciphertext length tracks plaintext length. Padding to size buckets would hide
   it, and fits as a pipeline version 2.
 
@@ -102,8 +102,13 @@ not its storage form. Occlude will do the same:
   verifies; only matching ciphertext to its commitment becomes impossible, which is the intent.
 - **The MAC algorithm is recorded with the root**, so a root is a secret and an algorithm, and moving
   algorithms is a root rotation.
-- **Signed heads are published** for anchoring, closing the truncation gap the record already
-  documents: the head, signed, written somewhere the database cannot reach. Forward-secure key
+- **Heads are published** for anchoring, closing the truncation gap the record already documents:
+  `head()` returns a `TrailHead` (the line's position and its digest, itself a MAC under the root)
+  to write down somewhere the database cannot reach, and `stillHolds(head)` checks it later.
+- **Reads are authenticated.** Because digests no longer cover ciphertext, a ciphertext copied in
+  from another row would pass them; every read of a payload or label is checked against its
+  commitment instead, and `reencrypt()` checks each field before rewriting it so it can never
+  launder a swapped ciphertext. Forward-secure key
   evolution and Merkle-tree proofs are the natural next steps and are not in this phase.
 
 ## What changes

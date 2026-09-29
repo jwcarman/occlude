@@ -54,6 +54,7 @@ public final class JdbcStorageConfig {
   private DataKeyProvider dataKeys;
   private String rootId;
   private Function<String, byte[]> roots;
+  private MacAlgorithm mac = MacAlgorithm.HMAC_SHA256;
   private boolean migrate = true;
 
   /** Where the tables are. */
@@ -83,6 +84,17 @@ public final class JdbcStorageConfig {
    */
   public JdbcStorageConfig encryptedWith(DataKeyProvider dataKeys) {
     this.dataKeys = Objects.requireNonNull(dataKeys, "a durable store needs keys to encrypt with");
+    return this;
+  }
+
+  /**
+   * What new values and lines are signed with. HMAC-SHA-256 unless said otherwise.
+   *
+   * <p>Recorded on every row, so changing it takes effect for what comes next and leaves what was
+   * already signed verifying under the algorithm it names. Pair a change with a new root.
+   */
+  public JdbcStorageConfig signedWith(MacAlgorithm mac) {
+    this.mac = Objects.requireNonNull(mac, "a store signs with some algorithm");
     return this;
   }
 
@@ -150,7 +162,8 @@ public final class JdbcStorageConfig {
                 rootId,
                 "a durable store signs its record and its values under a secret it does not hold:"
                     + " call rootedIn(...)"),
-            roots);
+            roots,
+            mac);
     if (migrate) {
       storage.migrate();
     }

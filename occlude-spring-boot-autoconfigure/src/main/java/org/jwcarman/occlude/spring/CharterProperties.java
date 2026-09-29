@@ -105,6 +105,12 @@ public class CharterProperties {
     private String current;
     private Map<String, String> secrets = new LinkedHashMap<>();
 
+    /**
+     * What new values and lines are signed with: HMAC_SHA256, HMAC_SHA384 or HMAC_SHA512. Each row
+     * records its own, so a change applies to what comes next; pair it with a new root.
+     */
+    private String mac = "HMAC_SHA256";
+
     public String getCurrent() {
       return current;
     }
@@ -119,6 +125,14 @@ public class CharterProperties {
 
     public void setSecrets(Map<String, String> secrets) {
       this.secrets = secrets;
+    }
+
+    public String getMac() {
+      return mac;
+    }
+
+    public void setMac(String mac) {
+      this.mac = mac;
     }
   }
 }

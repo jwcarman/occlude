@@ -8,6 +8,16 @@ CREATE TABLE IF NOT EXISTS occlude_value (
   value_type   TEXT        NOT NULL,
   payload      BYTEA       NOT NULL,
   label        BYTEA       NOT NULL,
+  -- What the payload and the label say, committed to under the root: a keyed MAC over each
+  -- plaintext, bound to this value's id so two rows holding the same thing commit differently.
+  --
+  -- The digest below covers these rather than the ciphertext, which is what keeps integrity and
+  -- encryption apart. Re-encrypting a row -- to retire a key, to move to a newer pipeline --
+  -- changes the ciphertext and nothing that is signed. Destroying a key leaves these, so the graph
+  -- still verifies even when what they commit to can no longer be read. A read decrypts and checks
+  -- against them, so a ciphertext swapped in from elsewhere is refused rather than served.
+  payload_commitment BYTEA NOT NULL,
+  label_commitment   BYTEA NOT NULL,
   derivation   TEXT,
   -- No timestamp. When a value was occluded is written down once, in occlude_audit, by the same
   -- transaction that writes this row -- one act, one time. A column here would be a second
@@ -33,7 +43,11 @@ CREATE TABLE IF NOT EXISTS occlude_value (
   -- stored. The same shape the payload codec uses for its keys: a current id to write with, and a
   -- lookup to read older rows back. The id is signed as well, so two stores sharing a secret still
   -- produce different digests.
-  root_id      TEXT        NOT NULL
+  root_id      TEXT        NOT NULL,
+  -- Which MAC the root signed this with, so moving to another is a root rotation rather than a
+  -- rewrite. Signed as well, and read against a short list of acceptable ones, so rewriting it
+  -- cannot talk a verifier down to something weaker.
+  mac          TEXT        NOT NULL
 );
 
 -- The immediate parentage, in the order the parents were given.
@@ -82,6 +96,10 @@ CREATE TABLE IF NOT EXISTS occlude_audit (
   reason      TEXT,
   detail      BYTEA,
   label       BYTEA,
+  -- The detail, the label and the context, committed to under the root and bound to this line's
+  -- place in the chain. The digest covers this rather than their ciphertext, for the reasons given
+  -- on occlude_value: the trail must survive both re-encryption and a destroyed key.
+  commitment  BYTEA       NOT NULL,
   -- Each line names the digest of the line before it. Values hash from their parents. A line has
   -- no parents, only a predecessor, so the trail is a chain where the graph of values is a DAG.
   --
@@ -97,6 +115,7 @@ CREATE TABLE IF NOT EXISTS occlude_audit (
   previous    BYTEA,
   digest      BYTEA       NOT NULL,
   root_id     TEXT        NOT NULL,
+  mac         TEXT        NOT NULL,
   -- Whatever the application calls identity, as JSON through its own codec and then encrypted,
   -- exactly like a label. Not in the clear, because occlude does not know what is in here: an
   -- AccessContext is a map the application fills, so it may hold a tenant, an email address or a

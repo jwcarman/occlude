@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -89,33 +90,39 @@ public final class JdbcStorage implements Storage {
       Codec<byte[]> storageCodec,
       Axes axes,
       String rootId,
-      Function<String, byte[]> roots) {
-    return new JdbcStorage(dataSource, codecs, storageCodec, axes, rootId, roots);
+      Function<String, byte[]> roots,
+      MacAlgorithm mac) {
+    return new JdbcStorage(dataSource, codecs, storageCodec, axes, rootId, roots, mac);
   }
 
   private static final String INSERT_AUDIT =
       """
       INSERT INTO occlude_audit
         (recorded_at, operation, value_id, target, outcome, reason, detail, label, previous, digest,
-         root_id, context)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         root_id, context, commitment, mac)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       """;
 
   private static final String INSERT_VALUE =
       """
       INSERT INTO occlude_value
-        (value_id, value_type, payload, label, derivation, digest, root_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+        (value_id, value_type, payload, label, derivation, digest, root_id, payload_commitment,
+         label_commitment, mac)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       """;
 
   private static final String SELECT_METADATA =
-      "SELECT value_type, label, derivation FROM occlude_value WHERE value_id = ?";
+      "SELECT value_id, value_type, label, label_commitment, derivation, root_id, mac"
+          + " FROM occlude_value WHERE value_id = ?";
   private static final String SELECT_PAYLOAD =
-      "SELECT payload FROM occlude_value WHERE value_id = ?";
+      "SELECT value_id, payload, payload_commitment, root_id, mac"
+          + " FROM occlude_value WHERE value_id = ?";
   private static final String SELECT_METADATA_MANY =
-      "SELECT value_id, value_type, label, derivation FROM occlude_value WHERE value_id = ANY (?)";
+      "SELECT value_id, value_type, label, label_commitment, derivation, root_id, mac"
+          + " FROM occlude_value WHERE value_id = ANY (?)";
   private static final String SELECT_PAYLOAD_MANY =
-      "SELECT value_id, payload FROM occlude_value WHERE value_id = ANY (?)";
+      "SELECT value_id, payload, payload_commitment, root_id, mac"
+          + " FROM occlude_value WHERE value_id = ANY (?)";
   private static final String SELECT_PARENTS =
       "SELECT parent_id FROM occlude_lineage WHERE child_id = ? ORDER BY position";
   private static final String INSERT_PARENT =
@@ -133,6 +140,18 @@ public final class JdbcStorage implements Storage {
   private static final String COL_DERIVATION = "derivation";
   private static final String COL_DIGEST = "digest";
   private static final String COL_PAYLOAD = "payload";
+  private static final String COL_ROOT_ID = "root_id";
+  private static final String COL_MAC = "mac";
+  private static final String COL_COMMITMENT = "commitment";
+  private static final String COL_PAYLOAD_COMMITMENT = "payload_commitment";
+  private static final String COL_LABEL_COMMITMENT = "label_commitment";
+  private static final String COL_DETAIL = "detail";
+  private static final String COL_CONTEXT = "context";
+
+  /** What a commitment is to, so a label's cannot be passed off as a payload's. */
+  private static final String PAYLOAD = "payload";
+
+  private static final String LABEL = "label";
 
   /**
    * Everything reachable from a value, walked at the moment of erasing rather than maintained.
@@ -162,14 +181,16 @@ public final class JdbcStorage implements Storage {
   private final Codec<byte[]> storageCodec;
 
   /**
-   * Serialisation then encryption, for the two things stored as a map of strings that must not be
-   * in the clear: a label, and whatever the application calls identity.
+   * Serialisation alone, for the two things stored as a map of strings: a label, and whatever the
+   * application calls identity. Kept apart from the encryption because what is committed to is the
+   * plaintext these produce, and what is written is that plaintext encrypted.
    */
-  private final Codec<Map<String, String>> protectedMap;
+  private final Codec<Map<String, String>> stringMaps;
 
   private final Axes axes;
   private final String rootId;
   private final Function<String, byte[]> roots;
+  private final MacAlgorithm mac;
   private final Map<String, Codec<?>> byType = new ConcurrentHashMap<>();
 
   private JdbcStorage(
@@ -178,19 +199,19 @@ public final class JdbcStorage implements Storage {
       Codec<byte[]> storageCodec,
       Axes axes,
       String rootId,
-      Function<String, byte[]> roots) {
+      Function<String, byte[]> roots,
+      MacAlgorithm mac) {
     this.dataSource = dataSource;
     this.codecs = codecs;
     this.storageCodec = storageCodec;
     this.axes = axes;
     this.rootId = rootId;
     this.roots = roots;
+    this.mac = mac;
     // One axis at a time, keyed by name. A record would have gone to disk positionally, and then
     // declaring a fourth axis would make every row already written undecodable.
-    this.protectedMap =
-        codecs
-            .create(TypeRef.mapOf(TypeRef.of(String.class), TypeRef.of(String.class)))
-            .andThen(storageCodec);
+    this.stringMaps =
+        codecs.create(TypeRef.mapOf(TypeRef.of(String.class), TypeRef.of(String.class)));
   }
 
   /** Creates the tables if they are not there. */
@@ -320,18 +341,19 @@ public final class JdbcStorage implements Storage {
     // same fact ends up stored twice.
     Predecessor head = lockTrailHead(connection);
     byte[] previous = head.digest();
-    byte[] detail = protect(entry.detail());
-    byte[] label = protect(entry.label());
-    // Encrypted ONCE, then both signed and stored. The envelope is deliberately non-deterministic
-    // -- an authenticated cipher uses a fresh nonce every time -- so encrypting a second copy for
-    // the digest signs bytes no column ever held, and every line fails its own check on read-back.
-    byte[] context = protectedMap.encode(entry.context());
+    byte[] detail = entry.detail().map(text -> text.getBytes(UTF_8)).orElse(null);
+    byte[] label = entry.label().map(text -> text.getBytes(UTF_8)).orElse(null);
+    byte[] context = stringMaps.encode(entry.context());
     // The database's clock, not this process's: a trail signs facts it witnessed, and when some
     // application server believed it decided something is not one of them. Truncated once, because
     // TIMESTAMPTZ keeps microseconds and an Instant offers nanoseconds -- signing what was in hand
     // rather than what reached the column made every line fail its own check when it was read back.
     Instant recordedAt = head.recordedAt().truncatedTo(ChronoUnit.MICROS);
-    byte[] digest = lineDigest(rootId, previous, recordedAt, entry, detail, label, context);
+    // What is signed is a commitment to the plaintext, never its ciphertext, so the line survives
+    // being re-encrypted and survives a destroyed key. Bound to the line's place in the chain, so
+    // two lines saying the same thing do not commit to it identically.
+    byte[] commitment = lineCommitment(rootId, mac, previous, recordedAt, detail, label, context);
+    byte[] digest = lineDigest(rootId, mac, previous, recordedAt, LineFacts.of(entry), commitment);
     try (PreparedStatement statement = connection.prepareStatement(INSERT_AUDIT)) {
       statement.setTimestamp(1, Timestamp.from(recordedAt));
       statement.setString(2, entry.operation().name());
@@ -339,44 +361,58 @@ public final class JdbcStorage implements Storage {
       statement.setString(4, entry.target().orElse(null));
       statement.setString(5, entry.outcome().name());
       statement.setString(6, entry.reason().orElse(null));
-      statement.setBytes(7, detail);
-      statement.setBytes(8, label);
+      statement.setBytes(7, encrypted(detail));
+      statement.setBytes(8, encrypted(label));
       statement.setBytes(9, previous);
       statement.setBytes(10, digest);
       statement.setString(11, rootId);
-      statement.setBytes(12, context);
+      statement.setBytes(12, storageCodec.encode(context));
+      statement.setBytes(13, commitment);
+      statement.setString(14, mac.jcaName());
       statement.executeUpdate();
     }
   }
 
-  /** Label-shaped, so it goes to disk the way a label does and never in the clear. */
-  private byte[] protect(Optional<String> value) {
-    return value.map(text -> storageCodec.encode(text.getBytes(UTF_8))).orElse(null);
+  /** Through the pipeline, keeping an absent field absent. */
+  private byte[] encrypted(byte[] plaintext) {
+    return plaintext == null ? null : storageCodec.encode(plaintext);
+  }
+
+  /** Back out of the pipeline, keeping an absent field absent. */
+  private byte[] decrypted(byte[] ciphertext) {
+    return ciphertext == null ? null : storageCodec.decode(ciphertext);
   }
 
   private void insertValue(Connection connection, String id, StoredValue value)
       throws SQLException {
-    byte[] payload = encode(value.type().type(), value.value());
-    byte[] label = protectedMap.encode(value.label().encode());
+    byte[] payload = serialised(value.type().type(), value.value());
+    byte[] label = stringMaps.encode(value.label().encode());
+    ValueCommitments commitments =
+        new ValueCommitments(
+            valueCommitment(rootId, mac, id, PAYLOAD, payload),
+            valueCommitment(rootId, mac, id, LABEL, label));
     // From the parents, which are immutable and already written, so nothing here is locked and two
     // derivations never wait on each other. A fresh value has none and starts its own graph.
     byte[] digest =
         digestOf(
             rootId,
+            mac,
             id,
             value.type().name(),
-            payload,
-            label,
+            commitments,
             value.lineage().derivation().orElse(null),
             parentDigests(connection, value));
     try (PreparedStatement statement = connection.prepareStatement(INSERT_VALUE)) {
       statement.setString(1, id);
       statement.setString(2, value.type().name());
-      statement.setBytes(3, payload);
-      statement.setBytes(4, label);
+      statement.setBytes(3, storageCodec.encode(payload));
+      statement.setBytes(4, storageCodec.encode(label));
       statement.setString(5, value.lineage().derivation().orElse(null));
       statement.setBytes(6, digest);
       statement.setString(7, rootId);
+      statement.setBytes(8, commitments.payload());
+      statement.setBytes(9, commitments.label());
+      statement.setString(10, mac.jcaName());
       statement.executeUpdate();
     }
   }
@@ -421,21 +457,26 @@ public final class JdbcStorage implements Storage {
    */
   private byte[] digestOfOrNull(
       String under,
+      String algorithm,
       String id,
       String type,
-      byte[] payload,
-      byte[] label,
+      ValueCommitments commitments,
       String derivation,
       List<byte[]> parents) {
+    MacAlgorithm named = MacAlgorithm.named(algorithm);
+    if (named == null) {
+      // A row naming a MAC this store will not verify with is broken, not a reason to use it.
+      return new byte[0];
+    }
     try {
-      return digestOf(under, id, type, payload, label, derivation, parents);
+      return digestOf(under, named, id, type, commitments, derivation, parents);
     } catch (IllegalStateException _) {
       return new byte[0];
     }
   }
 
   /**
-   * What a value hashes to: its own bytes, and whatever it was derived from.
+   * What a value hashes to: what it commits to, and whatever it was derived from.
    *
    * <p>Position matters, so a derivation over the same parents in a different order is a different
    * value. Every field is length-prefixed, so no two different graphs encode to the same bytes by
@@ -447,13 +488,13 @@ public final class JdbcStorage implements Storage {
    */
   private byte[] digestOf(
       String under,
+      MacAlgorithm algorithm,
       String id,
       String type,
-      byte[] payload,
-      byte[] label,
+      ValueCommitments commitments,
       String derivation,
       List<byte[]> parents) {
-    Mac mac = keyed(Domain.VALUE, under);
+    Mac mac = keyed(Domain.VALUE, under, algorithm);
     // Counted before they are fed. The parents are the only run whose length varies, so without a
     // count a value with two parents and a value with one could be fed identical bytes.
     feedCount(mac, parents.size());
@@ -462,8 +503,8 @@ public final class JdbcStorage implements Storage {
     }
     feed(mac, id.getBytes(UTF_8));
     feed(mac, type.getBytes(UTF_8));
-    feed(mac, payload);
-    feed(mac, label);
+    feed(mac, commitments.payload());
+    feed(mac, commitments.label());
     // What made it. Left out, it was free to change: the parents stayed right, the digest stayed
     // right, and lineage() named a derivation that had never run.
     feed(mac, derivation == null ? null : derivation.getBytes(UTF_8));
@@ -479,7 +520,8 @@ public final class JdbcStorage implements Storage {
    */
   private enum Domain {
     VALUE,
-    LINE
+    LINE,
+    COMMITMENT
   }
 
   /**
@@ -488,21 +530,78 @@ public final class JdbcStorage implements Storage {
    * <p>Named, so rotating a root does not invalidate what was written under the last one. The id is
    * signed too, so two stores sharing a secret still produce different digests.
    */
-  private Mac keyed(Domain domain, String id) {
+  private Mac keyed(Domain domain, String id, MacAlgorithm algorithm) {
     byte[] secret = roots.apply(id);
     if (secret == null) {
       throw new IllegalStateException(
           "nothing supplies the root '" + id + "', which some of this was written under");
     }
     try {
-      Mac mac = Mac.getInstance("HmacSHA256");
-      mac.init(new SecretKeySpec(secret, "HmacSHA256"));
+      Mac mac = Mac.getInstance(algorithm.jcaName());
+      mac.init(new SecretKeySpec(secret, algorithm.jcaName()));
       mac.update((byte) domain.ordinal());
       feed(mac, id.getBytes(UTF_8));
+      // The algorithm is signed too, so a row cannot claim one it was not signed with.
+      feed(mac, algorithm.jcaName().getBytes(UTF_8));
       return mac;
     } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-      throw new IllegalStateException("this JVM cannot compute HMAC-SHA256", e);
+      throw new IllegalStateException("this JVM cannot compute " + algorithm.jcaName(), e);
     }
+  }
+
+  /** What a value's payload and label commit to, fed to its digest in that order. */
+  private record ValueCommitments(byte[] payload, byte[] label) {
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof ValueCommitments(byte[] thatPayload, byte[] thatLabel)
+          && Arrays.equals(payload, thatPayload)
+          && Arrays.equals(label, thatLabel);
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * Arrays.hashCode(payload) + Arrays.hashCode(label);
+    }
+
+    @Override
+    public String toString() {
+      return "ValueCommitments";
+    }
+  }
+
+  /**
+   * A keyed commitment to one field of one value.
+   *
+   * <p>Keyed, because an unkeyed hash of a small value -- a last-4, a role -- is found by trying
+   * them all. Bound to the value's id and to which field it is, so equal plaintexts in two rows
+   * commit differently and a label's commitment cannot stand in for a payload's.
+   */
+  private byte[] valueCommitment(
+      String under, MacAlgorithm algorithm, String id, String field, byte[] plaintext) {
+    Mac commitment = keyed(Domain.COMMITMENT, under, algorithm);
+    feed(commitment, id.getBytes(UTF_8));
+    feed(commitment, field.getBytes(UTF_8));
+    feed(commitment, plaintext);
+    return commitment.doFinal();
+  }
+
+  /** A keyed commitment to a line's protected fields, bound to its place in the chain. */
+  private byte[] lineCommitment(
+      String under,
+      MacAlgorithm algorithm,
+      byte[] previous,
+      Instant recordedAt,
+      byte[] detail,
+      byte[] label,
+      byte[] context) {
+    Mac commitment = keyed(Domain.COMMITMENT, under, algorithm);
+    feed(commitment, previous);
+    feed(commitment, recordedAt.toString().getBytes(UTF_8));
+    feed(commitment, detail);
+    feed(commitment, label);
+    feed(commitment, context);
+    return commitment.doFinal();
   }
 
   /** How many of whatever follows, so two different shapes cannot feed the same bytes. */
@@ -635,24 +734,12 @@ public final class JdbcStorage implements Storage {
 
   private byte[] lineDigest(
       String under,
-      byte[] previous,
-      Instant recordedAt,
-      AuditRecord entry,
-      byte[] detail,
-      byte[] label,
-      byte[] context) {
-    return lineDigest(under, previous, recordedAt, LineFacts.of(entry), detail, label, context);
-  }
-
-  private byte[] lineDigest(
-      String under,
+      MacAlgorithm algorithm,
       byte[] previous,
       Instant recordedAt,
       LineFacts facts,
-      byte[] detail,
-      byte[] label,
-      byte[] context) {
-    Mac mac = keyed(Domain.LINE, under);
+      byte[] commitment) {
+    Mac mac = keyed(Domain.LINE, under, algorithm);
     feed(mac, previous);
     feed(mac, recordedAt.toString().getBytes(UTF_8));
     feed(mac, facts.operation().getBytes(UTF_8));
@@ -660,23 +747,24 @@ public final class JdbcStorage implements Storage {
     feed(mac, facts.target() == null ? null : facts.target().getBytes(UTF_8));
     feed(mac, facts.outcome().getBytes(UTF_8));
     feed(mac, facts.reason() == null ? null : facts.reason().getBytes(UTF_8));
-    feed(mac, detail);
-    feed(mac, label);
-    feed(mac, context);
+    feed(mac, commitment);
     return mac.doFinal();
   }
 
   /** The digest of one trail line, or empty when it cannot be checked at all. */
   private Optional<byte[]> lineDigestIfSigned(
       String under,
+      String algorithm,
       byte[] previous,
       Instant recordedAt,
       LineFacts facts,
-      byte[] detail,
-      byte[] label,
-      byte[] context) {
+      byte[] commitment) {
+    MacAlgorithm named = MacAlgorithm.named(algorithm);
+    if (named == null) {
+      return Optional.empty();
+    }
     try {
-      return Optional.of(lineDigest(under, previous, recordedAt, facts, detail, label, context));
+      return Optional.of(lineDigest(under, named, previous, recordedAt, facts, commitment));
     } catch (IllegalStateException _) {
       return Optional.empty();
     }
@@ -688,20 +776,173 @@ public final class JdbcStorage implements Storage {
    * <p>The one thing verification cannot do on its own is notice lines cut from the end: what
    * remains is a valid trail that simply stopped earlier, and no structure over data an attacker
    * controls can say otherwise. An anchor is the answer -- write this down elsewhere, periodically,
-   * and compare. It is one digest, so a log line or a printout will do.
+   * and compare with {@link #stillHolds(TrailHead)}. It is one line, so a log entry or a printout
+   * will do.
    *
    * @return the head, or empty when nothing has been recorded yet
    */
-  public byte[] head() {
+  public Optional<TrailHead> head() {
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement =
             connection.prepareStatement(
-                "SELECT digest FROM occlude_audit ORDER BY entry_id DESC LIMIT 1");
+                "SELECT entry_id, digest FROM occlude_audit ORDER BY entry_id DESC LIMIT 1");
         ResultSet rows = statement.executeQuery()) {
-      return rows.next() ? rows.getBytes(COL_DIGEST) : new byte[0];
+      return rows.next()
+          ? Optional.of(new TrailHead(rows.getLong(COL_ENTRY_ID), rows.getBytes(COL_DIGEST)))
+          : Optional.empty();
     } catch (SQLException e) {
       throw new IllegalStateException("could not read the head of the trail", e);
     }
+  }
+
+  /**
+   * Whether the trail still contains a head published earlier, exactly as it was.
+   *
+   * <p>False when that line is gone -- the trail was cut back past it -- or says something else.
+   * Together with {@link #firstBrokenEntry()}, which says everything up to the end agrees with
+   * itself, this is what notices truncation.
+   */
+  public boolean stillHolds(TrailHead anchor) {
+    Objects.requireNonNull(anchor, "an anchor must not be null");
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement("SELECT digest FROM occlude_audit WHERE entry_id = ?")) {
+      statement.setLong(1, anchor.entryId());
+      try (ResultSet rows = statement.executeQuery()) {
+        return rows.next() && Arrays.equals(rows.getBytes(COL_DIGEST), anchor.digest());
+      }
+    } catch (SQLException e) {
+      throw new IllegalStateException("could not look for the anchor in the trail", e);
+    }
+  }
+
+  /** How many rows one re-encryption transaction takes, so none holds its locks for long. */
+  private static final int REENCRYPT_PAGE = 500;
+
+  /**
+   * Re-encrypts everything this store holds under its current keys and pipeline.
+   *
+   * <p>What makes a key retirable. Every value's payload and label, and every line's detail, label
+   * and context, is decrypted, checked against the commitment signed for it, and encrypted again
+   * under the key and pipeline version this store writes with now. Nothing signed changes -- the
+   * digests cover commitments, not ciphertext -- so the trail and the value graph verify exactly as
+   * before, and once this returns the old key protects nothing and can be destroyed.
+   *
+   * <p>A field that does not match its commitment stops the run rather than being re-encrypted:
+   * encrypting it afresh would launder a ciphertext somebody swapped in into one that looks like
+   * this store wrote it. Pages are committed as they go, so an interrupted run is resumed by
+   * running it again; a field already under the current key is simply re-encrypted once more.
+   *
+   * <p>Every key a stored field names must still be available while this runs.
+   *
+   * @return how many rows were rewritten
+   * @throws IllegalStateException if a field is not what was signed for it
+   */
+  public int reencrypt() {
+    int rewritten = 0;
+    String afterValue = "";
+    while (afterValue != null) {
+      String from = afterValue;
+      Page<String> page =
+          inTransactionReturning(
+              "could not re-encrypt values", connection -> reencryptValues(connection, from));
+      rewritten += page.rewritten();
+      afterValue = page.last();
+    }
+    Long afterLine = 0L;
+    while (afterLine != null) {
+      long from = afterLine;
+      Page<Long> page =
+          inTransactionReturning(
+              "could not re-encrypt the trail", connection -> reencryptLines(connection, from));
+      rewritten += page.rewritten();
+      afterLine = page.last();
+    }
+    return rewritten;
+  }
+
+  /** One page of a re-encryption: how many rows it rewrote, and where the next one starts. */
+  private record Page<K>(int rewritten, K last) {}
+
+  private Page<String> reencryptValues(Connection connection, String after) throws SQLException {
+    // Shared, as deriving takes it: an erasure waits for this page rather than deadlocking on the
+    // rows it has locked, and derivations proceed alongside it.
+    lockLineageShared(connection);
+    String last = null;
+    int rewritten = 0;
+    try (PreparedStatement select =
+            connection.prepareStatement(
+                """
+                SELECT value_id, payload, label, payload_commitment, label_commitment, root_id, mac
+                  FROM occlude_value WHERE value_id > ? ORDER BY value_id LIMIT ? FOR UPDATE
+                """);
+        PreparedStatement update =
+            connection.prepareStatement(
+                "UPDATE occlude_value SET payload = ?, label = ? WHERE value_id = ?")) {
+      select.setString(1, after);
+      select.setInt(2, REENCRYPT_PAGE);
+      try (ResultSet rows = select.executeQuery()) {
+        while (rows.next()) {
+          last = rows.getString(COL_VALUE_ID);
+          update.setBytes(1, storageCodec.encode(payloadOf(rows)));
+          update.setBytes(2, storageCodec.encode(labelPlaintextOf(rows)));
+          update.setString(3, last);
+          update.addBatch();
+          rewritten++;
+        }
+      }
+      update.executeBatch();
+    }
+    return new Page<>(rewritten, rewritten < REENCRYPT_PAGE ? null : last);
+  }
+
+  private Page<Long> reencryptLines(Connection connection, long after) throws SQLException {
+    Long last = null;
+    int rewritten = 0;
+    try (PreparedStatement select =
+            connection.prepareStatement(
+                """
+                SELECT entry_id, recorded_at, previous, detail, label, context, commitment, root_id,
+                       mac
+                  FROM occlude_audit WHERE entry_id > ? ORDER BY entry_id LIMIT ? FOR UPDATE
+                """);
+        PreparedStatement update =
+            connection.prepareStatement(
+                "UPDATE occlude_audit SET detail = ?, label = ?, context = ? WHERE entry_id = ?")) {
+      select.setLong(1, after);
+      select.setInt(2, REENCRYPT_PAGE);
+      try (ResultSet rows = select.executeQuery()) {
+        while (rows.next()) {
+          last = rows.getLong(COL_ENTRY_ID);
+          byte[] detail = decrypted(rows.getBytes(COL_DETAIL));
+          byte[] label = decrypted(rows.getBytes(COL_LABEL));
+          byte[] context = storageCodec.decode(rows.getBytes(COL_CONTEXT));
+          MacAlgorithm algorithm = MacAlgorithm.named(rows.getString(COL_MAC));
+          if (algorithm == null
+              || !MessageDigest.isEqual(
+                  lineCommitment(
+                      rows.getString(COL_ROOT_ID),
+                      algorithm,
+                      rows.getBytes("previous"),
+                      rows.getTimestamp("recorded_at").toInstant(),
+                      detail,
+                      label,
+                      context),
+                  rows.getBytes(COL_COMMITMENT))) {
+            throw new IllegalStateException(
+                "line " + last + " of the trail is not what was signed for it");
+          }
+          update.setBytes(1, encrypted(detail));
+          update.setBytes(2, encrypted(label));
+          update.setBytes(3, storageCodec.encode(context));
+          update.setLong(4, last);
+          update.addBatch();
+          rewritten++;
+        }
+      }
+      update.executeBatch();
+    }
+    return new Page<>(rewritten, rewritten < REENCRYPT_PAGE ? null : last);
   }
 
   /**
@@ -718,8 +959,8 @@ public final class JdbcStorage implements Storage {
         PreparedStatement statement =
             connection.prepareStatement(
                 """
-                SELECT entry_id, recorded_at, operation, value_id, target, outcome, reason, detail, label,
-                       previous, digest, root_id, context
+                SELECT entry_id, recorded_at, operation, value_id, target, outcome, reason,
+                       previous, digest, root_id, commitment, mac
                 FROM occlude_audit ORDER BY entry_id
                 """);
         ResultSet rows = statement.executeQuery()) {
@@ -739,15 +980,16 @@ public final class JdbcStorage implements Storage {
                 rows.getString("target"),
                 rows.getString("outcome"),
                 rows.getString("reason"));
+        // Commitments rather than ciphertext, so no key is needed here: the trail verifies even
+        // after the key that encrypted a line has been destroyed.
         Optional<byte[]> digest =
             lineDigestIfSigned(
-                rows.getString("root_id"),
+                rows.getString(COL_ROOT_ID),
+                rows.getString(COL_MAC),
                 previous,
                 rows.getTimestamp("recorded_at").toInstant(),
                 facts,
-                rows.getBytes("detail"),
-                rows.getBytes(COL_LABEL),
-                rows.getBytes("context"));
+                rows.getBytes(COL_COMMITMENT));
         if (digest.isEmpty() || !Arrays.equals(digest.get(), rows.getBytes(COL_DIGEST))) {
           return Optional.of(rows.getLong(COL_ENTRY_ID));
         }
@@ -819,8 +1061,8 @@ public final class JdbcStorage implements Storage {
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement =
             connection.prepareStatement(
-                "SELECT value_id, value_type, payload, label, digest, root_id, derivation"
-                    + " FROM occlude_value ORDER BY value_id");
+                "SELECT value_id, value_type, payload_commitment, label_commitment, digest,"
+                    + " root_id, mac, derivation FROM occlude_value ORDER BY value_id");
         ResultSet rows = statement.executeQuery()) {
       Map<String, ValueRow> byId = loadValueRows(rows);
       List<String> broken = verifyToFixpoint(connection, byId);
@@ -839,7 +1081,12 @@ public final class JdbcStorage implements Storage {
    * the first thing to put one in a set would get a silently wrong answer.
    */
   private record ValueRow(
-      byte[] digest, byte[] payload, byte[] label, String derivation, String type, String rootId) {
+      byte[] digest,
+      ValueCommitments commitments,
+      String derivation,
+      String type,
+      String rootId,
+      String mac) {
 
     @Override
     public boolean equals(Object other) {
@@ -847,34 +1094,28 @@ public final class JdbcStorage implements Storage {
               instanceof
               ValueRow(
                   byte[] otherDigest,
-                  byte[] otherPayload,
-                  byte[] otherLabel,
+                  ValueCommitments otherCommitments,
                   String otherDerivation,
                   String otherType,
-                  String otherRootId)
+                  String otherRootId,
+                  String otherMac)
           && Arrays.equals(digest, otherDigest)
-          && Arrays.equals(payload, otherPayload)
-          && Arrays.equals(label, otherLabel)
+          && Objects.equals(commitments, otherCommitments)
           && Objects.equals(derivation, otherDerivation)
           && Objects.equals(type, otherType)
-          && Objects.equals(rootId, otherRootId);
+          && Objects.equals(rootId, otherRootId)
+          && Objects.equals(mac, otherMac);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(
-          Arrays.hashCode(digest),
-          Arrays.hashCode(payload),
-          Arrays.hashCode(label),
-          derivation,
-          type,
-          rootId);
+      return Objects.hash(Arrays.hashCode(digest), commitments, derivation, type, rootId, mac);
     }
 
     @Override
     public String toString() {
-      // Never the bytes: a payload is the value this library exists to keep out of a log line.
-      return "ValueRow[type=%s, derivation=%s, rootId=%s]".formatted(type, derivation, rootId);
+      return "ValueRow[type=%s, derivation=%s, rootId=%s, mac=%s]"
+          .formatted(type, derivation, rootId, mac);
     }
   }
 
@@ -886,11 +1127,12 @@ public final class JdbcStorage implements Storage {
           id,
           new ValueRow(
               rows.getBytes(COL_DIGEST),
-              rows.getBytes(COL_PAYLOAD),
-              rows.getBytes(COL_LABEL),
+              new ValueCommitments(
+                  rows.getBytes(COL_PAYLOAD_COMMITMENT), rows.getBytes(COL_LABEL_COMMITMENT)),
               rows.getString(COL_DERIVATION),
               rows.getString(COL_VALUE_TYPE),
-              rows.getString("root_id")));
+              rows.getString(COL_ROOT_ID),
+              rows.getString(COL_MAC)));
     }
     return byId;
   }
@@ -926,10 +1168,10 @@ public final class JdbcStorage implements Storage {
         byte[] computed =
             digestOfOrNull(
                 row.rootId(),
+                row.mac(),
                 id,
                 row.type(),
-                row.payload(),
-                row.label(),
+                row.commitments(),
                 row.derivation(),
                 parents);
         if (Arrays.equals(computed, row.digest())) {
@@ -990,7 +1232,7 @@ public final class JdbcStorage implements Storage {
         if (!rows.next()) {
           return Optional.empty();
         }
-        Label label = Label.decode(protectedMap.decode(rows.getBytes(COL_LABEL)), axes);
+        Label label = labelOf(rows);
         String derivation = rows.getString(COL_DERIVATION);
         Lineage lineage =
             derivation == null
@@ -1015,7 +1257,7 @@ public final class JdbcStorage implements Storage {
       try (ResultSet rows = statement.executeQuery()) {
         while (rows.next()) {
           String id = rows.getString(COL_VALUE_ID);
-          Label label = Label.decode(protectedMap.decode(rows.getBytes(COL_LABEL)), axes);
+          Label label = labelOf(rows);
           String derivation = rows.getString(COL_DERIVATION);
           Lineage lineage =
               derivation == null
@@ -1042,7 +1284,7 @@ public final class JdbcStorage implements Storage {
       try (ResultSet rows = statement.executeQuery()) {
         while (rows.next()) {
           String id = rows.getString(COL_VALUE_ID);
-          found.put(id, codecFor(wanted.get(id)).decode(rows.getBytes(COL_PAYLOAD)));
+          found.put(id, serialiserFor(wanted.get(id)).decode(payloadOf(rows)));
         }
       }
       return found;
@@ -1060,7 +1302,7 @@ public final class JdbcStorage implements Storage {
         if (!rows.next()) {
           return Optional.empty();
         }
-        return Optional.of(codecFor(type).decode(rows.getBytes(COL_PAYLOAD)));
+        return Optional.of(serialiserFor(type).decode(payloadOf(rows)));
       }
     } catch (SQLException e) {
       throw new IllegalStateException("could not read " + id, e);
@@ -1121,16 +1363,52 @@ public final class JdbcStorage implements Storage {
   }
 
   @SuppressWarnings("unchecked")
-  private byte[] encode(TypeRef<?> type, Object value) {
-    return ((Codec<Object>) codecFor(type)).encode(value);
+  private byte[] serialised(TypeRef<?> type, Object value) {
+    return ((Codec<Object>) serialiserFor(type)).encode(value);
   }
 
-  /** Serialise, then whatever the application said happens to bytes on the way to the table. */
+  /** How values of this type become bytes, before anything protects them. */
   @SuppressWarnings("unchecked")
-  private <T> Codec<T> codecFor(TypeRef<T> type) {
+  private <T> Codec<T> serialiserFor(TypeRef<T> type) {
     return (Codec<T>)
-        byType.computeIfAbsent(
-            type.getType().getTypeName(), name -> codecs.create(type).andThen(storageCodec));
+        byType.computeIfAbsent(type.getType().getTypeName(), name -> codecs.create(type));
+  }
+
+  /**
+   * A row's label, decrypted and checked against what was signed for it.
+   *
+   * <p>The digests cover commitments rather than ciphertext, so a ciphertext copied in from another
+   * row would pass every digest check. Checking each read against its commitment is what refuses
+   * it.
+   */
+  private Label labelOf(ResultSet rows) throws SQLException {
+    return Label.decode(stringMaps.decode(labelPlaintextOf(rows)), axes);
+  }
+
+  private byte[] labelPlaintextOf(ResultSet rows) throws SQLException {
+    byte[] plaintext = storageCodec.decode(rows.getBytes(COL_LABEL));
+    faithful(rows, LABEL, plaintext, rows.getBytes(COL_LABEL_COMMITMENT));
+    return plaintext;
+  }
+
+  /** A row's payload, decrypted and checked against what was signed for it. */
+  private byte[] payloadOf(ResultSet rows) throws SQLException {
+    byte[] plaintext = storageCodec.decode(rows.getBytes(COL_PAYLOAD));
+    faithful(rows, PAYLOAD, plaintext, rows.getBytes(COL_PAYLOAD_COMMITMENT));
+    return plaintext;
+  }
+
+  private void faithful(ResultSet rows, String field, byte[] plaintext, byte[] committed)
+      throws SQLException {
+    String id = rows.getString(COL_VALUE_ID);
+    MacAlgorithm algorithm = MacAlgorithm.named(rows.getString(COL_MAC));
+    if (algorithm == null
+        || !MessageDigest.isEqual(
+            valueCommitment(rows.getString(COL_ROOT_ID), algorithm, id, field, plaintext),
+            committed)) {
+      throw new IllegalStateException(
+          "the " + field + " stored for " + id + " is not what was signed for it");
+    }
   }
 
   private String read(String resource) {

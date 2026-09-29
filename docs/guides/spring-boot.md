@@ -86,6 +86,7 @@ occlude:
     current: r1
     secrets:
       r1: ${OCCLUDE_ROOT_1}  # base64
+    mac: HMAC_SHA256         # or HMAC_SHA384, HMAC_SHA512
 ```
 
 Keys and roots come from the environment or a secret store, never a committed file. A

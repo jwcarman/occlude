@@ -15,6 +15,7 @@
  */
 package org.jwcarman.occlude.spring;
 
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -29,6 +30,7 @@ import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.Storage;
 import org.jwcarman.occlude.jdbc.JdbcStorage;
 import org.jwcarman.occlude.jdbc.JdbcStorageConfig;
+import org.jwcarman.occlude.jdbc.MacAlgorithm;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -135,11 +137,28 @@ public class JdbcCharterAutoConfiguration {
             .dataSource(dataSource)
             .codecs(codecs)
             .encryptedWith(keys)
-            .rootedIn(roots.getCurrent(), secrets::get);
+            .rootedIn(roots.getCurrent(), secrets::get)
+            .signedWith(macNamed(roots.getMac()));
     if (!properties.isMigrate()) {
       jdbc.withoutMigration();
     }
     return jdbc.storage(charter.axes());
+  }
+
+  /**
+   * A signing algorithm by name, and a message listing the choices rather than a bare enum error.
+   */
+  private static MacAlgorithm macNamed(String name) {
+    return Arrays.stream(MacAlgorithm.values())
+        .filter(algorithm -> algorithm.name().equals(name))
+        .findFirst()
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "occlude.roots.mac is '"
+                        + name
+                        + "'; it must be one of "
+                        + Arrays.toString(MacAlgorithm.values())));
   }
 
   /** Base64, and a message naming which entry was not, rather than a bare decoder exception. */

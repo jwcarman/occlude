@@ -110,12 +110,22 @@ class JdbcStorageWhiteboxTest {
   private Object newValueRow(
       byte[] digest, byte[] payload, byte[] label, String derivation, String type, String rootId)
       throws ReflectiveOperationException {
+    Class<?> commitmentsType =
+        Class.forName("org.jwcarman.occlude.jdbc.JdbcStorage$ValueCommitments");
+    Constructor<?> commitments = commitmentsType.getDeclaredConstructor(byte[].class, byte[].class);
+    commitments.setAccessible(true);
     Constructor<?> ctor =
         Class.forName("org.jwcarman.occlude.jdbc.JdbcStorage$ValueRow")
             .getDeclaredConstructor(
-                byte[].class, byte[].class, byte[].class, String.class, String.class, String.class);
+                byte[].class,
+                commitmentsType,
+                String.class,
+                String.class,
+                String.class,
+                String.class);
     ctor.setAccessible(true);
-    return ctor.newInstance(digest, payload, label, derivation, type, rootId);
+    return ctor.newInstance(
+        digest, commitments.newInstance(payload, label), derivation, type, rootId, "HmacSHA256");
   }
 
   private Object aValueRow() throws ReflectiveOperationException {

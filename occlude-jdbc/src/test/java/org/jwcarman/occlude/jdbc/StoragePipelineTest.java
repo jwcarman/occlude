@@ -74,7 +74,7 @@ class StoragePipelineTest {
   void does_not_compress() {
     byte[] repetitive = "a".repeat(4096).getBytes(StandardCharsets.UTF_8);
 
-    assertThat(pipeline.encode(repetitive).length).isGreaterThan(repetitive.length);
+    assertThat(pipeline.encode(repetitive)).hasSizeGreaterThan(repetitive.length);
   }
 
   @Test

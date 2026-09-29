@@ -347,8 +347,65 @@ class JdbcCharterTest {
     assertThat(storage.brokenValues()).isEmpty();
   }
 
+  /**
+   * The digests cover what a value commits to, not its ciphertext, so an edited ciphertext is
+   * caught where it matters: the moment somebody reads it.
+   */
   @Test
-  @DisplayName("notices a value somebody edited, and everything derived from it")
+  @DisplayName("refuses to read a value whose ciphertext was edited")
+  void refuses_to_read_an_edited_ciphertext() throws SQLException {
+    Occluded<Card> card = card();
+
+    try (Connection connection = dataSource.getConnection();
+        var statement =
+            connection.prepareStatement(
+                "UPDATE occlude_value SET payload = ? WHERE value_id = ?")) {
+      statement.setBytes(1, "not what was stored".getBytes(StandardCharsets.UTF_8));
+      statement.setString(2, card.id());
+      assertThat(statement.executeUpdate()).isPositive();
+    }
+
+    TypeRef<Card> cardType = TypeRef.of(Card.class);
+    assertThatThrownBy(() -> storage.value(card.id(), cardType))
+        .isInstanceOf(RuntimeException.class);
+  }
+
+  /**
+   * A well-formed ciphertext copied from another row decrypts perfectly -- same key, same pipeline.
+   * Only its commitment, bound to the row it was written for, can tell.
+   */
+  @Test
+  @DisplayName("refuses to read a ciphertext copied in from another value")
+  void refuses_a_ciphertext_copied_from_another_value() throws SQLException {
+    Occluded<Card> mine = card();
+    // Another tenant's, so its label says something different from mine and a swapped label would
+    // move my card into globex's reach.
+    edge.set(AccessContext.of("tenant", "globex"));
+    Occluded<Card> other = cards.occlude(new Card("4000056655665556", "SOMEBODY ELSE"));
+
+    try (Connection connection = dataSource.getConnection();
+        var statement =
+            connection.prepareStatement(
+                "UPDATE occlude_value SET payload = (SELECT payload FROM occlude_value WHERE"
+                    + " value_id = ?), label = (SELECT label FROM occlude_value WHERE value_id = ?)"
+                    + " WHERE value_id = ?")) {
+      statement.setString(1, other.id());
+      statement.setString(2, other.id());
+      statement.setString(3, mine.id());
+      assertThat(statement.executeUpdate()).isPositive();
+    }
+
+    TypeRef<Card> cardType = TypeRef.of(Card.class);
+    assertThatThrownBy(() -> storage.value(mine.id(), cardType))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("not what was signed");
+    assertThatThrownBy(() -> storage.metadata(mine.id()))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("not what was signed");
+  }
+
+  @Test
+  @DisplayName("notices a value whose commitment was edited, and everything derived from it")
   void notices_an_edited_value() throws SQLException {
     Occluded<Card> card = card();
     Occluded<Last4> last4 = cardLast4.derive(card).orThrow();
@@ -356,8 +413,8 @@ class JdbcCharterTest {
     try (Connection connection = dataSource.getConnection();
         var statement =
             connection.prepareStatement(
-                "UPDATE occlude_value SET payload = ? WHERE value_id = ?")) {
-      statement.setBytes(1, "not what was stored".getBytes(StandardCharsets.UTF_8));
+                "UPDATE occlude_value SET payload_commitment = ? WHERE value_id = ?")) {
+      statement.setBytes(1, "not what was signed".getBytes(StandardCharsets.UTF_8));
       statement.setString(2, card.id());
       assertThat(statement.executeUpdate()).isPositive();
     }
@@ -711,7 +768,7 @@ class JdbcCharterTest {
    * an attacker controls can tell you about entries they deleted.
    *
    * <p>Closing it takes something outside: the head digest published where whoever can write to
-   * this database cannot reach, and compared afterwards. {@link JdbcStorage#head()} is that digest.
+   * this database cannot reach, and checked afterwards with {@link JdbcStorage#stillHolds}.
    */
   @Test
   @DisplayName("cannot notice lines cut from the end, which is what an anchor is for")
@@ -719,7 +776,8 @@ class JdbcCharterTest {
     card();
     edge.set(AccessContext.of("tenant", "acme"));
     vendorLlm.reveal(card());
-    byte[] anchored = storage.head();
+    TrailHead anchored = storage.head().orElseThrow();
+    assertThat(storage.stillHolds(anchored)).isTrue();
 
     try (Connection connection = dataSource.getConnection();
         var statement = connection.createStatement()) {
@@ -733,7 +791,8 @@ class JdbcCharterTest {
     // The chain still agrees with itself, which is exactly the problem.
     assertThat(storage.firstBrokenEntry()).isEmpty();
     // And the head somebody wrote down elsewhere is what gives it away.
-    assertThat(storage.head()).isNotEqualTo(anchored);
+    assertThat(storage.stillHolds(anchored)).isFalse();
+    assertThat(storage.head()).isNotEqualTo(Optional.of(anchored));
   }
 
   @Test
@@ -1290,7 +1349,7 @@ class JdbcCharterTest {
   }
 
   @Test
-  @DisplayName("the head of an empty trail is empty, not absent")
+  @DisplayName("an empty trail has no head")
   void head_of_an_empty_trail_is_empty() {
     assertThat(storage.head()).isEmpty();
   }
