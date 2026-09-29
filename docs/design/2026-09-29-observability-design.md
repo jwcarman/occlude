@@ -38,13 +38,17 @@ describe the system rather than any value in it. They are the same ones the mani
 
 | Key | Values | Cardinality |
 |---|---|---|
-| `operation` | `conceal`, `reveal`, `derive`, `query`, `erase`, `inspect` | 6 |
-| `portal` | the declared name (`note-desk`, `shout`) | as many as were declared |
-| `outcome` | `allowed`, `refused`, `failed` | 3 |
-| `reason` | the coarse code (`ABOVE_CEILING`, `NO_SUCH_VALUE`, `NOT_AS_SIGNED`, `UNREADABLE`...) or `none` | enumerated |
-| `error` | the simple class name of anything thrown, or `none` | small |
+| `occlude.operation` | `conceal`, `reveal`, `derive`, `query`, `erase`, `inspect` | 6 |
+| `occlude.portal` | the declared name (`note-desk`, `shout`) | as many as were declared |
+| `occlude.outcome` | `allowed`, `refused`, `failed` | 3 |
+| `occlude.reason` | the coarse code (`ABOVE_CEILING`, `NO_SUCH_VALUE`, `NOT_AS_SIGNED`, `UNREADABLE`...) or `none` | enumerated |
+| `error.type` | the fully-qualified class name of anything thrown, or `none` | small |
 
-The observation itself is named `occlude.operation`.
+The observation itself is named `occlude.operation`. OpenTelemetry's semantic conventions have
+nothing for authorization decisions, so these follow the general rules: a library's own attributes
+are namespaced with its name, and `error.type` is the convention's attribute for the class of error
+an operation ended with. The `user.*` and `enduser.*` attributes exist and are deliberately never
+set.
 
 Every value is either an enum or a name fixed at startup, so cardinality is bounded by the charter
 itself.
@@ -93,31 +97,36 @@ ends with the result it returns:
 
 - a granted result: `occlude.outcome=allowed`
 - a refused result: `occlude.outcome=refused`, `occlude.reason=<the reason's name>`
-- an exception: `occlude.outcome=failed`, `error=<the exception's class name>`, then rethrown
+- an exception: `occlude.outcome=failed`, `error.type=<the exception's class name>`, then rethrown
 
 Occlude owns what goes on the observation, and that is where the rule above is enforced:
 
 - **Key values come from an `OccludeObservationConvention`** that sets only the keys in the table
   above. Applications may replace it the way Micrometer expects, and the default is the safe one.
-- **`observation.error(e)` is never called.** It attaches the exception, and Micrometer's handlers
-  and the tracing bridges put its message on the span, where a storage exception's message names a
-  value id. The failure is recorded as the `error` key value, by class name, instead.
+- **`observation.error(e)` is never given the real exception.** Micrometer's handlers and the
+  tracing bridges put its message on the span, where a storage exception's message names a value
+  id. When an exception ends an operation, the observation is given an `OccludeFailure` whose
+  message is only the real class name, with no cause and no stack trace, so the span is still
+  marked as an error. A refusal returned as a result is not an error and marks nothing, as a 4xx
+  does not mark a server's span.
 - **An `ObservationDocumentation` enum lists every key**, so the conventions are discoverable, and
   a test can assert nothing else ever appears.
 
 `NOT_AS_SIGNED` and `UNREADABLE` surface as exceptions from `Trail.reading` rather than refused
-results. Whether they are `refused` with their reason or `failed` with the exception's class is an
-open question, below.
+results; they are `refused` with their reason, and `error.type` names the exception.
 
 Measuring is not auditing. The trail stays the one record of what happened, written in the same
 transaction as what it describes. An observation is best-effort: a handler that throws never
 changes the outcome of the operation it was watching.
 
-### The Spring starter passes the registry in
+### The Spring starter uses Spring Boot's registry
 
-When an `ObservationRegistry` bean exists — Spring Boot configures one whenever Actuator is present
-— the binder adds it to the bindings. Spring Boot's `DefaultMeterObservationHandler` then turns
-each observation into a timer (`occlude.operation`, with count, latency and an active gauge), and a
+The auto-configuration depends on Spring Boot's `spring-boot-micrometer-observation` module and
+runs after its `ObservationAutoConfiguration`, which defines the registry `@ConditionalOnMissingBean`.
+So there is always a registry, and the binder injects it directly, the way Boot's own observation
+auto-configurations do; an application's own registry replaces Boot's. It records nothing until a
+handler is added. With Actuator, Spring Boot's `DefaultMeterObservationHandler` turns each
+observation into a timer (`occlude.operation`, with count, latency and an active gauge), and a
 tracing bridge, if there is one, into a span. Nothing about this needs an Occlude-specific handler
 or adapter.
 
@@ -137,8 +146,9 @@ occlude:
 
 Each run:
 
-- is an observation, `occlude.integrity`, tagged `result` = `intact`, `unreadable`, `altered` or
-  `failed`. A timer per result is enough to alert on (`result="altered"` increasing) and needs no
+- is an observation, `occlude.integrity`, tagged `occlude.integrity.result` = `intact`,
+  `unreadable`, `altered` or `failed`. A timer per result is enough to alert on (`altered`
+  increasing) and needs no
   dependency beyond the one core already has; gauges would have needed `micrometer-core`.
 - logs at ERROR when anything is altered or the trail is broken, and WARN for unreadable values,
   with counts only, never ids (the ids are in the sweep's result for whoever investigates)

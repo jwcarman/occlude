@@ -47,7 +47,7 @@ public class DefaultOccludeObservationConvention implements OccludeObservationCo
         LowCardinalityKeys.PORTAL.withValue(context.getPortal()),
         LowCardinalityKeys.OUTCOME.withValue(context.getOutcome().value()),
         LowCardinalityKeys.REASON.withValue(orNone(context.getReason())),
-        LowCardinalityKeys.ERROR.withValue(orNone(context.getErrorType())));
+        LowCardinalityKeys.ERROR_TYPE.withValue(orNone(context.getErrorType())));
   }
 
   private static String operation(OccludeObservationContext context) {

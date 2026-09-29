@@ -23,6 +23,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.jwcarman.occlude.jdbc.IntegrityReport;
 import org.jwcarman.occlude.jdbc.StorageIntegrity;
+import org.jwcarman.occlude.observation.OccludeFailure;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
@@ -31,11 +32,11 @@ import org.springframework.context.SmartLifecycle;
  * Checks the store on a schedule, so tampering is noticed by somebody rather than by whoever next
  * happens to read the altered row.
  *
- * <p>Each run is an observation, {@code occlude.integrity}, tagged {@code result} = {@code intact},
- * {@code unreadable}, {@code altered} or {@code failed}: a timer to alert on, with no new
- * dependency. What was found is logged as counts -- which rows, {@link StorageIntegrity#check()}
- * names for whoever investigates -- along with the trail's head, so anchoring can be as simple as
- * shipping that line somewhere the database's writers cannot reach.
+ * <p>Each run is an observation, {@code occlude.integrity}, tagged {@code occlude.integrity.result}
+ * = {@code intact}, {@code unreadable}, {@code altered} or {@code failed}: a timer to alert on,
+ * with no new dependency. What was found is logged as counts -- which rows, {@link
+ * StorageIntegrity#check()} names for whoever investigates -- along with the trail's head, so
+ * anchoring can be as simple as shipping that line somewhere the database's writers cannot reach.
  *
  * <p>A run that cannot finish, during a key service outage say, is {@code failed} and changes
  * nothing else: it does not claim the store was checked and found clean.
@@ -43,6 +44,9 @@ import org.springframework.context.SmartLifecycle;
 public class IntegrityMonitor implements SmartLifecycle {
 
   private static final Logger log = LoggerFactory.getLogger(IntegrityMonitor.class);
+
+  /** The run's result, namespaced as the semantic conventions ask of a library's attributes. */
+  static final String RESULT = "occlude.integrity.result";
 
   private final StorageIntegrity integrity;
   private final Duration interval;
@@ -82,10 +86,11 @@ public class IntegrityMonitor implements SmartLifecycle {
     observation.start();
     try {
       IntegrityReport report = integrity.check();
-      observation.lowCardinalityKeyValue("result", resultOf(report));
+      observation.lowCardinalityKeyValue(RESULT, resultOf(report));
       logged(report);
     } catch (RuntimeException e) {
-      observation.lowCardinalityKeyValue("result", "failed");
+      observation.lowCardinalityKeyValue(RESULT, "failed");
+      observation.error(new OccludeFailure(e));
       log.warn(
           "occlude could not finish checking its store ({}); nothing is concluded from this run",
           e.getClass().getName());

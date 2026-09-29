@@ -57,6 +57,7 @@ import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.boot.actuate.autoconfigure.endpoint.EndpointAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.micrometer.observation.autoconfigure.ObservationAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -89,7 +90,9 @@ class CharterAutoConfigurationTest {
 
   private final ApplicationContextRunner runner =
       new ApplicationContextRunner()
-          .withConfiguration(AutoConfigurations.of(CharterAutoConfiguration.class));
+          .withConfiguration(
+              AutoConfigurations.of(
+                  ObservationAutoConfiguration.class, CharterAutoConfiguration.class));
 
   /** What an application contributes: its vocabulary, and somewhere to keep things. */
   @Configuration(proxyBeanMethods = false)
@@ -386,7 +389,9 @@ class CharterAutoConfigurationTest {
         runner
             .withConfiguration(
                 AutoConfigurations.of(
-                    CharterEndpointAutoConfiguration.class, EndpointAutoConfiguration.class))
+                    ObservationAutoConfiguration.class,
+                    CharterEndpointAutoConfiguration.class,
+                    EndpointAutoConfiguration.class))
             .withUserConfiguration(ARichApplication.class)
             .withPropertyValues("management.endpoints.web.exposure.include=charter");
 
@@ -480,7 +485,9 @@ class CharterAutoConfigurationTest {
     return runner
         .withConfiguration(
             AutoConfigurations.of(
-                CharterEndpointAutoConfiguration.class, EndpointAutoConfiguration.class))
+                ObservationAutoConfiguration.class,
+                CharterEndpointAutoConfiguration.class,
+                EndpointAutoConfiguration.class))
         .withUserConfiguration(AnApplication.class);
   }
 
@@ -517,7 +524,11 @@ class CharterAutoConfigurationTest {
   @DisplayName("binds against storage contributed by a later auto-configuration")
   void binds_against_storage_contributed_later() {
     new ApplicationContextRunner()
-        .withConfiguration(AutoConfigurations.of(CharterAutoConfiguration.class, LateStorage.class))
+        .withConfiguration(
+            AutoConfigurations.of(
+                ObservationAutoConfiguration.class,
+                CharterAutoConfiguration.class,
+                LateStorage.class))
         .withUserConfiguration(NoStorage.class)
         .run(
             context -> {
@@ -548,7 +559,9 @@ class CharterAutoConfigurationTest {
   @DisplayName("fails to start when an application declares a charter and supplies no storage")
   void fails_to_start_without_storage() {
     new ApplicationContextRunner()
-        .withConfiguration(AutoConfigurations.of(CharterAutoConfiguration.class))
+        .withConfiguration(
+            AutoConfigurations.of(
+                ObservationAutoConfiguration.class, CharterAutoConfiguration.class))
         .withUserConfiguration(NoStorage.class)
         .run(
             context ->
@@ -606,9 +619,9 @@ class CharterAutoConfigurationTest {
             });
   }
 
-  /** Telemetry is the application's: its registry, when it has one, sees every operation. */
+  /** An application's own registry replaces Spring Boot's, and sees every operation. */
   @Test
-  @DisplayName("observes every operation through the application's registry")
+  @DisplayName("observes every operation through a registry the application contributes")
   void observes_through_the_applications_registry() {
     runner
         .withUserConfiguration(AnApplication.class, Observed.class)
@@ -626,6 +639,47 @@ class CharterAutoConfigurationTest {
               assertThat(context.getBean(Observed.class).names)
                   .containsExactly("occlude.operation");
             });
+  }
+
+  /**
+   * Out of the box: Spring Boot's registry, and whatever handler beans the application has -- which
+   * is all Actuator or a tracing bridge contributes -- see every operation.
+   */
+  @Test
+  @DisplayName("observes through Spring Boot's registry and the application's handlers")
+  void observes_through_spring_boots_registry() {
+    runner
+        .withUserConfiguration(AnApplication.class, AHandler.class)
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              Occlude<String> notes =
+                  context
+                      .<Occlude<String>>getBeanProvider(
+                          ResolvableType.forClassWithGenerics(Occlude.class, String.class))
+                      .getObject();
+
+              notes.occlude("a note");
+
+              assertThat(context.getBean(AHandler.class).names)
+                  .containsExactly("occlude.operation");
+            });
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class AHandler implements ObservationHandler<Observation.Context> {
+
+    private final List<String> names = new ArrayList<>();
+
+    @Override
+    public boolean supportsContext(Observation.Context context) {
+      return true;
+    }
+
+    @Override
+    public void onStop(Observation.Context context) {
+      names.add(context.getName());
+    }
   }
 
   @Configuration(proxyBeanMethods = false)

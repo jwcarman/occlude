@@ -20,6 +20,7 @@ import io.micrometer.observation.ObservationRegistry;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 import org.jwcarman.occlude.observation.DefaultOccludeObservationConvention;
+import org.jwcarman.occlude.observation.OccludeFailure;
 import org.jwcarman.occlude.observation.OccludeObservationContext;
 import org.jwcarman.occlude.observation.OccludeObservationDocumentation;
 import org.jwcarman.occlude.storage.AuditRecord;
@@ -33,9 +34,11 @@ import org.jwcarman.occlude.storage.StorageUnreadableException;
  * is a timer and a span at once, and a trace shows the database calls inside the operation that
  * made them.
  *
- * <p>Never {@code observation.error(e)}. It attaches the exception, and handlers and tracing
- * bridges put its message on the span, where a storage exception's message names a value. What was
- * thrown is recorded by class name on the context instead.
+ * <p>Never {@code observation.error(e)} with the real exception. Handlers and tracing bridges put
+ * its message on the span, where a storage exception's message names a value. When an exception
+ * ends an operation the observation is given an {@link OccludeFailure} carrying only the class
+ * name, so the span is still marked as failed; a refusal returned as a result is not a failure and
+ * marks nothing.
  *
  * <p>Telemetry never decides an outcome: a handler that throws is ignored, and the operation ends
  * exactly as it would have with nobody watching.
@@ -68,16 +71,16 @@ final class Observing {
       return result;
     } catch (StorageIntegrityException e) {
       context.refused(Trail.NOT_AS_SIGNED, e);
-      throw e;
+      throw failed(observation, e);
     } catch (StorageUnreadableException e) {
       context.refused(Trail.UNREADABLE, e);
-      throw e;
+      throw failed(observation, e);
     } catch (RefusedException e) {
       context.refused(e.reason(), null);
       throw e;
     } catch (RuntimeException e) {
       context.failed(e);
-      throw e;
+      throw failed(observation, e);
     } finally {
       quietly(scope::close);
       quietly(observation::stop);
@@ -117,6 +120,15 @@ final class Observing {
     if (result instanceof Inspected.Refused refused) {
       context.refused(refused.reason().name(), null);
     }
+  }
+
+  /**
+   * Marks the observation as failed, with nothing of the exception but its class, and hands it
+   * back.
+   */
+  private static RuntimeException failed(Observation observation, RuntimeException thrown) {
+    quietly(() -> observation.error(new OccludeFailure(thrown)));
+    return thrown;
   }
 
   private static Observation.Scope scoped(Observation observation) {

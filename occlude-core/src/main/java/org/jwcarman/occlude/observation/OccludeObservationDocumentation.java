@@ -39,18 +39,24 @@ public enum OccludeObservationDocumentation implements ObservationDocumentation 
     }
   };
 
-  /** The only keys. None of them can carry a value, an identifier, a label or an identity. */
+  /**
+   * The only keys. None of them can carry a value, an identifier, a label or an identity.
+   *
+   * <p>Namespaced, as OpenTelemetry's semantic conventions ask of a library's own attributes, and
+   * so nothing here collides with a framework's {@code outcome} on the same span. {@code
+   * error.type} is the convention's own attribute for the class of error an operation ended with.
+   */
   public enum LowCardinalityKeys implements KeyName {
     /** conceal, reveal, derive, query, erase or inspect. */
-    OPERATION("operation"),
+    OPERATION("occlude.operation"),
     /** The portal's declared name. */
-    PORTAL("portal"),
+    PORTAL("occlude.portal"),
     /** allowed, refused or failed. */
-    OUTCOME("outcome"),
+    OUTCOME("occlude.outcome"),
     /** The coarse reason code for a refusal, or none. */
-    REASON("reason"),
-    /** The simple class name of what was thrown, or none. */
-    ERROR("error");
+    REASON("occlude.reason"),
+    /** The fully-qualified class name of what was thrown, or none. */
+    ERROR_TYPE("error.type");
 
     private final String key;
 

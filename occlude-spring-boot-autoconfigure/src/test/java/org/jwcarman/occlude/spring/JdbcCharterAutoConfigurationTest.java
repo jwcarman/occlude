@@ -39,6 +39,7 @@ import org.jwcarman.occlude.storage.Storage;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.micrometer.observation.autoconfigure.ObservationAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -72,7 +73,9 @@ class JdbcCharterAutoConfigurationTest {
       new ApplicationContextRunner()
           .withConfiguration(
               AutoConfigurations.of(
-                  CharterAutoConfiguration.class, JdbcCharterAutoConfiguration.class))
+                  ObservationAutoConfiguration.class,
+                  CharterAutoConfiguration.class,
+                  JdbcCharterAutoConfiguration.class))
           // The schema is Postgres -- TIMESTAMPTZ is not H2 -- and it is exercised against a real
           // Postgres in occlude-jdbc. What is under test here is which beans appear and in what
           // order.
@@ -192,7 +195,9 @@ class JdbcCharterAutoConfigurationTest {
     new ApplicationContextRunner()
         .withConfiguration(
             AutoConfigurations.of(
-                CharterAutoConfiguration.class, JdbcCharterAutoConfiguration.class))
+                ObservationAutoConfiguration.class,
+                CharterAutoConfiguration.class,
+                JdbcCharterAutoConfiguration.class))
         .withPropertyValues(
             "occlude.migrate=false",
             "occlude.roots.current=r1",
@@ -216,7 +221,9 @@ class JdbcCharterAutoConfigurationTest {
     new ApplicationContextRunner()
         .withConfiguration(
             AutoConfigurations.of(
-                CharterAutoConfiguration.class, JdbcCharterAutoConfiguration.class))
+                ObservationAutoConfiguration.class,
+                CharterAutoConfiguration.class,
+                JdbcCharterAutoConfiguration.class))
         .withPropertyValues(
             "occlude.migrate=false",
             "occlude.keys.current=k1",
@@ -345,7 +352,9 @@ class JdbcCharterAutoConfigurationTest {
     new ApplicationContextRunner()
         .withConfiguration(
             AutoConfigurations.of(
-                CharterAutoConfiguration.class, JdbcCharterAutoConfiguration.class))
+                ObservationAutoConfiguration.class,
+                CharterAutoConfiguration.class,
+                JdbcCharterAutoConfiguration.class))
         .withPropertyValues(KEYS_AND_ROOT)
         .withUserConfiguration(AnApplicationOnPostgres.class)
         .run(context -> assertThat(context).hasNotFailed());

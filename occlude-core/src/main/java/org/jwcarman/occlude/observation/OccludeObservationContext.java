@@ -76,7 +76,7 @@ public class OccludeObservationContext extends Observation.Context {
     return reason;
   }
 
-  /** The simple class name of what was thrown, or {@code null}. Never its message. */
+  /** The fully-qualified class name of what was thrown, or {@code null}. Never its message. */
   public String getErrorType() {
     return errorType;
   }
@@ -85,13 +85,13 @@ public class OccludeObservationContext extends Observation.Context {
   public void refused(String reason, Throwable thrown) {
     this.outcome = Outcome.REFUSED;
     this.reason = reason;
-    this.errorType = thrown == null ? null : thrown.getClass().getSimpleName();
+    this.errorType = thrown == null ? null : thrown.getClass().getName();
   }
 
   /** It failed with this, which was not a decision. */
   public void failed(Throwable thrown) {
     this.outcome = Outcome.FAILED;
     this.reason = null;
-    this.errorType = thrown.getClass().getSimpleName();
+    this.errorType = thrown.getClass().getName();
   }
 }

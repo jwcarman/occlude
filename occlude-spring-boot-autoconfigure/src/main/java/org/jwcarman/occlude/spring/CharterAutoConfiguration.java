@@ -24,13 +24,13 @@ import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.storage.Storage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.micrometer.observation.autoconfigure.ObservationAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 
 /**
@@ -47,7 +47,7 @@ import org.springframework.context.annotation.Bean;
  * it the same way: {@code @Bean(name = CharterAutoConfiguration.STORAGE, defaultCandidate =
  * false)}.
  */
-@AutoConfiguration
+@AutoConfiguration(after = ObservationAutoConfiguration.class)
 @EnableConfigurationProperties(CharterProperties.class)
 public class CharterAutoConfiguration {
 
@@ -100,27 +100,23 @@ public class CharterAutoConfiguration {
    * none fails to start, with Spring's own report of the missing bean, rather than serving requests
    * that all refuse. It is asked for by name, which is what finds a store no other bean can.
    *
-   * <p>Every operation is observed through the application's {@link ObservationRegistry} when it
-   * has one -- Spring Boot configures one alongside Actuator -- and through nothing otherwise.
-   * Looked for rather than defaulted with a bean of our own: the registry is the application's, and
-   * a no-op one contributed here could stand in for Spring Boot's and silence every other library's
-   * telemetry with it.
+   * <p>Every operation is observed through Spring Boot's {@link ObservationRegistry}, which is
+   * always there: this module depends on Boot's observation auto-configuration and runs after it,
+   * as Boot's own observation auto-configurations do. With no handler it records nothing; Actuator
+   * or a tracing bridge adds one, and every operation shows up.
    */
   @Bean
   @ConditionalOnBean(Axes.class)
   public SmartInitializingSingleton charterBinder(
       @Qualifier(STORAGE) Storage storage,
       AccessContextProvider access,
-      ObjectProvider<ObservationRegistry> observations,
+      ObservationRegistry observations,
       CharterProperties properties) {
     return () -> {
       if (constituted == null) {
         return;
       }
-      constituted.bind(
-          Bindings.of(storage)
-              .withIdentity(access)
-              .observedBy(observations.getIfAvailable(() -> ObservationRegistry.NOOP)));
+      constituted.bind(Bindings.of(storage).withIdentity(access).observedBy(observations));
       if (properties.isLogManifest()) {
         log.info("\n{}", constituted.manifest());
       }

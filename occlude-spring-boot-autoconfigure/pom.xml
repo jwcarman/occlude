@@ -31,6 +31,16 @@
   <name>Occlude :: Spring Boot AutoConfigure</name>
 
   <dependencies>
+    <!-- Spring Boot's own ObservationRegistry, wherever this runs: every operation is observed
+         through a real registry, which exports nothing until Actuator or a tracing bridge adds a
+         handler. Required rather than optional, so the registry is injected like any other bean.
+         Not the OpenTelemetry starter, whose exporters would try to reach a collector most
+         applications do not have. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-micrometer-observation</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>org.jwcarman.occlude</groupId>
       <artifactId>occlude-jdbc</artifactId>
@@ -76,6 +86,7 @@
       <artifactId>spring-boot-test</artifactId>
       <scope>test</scope>
     </dependency>
+
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-test</artifactId>

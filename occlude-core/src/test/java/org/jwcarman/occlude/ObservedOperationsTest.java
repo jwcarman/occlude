@@ -38,6 +38,7 @@ import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.observation.OccludeFailure;
 import org.jwcarman.occlude.observation.OccludeObservationContext;
 import org.jwcarman.occlude.observation.OccludeObservationDocumentation;
 import org.jwcarman.occlude.storage.AuditRecord;
@@ -176,7 +177,7 @@ class ObservedOperationsTest {
     erasure.erase(held);
 
     assertThat(observed)
-        .extracting(context -> tags(context).get("operation") + " " + context.getPortal())
+        .extracting(context -> tags(context).get("occlude.operation") + " " + context.getPortal())
         .containsExactly(
             "conceal notes",
             "reveal desk",
@@ -189,9 +190,9 @@ class ObservedOperationsTest {
         .allSatisfy(
             context ->
                 assertThat(tags(context))
-                    .containsEntry("outcome", "allowed")
-                    .containsEntry("reason", "none")
-                    .containsEntry("error", "none"));
+                    .containsEntry("occlude.outcome", "allowed")
+                    .containsEntry("occlude.reason", "none")
+                    .containsEntry("error.type", "none"));
     assertThat(last().getName()).isEqualTo("occlude.operation");
     assertThat(last().getContextualName()).isEqualTo("occlude erase erasure");
   }
@@ -203,22 +204,22 @@ class ObservedOperationsTest {
 
     elsewhere.reveal(held);
     assertThat(tags(last()))
-        .containsEntry("outcome", "refused")
-        .containsEntry("reason", "ABOVE_CEILING");
+        .containsEntry("occlude.outcome", "refused")
+        .containsEntry("occlude.reason", "ABOVE_CEILING");
     barred.ask(held, "x");
-    assertThat(tags(last())).containsEntry("reason", "ABOVE_CEILING");
+    assertThat(tags(last())).containsEntry("occlude.reason", "ABOVE_CEILING");
     whisper.derive(held);
-    assertThat(tags(last())).containsEntry("reason", "ABOVE_CEILING");
+    assertThat(tags(last())).containsEntry("occlude.reason", "ABOVE_CEILING");
     outsider.inspect(held);
-    assertThat(tags(last())).containsEntry("reason", "ABOVE_CEILING");
+    assertThat(tags(last())).containsEntry("occlude.reason", "ABOVE_CEILING");
     never.erase(held);
-    assertThat(tags(last())).containsEntry("reason", "NOT_PERMITTED");
+    assertThat(tags(last())).containsEntry("occlude.reason", "NOT_PERMITTED");
     assertThatThrownBy(() -> unlabelled.occlude("x")).isInstanceOf(RefusedException.class);
     assertThat(tags(last()))
-        .containsEntry("operation", "conceal")
-        .containsEntry("outcome", "refused")
-        .containsEntry("reason", "SOURCE_CANNOT_LABEL")
-        .containsEntry("error", "none");
+        .containsEntry("occlude.operation", "conceal")
+        .containsEntry("occlude.outcome", "refused")
+        .containsEntry("occlude.reason", "SOURCE_CANNOT_LABEL")
+        .containsEntry("error.type", "none");
   }
 
   @Test
@@ -230,13 +231,13 @@ class ObservedOperationsTest {
         new StorageIntegrityException("the payload stored for " + held.id() + " is altered");
     assertThatThrownBy(() -> desk.reveal(held)).isInstanceOf(StorageIntegrityException.class);
     assertThat(tags(last()))
-        .containsEntry("outcome", "refused")
-        .containsEntry("reason", "NOT_AS_SIGNED")
-        .containsEntry("error", "StorageIntegrityException");
+        .containsEntry("occlude.outcome", "refused")
+        .containsEntry("occlude.reason", "NOT_AS_SIGNED")
+        .containsEntry("error.type", StorageIntegrityException.class.getName());
 
     storage.onValue = new StorageUnreadableException("would not decrypt " + held.id(), null);
     assertThatThrownBy(() -> desk.reveal(held)).isInstanceOf(StorageUnreadableException.class);
-    assertThat(tags(last())).containsEntry("reason", "UNREADABLE");
+    assertThat(tags(last())).containsEntry("occlude.reason", "UNREADABLE");
   }
 
   @Test
@@ -248,9 +249,9 @@ class ObservedOperationsTest {
     assertThatThrownBy(() -> desk.reveal(held)).isInstanceOf(IllegalStateException.class);
 
     assertThat(tags(last()))
-        .containsEntry("outcome", "failed")
-        .containsEntry("reason", "none")
-        .containsEntry("error", "IllegalStateException");
+        .containsEntry("occlude.outcome", "failed")
+        .containsEntry("occlude.reason", "none")
+        .containsEntry("error.type", IllegalStateException.class.getName());
   }
 
   /** The rule the whole design rests on, as a test a later change cannot quietly break. */
@@ -265,6 +266,7 @@ class ObservedOperationsTest {
     assertThatThrownBy(() -> desk.reveal(held)).isInstanceOf(StorageIntegrityException.class);
 
     assertThat(observed).hasSize(4);
+    assertThat(observed).filteredOn(context -> context.getError() != null).hasSize(1);
     for (OccludeObservationContext context : observed) {
       String everything =
           context.getName()
@@ -275,7 +277,13 @@ class ObservedOperationsTest {
           .doesNotContain("hello")
           .doesNotContain("acme")
           .doesNotContain("dana");
-      assertThat(context.getError()).isNull();
+      if (context.getError() != null) {
+        assertThat(context.getError())
+            .isInstanceOf(OccludeFailure.class)
+            .hasMessage(StorageIntegrityException.class.getName())
+            .hasNoCause();
+        assertThat(context.getError().getStackTrace()).isEmpty();
+      }
     }
   }
 

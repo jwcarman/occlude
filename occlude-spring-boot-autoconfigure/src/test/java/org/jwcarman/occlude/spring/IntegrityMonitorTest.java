@@ -88,7 +88,7 @@ class IntegrityMonitorTest {
 
               @Override
               public void onStop(Observation.Context context) {
-                results.add(context.getLowCardinalityKeyValue("result").getValue());
+                results.add(context.getLowCardinalityKeyValue(IntegrityMonitor.RESULT).getValue());
               }
             });
     logged.start();

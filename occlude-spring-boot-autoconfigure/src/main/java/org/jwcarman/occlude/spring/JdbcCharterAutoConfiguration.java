@@ -32,7 +32,6 @@ import org.jwcarman.occlude.jdbc.JdbcStorage;
 import org.jwcarman.occlude.jdbc.JdbcStorageConfig;
 import org.jwcarman.occlude.jdbc.MacAlgorithm;
 import org.jwcarman.occlude.jdbc.StorageIntegrity;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -168,19 +167,15 @@ public class JdbcCharterAutoConfiguration {
     /**
      * The store checked on a schedule, when {@code occlude.integrity.interval} says how often.
      *
-     * <p>Each run is observed through the application's registry when it has one, for the same
-     * reason operations are: the registry is the application's.
+     * <p>Each run is observed through Spring Boot's registry, like every operation.
      */
     @Bean
     @ConditionalOnProperty(prefix = "occlude.integrity", name = "interval")
     public IntegrityMonitor integrityMonitor(
         StorageIntegrity integrity,
         CharterProperties properties,
-        ObjectProvider<ObservationRegistry> observations) {
-      return new IntegrityMonitor(
-          integrity,
-          properties.getIntegrity().getInterval(),
-          observations.getIfAvailable(() -> ObservationRegistry.NOOP));
+        ObservationRegistry observations) {
+      return new IntegrityMonitor(integrity, properties.getIntegrity().getInterval(), observations);
     }
 
     /**
