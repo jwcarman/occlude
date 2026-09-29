@@ -28,9 +28,10 @@ no size to save that is worth it.
 
 ## Roots
 
-`rootedIn(name, secret)` names the secret the digests are computed under. There is no default: a
-store used to be rooted in a published constant unless told otherwise, which made its record
-forgeable by anyone who could write its tables. The name is stored with
+`rootedIn(name, secret)` names the secret the digests are computed under. It must be at least 32
+bytes, random, and kept outside the database: the record is exactly as hard to forge as the root is
+to guess. There is no default: a store used to be rooted in a published constant unless told
+otherwise, which made its record forgeable by anyone who could write its tables. The name is stored with
 each row, so rotating a root does not invalidate what was written under the last one — supply both
 and old rows still verify.
 
@@ -54,7 +55,10 @@ That keeps integrity and encryption apart, the way established audit systems do:
   the trail and the graph still verify; only the plaintext is gone.
 - **Every read is checked.** A payload or label is decrypted and compared with its commitment before
   it is used, so a ciphertext copied in from another row — which would decrypt perfectly — is refused
-  rather than served.
+  rather than served. The commitments also cover the value's type, what made it and from which
+  parents, so none of those can be rewritten underneath it either. A read that finds tampering throws
+  `StorageIntegrityException`, and the operation records a refused line with reason `NOT_AS_SIGNED`
+  before the exception reaches the caller.
 
 ## Signing algorithm
 
@@ -74,6 +78,22 @@ again under the current key and pipeline version. Afterwards nothing needs the o
 provider can drop it. A field that does not match its commitment stops the run instead of being
 re-encrypted, because encrypting it afresh would make a swapped ciphertext look like this store wrote
 it. Pages commit as they go; an interrupted run is finished by running it again.
+
+## Sweeping
+
+The digest checks need only the root; checking ciphertext against its commitments needs the keys, so
+it is a separate pass:
+
+```java
+Sweep sweep = storage.sweep();
+sweep.intact();            // nothing altered
+sweep.alteredValues();     // decrypted, but not what was signed: proof of tampering
+sweep.unreadableValues();  // would not decrypt with the keys at hand
+```
+
+*Unreadable* is what a destroyed key looks like, and also what a damaged ciphertext looks like; only
+whoever manages the keys can tell which, so the sweep reports it apart from *altered* rather than
+guessing.
 
 ## Anchoring
 
@@ -115,6 +135,7 @@ transaction and restored afterwards, because the chain's ordering depends on it.
 storage.firstBrokenEntry();   // check the chain first
 storage.brokenValues();
 storage.missingValues();
+storage.sweep();              // and the ciphertext, which needs the keys
 ```
 
 See [The Record](../concepts/the-record.md).

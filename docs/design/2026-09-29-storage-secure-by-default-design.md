@@ -74,6 +74,25 @@ can change the whole pipeline. Two gaps are occlude's, and are phase 2:
    authenticates its whole header, wrapped key included, as GCM associated data. Re-encrypting audit
    lines breaks the chain, which signs their encrypted bytes; phase 2 below resolves it.
 
+## What review changed (2026-09-29)
+
+An adversarial review of phase 2 found, and these fix:
+
+- **An unverifiable row matched a blanked digest.** A row naming an unknown MAC or root computed an
+  empty digest, which a writer could match by clearing the stored one. Unverifiable is now broken,
+  never "equal to empty".
+- **Type, derivation and lineage were unchecked on read.** They now sit inside the commitments every
+  read verifies: the payload's binds its type, the label's binds type, derivation and parents.
+- **Tampering found on read left no record.** Storage throws `StorageIntegrityException`, and every
+  operation records a refused line with reason `NOT_AS_SIGNED` before rethrowing. `sweep()` checks
+  every ciphertext against its commitment and reports *altered* apart from *unreadable*.
+- **Roots of any length were accepted.** A root must be at least 32 bytes, checked when the store is
+  built and whenever a root is used.
+- Constant-time comparisons in the verifiers; separate domain tags for value and line commitments;
+  erase lines carry the root's label; `StoredValue` no longer prints its value.
+
+Still open: re-signing under a new root (a root, unlike a key, cannot yet be retired).
+
 ## Also phase 2
 
 - **Binding a ciphertext to its row.** Commitments bound to the row already refuse a copied

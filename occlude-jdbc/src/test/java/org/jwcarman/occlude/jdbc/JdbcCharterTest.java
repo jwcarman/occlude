@@ -705,7 +705,9 @@ class JdbcCharterTest {
             .dataSource(dataSource)
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
             .encryptedWith(TestKeys.dataKeys())
-            .rootedIn("open", "somebody else's key".getBytes(StandardCharsets.UTF_8))
+            .rootedIn(
+                "open",
+                "somebody else's key -- long enough to be a root".getBytes(StandardCharsets.UTF_8))
             .withoutMigration()
             .storage(Axes.of(TENANT, INTEGRITY, DATA));
 
@@ -723,8 +725,8 @@ class JdbcCharterTest {
   @Test
   @DisplayName("verifies what an older root signed after a new one takes over")
   void verifies_across_a_rotation() {
-    byte[] first = "the first root".getBytes(StandardCharsets.UTF_8);
-    byte[] second = "the second root".getBytes(StandardCharsets.UTF_8);
+    byte[] first = "the first root -- long enough to be a root".getBytes(StandardCharsets.UTF_8);
+    byte[] second = "the second root -- long enough to be a root".getBytes(StandardCharsets.UTF_8);
     Axes axes = Axes.of(TENANT, INTEGRITY, DATA);
 
     DefaultCharter under1 = new DefaultCharter(axes);
@@ -1271,7 +1273,11 @@ class JdbcCharterTest {
   void reports_a_value_whose_root_is_unknown() {
     Axes axes = Axes.of(TENANT, INTEGRITY, DATA);
     JdbcStorage writer =
-        rooted("r1", Map.of("r1", "first secret".getBytes(StandardCharsets.UTF_8)), axes);
+        rooted(
+            "r1",
+            Map.of(
+                "r1", "first secret -- long enough to be a root".getBytes(StandardCharsets.UTF_8)),
+            axes);
     StoredValue value =
         new StoredValue(
             "a note",
@@ -1293,20 +1299,40 @@ class JdbcCharterTest {
 
     // "r1" was the writer's root. This reader has never heard of it.
     JdbcStorage reader =
-        rooted("r2", Map.of("r2", "second secret".getBytes(StandardCharsets.UTF_8)), axes);
+        rooted(
+            "r2",
+            Map.of(
+                "r2", "second secret -- long enough to be a root".getBytes(StandardCharsets.UTF_8)),
+            axes);
 
     assertThat(reader.brokenValues()).containsExactly("note-1");
   }
 
   @Test
-  @DisplayName("cannot sign anything under a root nobody configured")
-  void cannot_sign_under_a_root_nobody_configured() {
-    JdbcStorage ghostRootedStorage = rooted("ghost", Map.of(), Axes.of(TENANT, INTEGRITY, DATA));
-    AuditRecord line = aQueryLine("x");
+  @DisplayName("refuses to be built under a root nobody configured")
+  void refuses_to_be_built_under_a_root_nobody_configured() {
+    Axes axes = Axes.of(TENANT, INTEGRITY, DATA);
+    Map<String, byte[]> none = Map.of();
 
-    assertThatThrownBy(() -> ghostRootedStorage.append(line))
+    assertThatThrownBy(() -> rooted("ghost", none, axes))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("nothing supplies the root 'ghost'");
+        .hasMessageContaining("the root 'ghost' needs a secret of at least 32 bytes");
+  }
+
+  /** The whole design's forgery resistance is the root's entropy, so a short one is refused. */
+  @Test
+  @DisplayName("refuses a root shorter than 32 bytes")
+  void refuses_a_short_root() {
+    JdbcStorageConfig config =
+        new JdbcStorageConfig()
+            .dataSource(dataSource)
+            .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
+            .encryptedWith(TestKeys.dataKeys());
+    byte[] shortSecret = "too short".getBytes(StandardCharsets.UTF_8);
+
+    assertThatThrownBy(() -> config.rootedIn("r1", shortSecret))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("at least 32 bytes");
   }
 
   @Test
@@ -1315,7 +1341,7 @@ class JdbcCharterTest {
     JdbcStorage rootedStorage =
         rooted(
             "r1",
-            Map.of("r1", "secret".getBytes(StandardCharsets.UTF_8)),
+            Map.of("r1", "secret -- long enough to be a root".getBytes(StandardCharsets.UTF_8)),
             Axes.of(TENANT, INTEGRITY, DATA));
     rootedStorage.append(aQueryLine("x"));
     assertThat(rootedStorage.firstBrokenEntry()).isEmpty();
@@ -1368,6 +1394,19 @@ class JdbcCharterTest {
   }
 
   @Test
+  @DisplayName("sweeping reports a broken connection rather than answering")
+  void sweep_reports_when_the_table_is_gone() throws SQLException {
+    try (Connection connection = dataSource.getConnection();
+        var statement = connection.createStatement()) {
+      statement.execute("DROP TABLE occlude_audit");
+    }
+
+    assertThatThrownBy(storage::sweep)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("could not sweep the store");
+  }
+
+  @Test
   @DisplayName("checking an anchor reports a broken connection rather than answering")
   void still_holds_reports_when_the_table_is_gone() throws SQLException {
     TrailHead anchor = new TrailHead(1, new byte[] {1});
@@ -1389,14 +1428,32 @@ class JdbcCharterTest {
   @DisplayName("treats an empty root secret as a missing root")
   void treats_an_empty_root_as_missing() {
     card();
+    byte[] current = "a newer root, long enough to be one".getBytes(StandardCharsets.UTF_8);
+    // The rows were signed under TestKeys.ROOT_ID; a later lookup answers for it with nothing.
     JdbcStorage emptyRoot =
         rooted(
-            TestKeys.ROOT_ID,
-            Map.of(TestKeys.ROOT_ID, new byte[0]),
+            "r2",
+            Map.of("r2", current, TestKeys.ROOT_ID, new byte[0]),
             Axes.of(TENANT, INTEGRITY, DATA));
 
     assertThat(emptyRoot.firstBrokenEntry()).isPresent();
     assertThat(emptyRoot.brokenValues()).isNotEmpty();
+  }
+
+  /** A short old root is no better than a missing one: the rows under it cannot be trusted. */
+  @Test
+  @DisplayName("treats an old root that is too short as one it cannot verify with")
+  void treats_a_short_old_root_as_unverifiable() {
+    card();
+    byte[] current = "a newer root, long enough to be one".getBytes(StandardCharsets.UTF_8);
+    JdbcStorage shortRoot =
+        rooted(
+            "r2",
+            Map.of("r2", current, TestKeys.ROOT_ID, "short".getBytes(StandardCharsets.UTF_8)),
+            Axes.of(TENANT, INTEGRITY, DATA));
+
+    assertThat(shortRoot.firstBrokenEntry()).isPresent();
+    assertThat(shortRoot.brokenValues()).isNotEmpty();
   }
 
   @Test
@@ -1635,7 +1692,7 @@ class JdbcCharterTest {
   @DisplayName("a single secret roots everything, and refuses anything claiming another root")
   void a_single_secret_roots_everything() {
     Axes axes = Axes.of(TENANT, INTEGRITY, DATA);
-    byte[] secret = "only secret".getBytes(StandardCharsets.UTF_8);
+    byte[] secret = "only secret -- long enough to be a root".getBytes(StandardCharsets.UTF_8);
     JdbcStorage single =
         new JdbcStorageConfig()
             .dataSource(dataSource)

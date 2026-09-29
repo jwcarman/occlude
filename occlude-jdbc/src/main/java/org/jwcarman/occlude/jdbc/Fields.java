@@ -22,13 +22,16 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import org.jwcarman.codec.Codec;
 import org.jwcarman.codec.CodecFactory;
 import org.jwcarman.codec.TypeRef;
 import org.jwcarman.occlude.Lineage;
+import org.jwcarman.occlude.StorageIntegrityException;
 import org.jwcarman.occlude.StoredMetadata;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Label;
@@ -77,11 +80,6 @@ final class Fields {
     return storageCodec.encode(plaintext);
   }
 
-  /** Back out of the pipeline. */
-  byte[] decrypt(byte[] ciphertext) {
-    return storageCodec.decode(ciphertext);
-  }
-
   @SuppressWarnings("unchecked")
   byte[] serialised(TypeRef<?> type, Object value) {
     return ((Codec<Object>) serialiserFor(type)).encode(value);
@@ -101,33 +99,42 @@ final class Fields {
    * row would pass every digest check. Checking each read against its commitment is what refuses
    * it.
    */
-  Label labelOf(ResultSet rows) throws SQLException {
-    return Label.decode(stringMaps.decode(labelPlaintextOf(rows)), axes);
+  Label labelOf(ResultSet rows, List<String> parents) throws SQLException {
+    return Label.decode(stringMaps.decode(labelPlaintextOf(rows, parents)), axes);
   }
 
-  byte[] labelPlaintextOf(ResultSet rows) throws SQLException {
+  /**
+   * A row's label, decrypted and checked -- together with its type, derivation and parents, which
+   * the caller read from the same place and is about to act on.
+   */
+  byte[] labelPlaintextOf(ResultSet rows, List<String> parents) throws SQLException {
     byte[] plaintext = storageCodec.decode(rows.getBytes(Columns.LABEL));
-    faithful(rows, Signer.LABEL, plaintext, rows.getBytes(Columns.LABEL_COMMITMENT));
+    List<byte[]> facts =
+        Signer.labelFacts(
+            rows.getString(Columns.VALUE_TYPE), rows.getString(Columns.DERIVATION), parents);
+    faithful(rows, Signer.LABEL, facts, plaintext, rows.getBytes(Columns.LABEL_COMMITMENT));
     return plaintext;
   }
 
   /** A row's payload, decrypted and checked against what was signed for it. */
   byte[] payloadOf(ResultSet rows) throws SQLException {
     byte[] plaintext = storageCodec.decode(rows.getBytes(Columns.PAYLOAD));
-    faithful(rows, Signer.PAYLOAD, plaintext, rows.getBytes(Columns.PAYLOAD_COMMITMENT));
+    List<byte[]> facts = Signer.payloadFacts(rows.getString(Columns.VALUE_TYPE));
+    faithful(rows, Signer.PAYLOAD, facts, plaintext, rows.getBytes(Columns.PAYLOAD_COMMITMENT));
     return plaintext;
   }
 
-  void faithful(ResultSet rows, String field, byte[] plaintext, byte[] committed)
+  private void faithful(
+      ResultSet rows, String field, List<byte[]> facts, byte[] plaintext, byte[] committed)
       throws SQLException {
     String id = rows.getString(Columns.VALUE_ID);
     MacAlgorithm algorithm = MacAlgorithm.named(rows.getString(Columns.MAC));
     if (algorithm == null
         || !MessageDigest.isEqual(
             signer.valueCommitment(
-                rows.getString(Columns.ROOT_ID), algorithm, id, field, plaintext),
+                rows.getString(Columns.ROOT_ID), algorithm, id, field, facts, plaintext),
             committed)) {
-      throw new IllegalStateException(
+      throw new StorageIntegrityException(
           "the " + field + " stored for " + id + " is not what was signed for it");
     }
   }
@@ -142,15 +149,68 @@ final class Fields {
     return ciphertext == null ? null : storageCodec.decode(ciphertext);
   }
 
+  /** A line's protected fields, decrypted and checked against the commitment signed for them. */
+  record Line(byte[] detail, byte[] label, byte[] context) {
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof Line that
+          && Arrays.equals(detail, that.detail)
+          && Arrays.equals(label, that.label)
+          && Arrays.equals(context, that.context);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(
+          Arrays.hashCode(detail), Arrays.hashCode(label), Arrays.hashCode(context));
+    }
+
+    @Override
+    public String toString() {
+      // Never the fields: a detail names the label a refusal turned away.
+      return "Line";
+    }
+  }
+
+  /**
+   * One line's detail, label and context, decrypted and checked, from a row carrying them with its
+   * entry id, predecessor, time, commitment, root and MAC.
+   *
+   * @throws StorageIntegrityException if they are not what was signed for that line
+   */
+  Line lineOf(ResultSet rows) throws SQLException {
+    byte[] detail = decrypted(rows.getBytes(Columns.DETAIL));
+    byte[] label = decrypted(rows.getBytes(Columns.LABEL));
+    byte[] context = storageCodec.decode(rows.getBytes(Columns.CONTEXT));
+    MacAlgorithm algorithm = MacAlgorithm.named(rows.getString(Columns.MAC));
+    if (algorithm == null
+        || !MessageDigest.isEqual(
+            signer.lineCommitment(
+                rows.getString(Columns.ROOT_ID),
+                algorithm,
+                rows.getBytes("previous"),
+                rows.getTimestamp("recorded_at").toInstant(),
+                detail,
+                label,
+                context),
+            rows.getBytes(Columns.COMMITMENT))) {
+      throw new StorageIntegrityException(
+          "line " + rows.getLong(Columns.ENTRY_ID) + " of the trail is not what was signed for it");
+    }
+    return new Line(detail, label, context);
+  }
+
   /** One row's type, checked label and lineage. */
   StoredMetadata metadataOf(Connection connection, ResultSet rows) throws SQLException {
     String derivation = rows.getString(Columns.DERIVATION);
+    // Read for every value, fresh ones included: a lineage row added to a value that has none would
+    // otherwise go unchecked, and it decides what an erasure of its "parent" takes with it.
+    List<String> parents = parentsOf(connection, rows.getString(Columns.VALUE_ID));
+    Label label = labelOf(rows, parents);
     Lineage lineage =
-        derivation == null
-            ? Lineage.occluded()
-            : Lineage.derivedFrom(
-                parentsOf(connection, rows.getString(Columns.VALUE_ID)), derivation);
-    return new StoredMetadata(rows.getString(Columns.VALUE_TYPE), labelOf(rows), lineage);
+        derivation == null ? Lineage.occluded() : Lineage.derivedFrom(parents, derivation);
+    return new StoredMetadata(rows.getString(Columns.VALUE_TYPE), label, lineage);
   }
 
   private static final String SELECT_PARENTS =

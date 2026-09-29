@@ -19,7 +19,7 @@ occlude:
   roots:
     current: demo
     secrets:
-      demo: ${OCCLUDE_DEMO_ROOT:ZGVtby1yb290LW5vdC1hLXNlY3JldC1hdC1hbGwh}
+      demo: ${OCCLUDE_DEMO_ROOT:ZGVtby1yb290LW5vdC1hLXNlY3JldC1hdC1hbGwtZG8tbm90LWRlcGxveQ==}
 
 management:
   endpoints:

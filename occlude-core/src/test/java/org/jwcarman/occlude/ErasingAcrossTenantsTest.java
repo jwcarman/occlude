@@ -244,6 +244,43 @@ class ErasingAcrossTenantsTest {
     assertThat(storage.contains(root.id())).isFalse();
   }
 
+  /** An auditor has to be able to say whose data an erasure was about, refused or allowed. */
+  @Test
+  @DisplayName("records the label of what it was asked to erase")
+  void records_the_label_of_what_it_was_asked_to_erase() {
+    MemoryStorage storage = new MemoryStorage();
+    DefaultCharter config = new DefaultCharter(TENANT, LEVEL);
+    Occlude<Record> records =
+        config.source(
+            "records", RECORD_TYPE, ctx -> Label.of(TENANT, "acme").with(LEVEL, Level.LOW));
+    Derivation<Record, Record> copy =
+        config.derivation(
+            "copy",
+            RECORD_TYPE,
+            RECORD_TYPE,
+            r -> new Record(r.text() + "-copy"),
+            d -> d.accepting(Ceiling.of(TENANT, Constraint.any()).with(LEVEL, Constraint.any())));
+    Erasure nobody = config.erasure("nobody", (label, ctx) -> false);
+    Erasure anybody = config.erasure("anybody", (label, ctx) -> true);
+    config.bind(storage, AccessContextProvider.none());
+    Occluded<Record> root = records.occlude(new Record("root"));
+    Occluded<Record> child = copy.derive(root).orThrow();
+
+    nobody.erase(root);
+    anybody.erase(root);
+
+    String label = Label.of(TENANT, "acme").with(LEVEL, Level.LOW).toString();
+    assertThat(storage.audit(AuditRecord.Operation.ERASE))
+        .filteredOn(line -> line.value().equals(root.id()))
+        .hasSize(2)
+        .allSatisfy(line -> assertThat(line.label()).contains(label));
+    // A descendant's label is not in hand when it goes, and is not guessed.
+    assertThat(storage.audit(AuditRecord.Operation.ERASE))
+        .filteredOn(line -> line.value().equals(child.id()))
+        .singleElement()
+        .satisfies(line -> assertThat(line.label()).isEmpty());
+  }
+
   @Test
   @DisplayName("refuses two erasures under one name")
   void refuses_two_erasures_under_one_name() {

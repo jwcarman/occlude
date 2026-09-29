@@ -16,7 +16,6 @@
 
 package org.jwcarman.occlude.jdbc;
 
-import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -27,12 +26,10 @@ final class Reencryption {
 
   private final Transactions transactions;
   private final Fields fields;
-  private final Signer signer;
 
-  Reencryption(Transactions transactions, Fields fields, Signer signer) {
+  Reencryption(Transactions transactions, Fields fields) {
     this.transactions = transactions;
     this.fields = fields;
-    this.signer = signer;
   }
 
   /** How many rows one re-encryption transaction takes, so none holds its locks for long. */
@@ -92,7 +89,8 @@ final class Reencryption {
     try (PreparedStatement select =
             connection.prepareStatement(
                 """
-                SELECT value_id, payload, label, payload_commitment, label_commitment, root_id, mac
+                SELECT value_id, value_type, derivation, payload, label, payload_commitment,
+                       label_commitment, root_id, mac
                   FROM occlude_value WHERE value_id > ? ORDER BY value_id LIMIT ? FOR UPDATE
                 """);
         PreparedStatement update =
@@ -104,7 +102,8 @@ final class Reencryption {
         while (rows.next()) {
           last = rows.getString(Columns.VALUE_ID);
           update.setBytes(1, fields.encrypt(fields.payloadOf(rows)));
-          update.setBytes(2, fields.encrypt(fields.labelPlaintextOf(rows)));
+          update.setBytes(
+              2, fields.encrypt(fields.labelPlaintextOf(rows, Fields.parentsOf(connection, last))));
           update.setString(3, last);
           update.addBatch();
           rewritten++;
@@ -133,27 +132,10 @@ final class Reencryption {
       try (ResultSet rows = select.executeQuery()) {
         while (rows.next()) {
           last = rows.getLong(Columns.ENTRY_ID);
-          byte[] detail = fields.decrypted(rows.getBytes(Columns.DETAIL));
-          byte[] label = fields.decrypted(rows.getBytes(Columns.LABEL));
-          byte[] context = fields.decrypt(rows.getBytes(Columns.CONTEXT));
-          MacAlgorithm algorithm = MacAlgorithm.named(rows.getString(Columns.MAC));
-          if (algorithm == null
-              || !MessageDigest.isEqual(
-                  signer.lineCommitment(
-                      rows.getString(Columns.ROOT_ID),
-                      algorithm,
-                      rows.getBytes("previous"),
-                      rows.getTimestamp("recorded_at").toInstant(),
-                      detail,
-                      label,
-                      context),
-                  rows.getBytes(Columns.COMMITMENT))) {
-            throw new IllegalStateException(
-                "line " + last + " of the trail is not what was signed for it");
-          }
-          update.setBytes(1, fields.encrypted(detail));
-          update.setBytes(2, fields.encrypted(label));
-          update.setBytes(3, fields.encrypt(context));
+          Fields.Line line = fields.lineOf(rows);
+          update.setBytes(1, fields.encrypted(line.detail()));
+          update.setBytes(2, fields.encrypted(line.label()));
+          update.setBytes(3, fields.encrypt(line.context()));
           update.setLong(4, last);
           update.addBatch();
           rewritten++;

@@ -95,13 +95,27 @@ final class Deriving {
     }
 
     List<String> parentIds = parents.stream().map(Occluded::id).toList();
-    Vetted<O> vetted = vetting(spec, parents, parentIds, ceiling, refused, because);
+    Map<String, StoredMetadata> labels =
+        trail.reading(
+            AuditRecord.Operation.DERIVE,
+            parentIds.getFirst(),
+            id,
+            context,
+            () -> storage.metadata(parentIds));
+    Vetted<O> vetted = vetting(spec, parents, labels, ceiling, refused, because);
     if (vetted.refusal() != null) {
       return vetted.refusal();
     }
 
     // Only now, and only for parents every check above let through.
-    Read<O> read = reading(parents, vetted.wanted());
+    Map<String, Object> plaintext =
+        trail.reading(
+            AuditRecord.Operation.DERIVE,
+            parentIds.getFirst(),
+            id,
+            context,
+            () -> storage.values(vetted.wanted()));
+    Read<O> read = reading(parents, plaintext);
     if (read.refusal() != null) {
       return read.refusal();
     }
@@ -173,12 +187,11 @@ final class Deriving {
   private <O> Vetted<O> vetting(
       DerivationSpec<O> spec,
       List<Occluded<?>> parents,
-      List<String> parentIds,
+      Map<String, StoredMetadata> labels,
       Ceiling ceiling,
       AtomicReference<Label> refused,
       AtomicReference<String> because) {
     String id = spec.name();
-    Map<String, StoredMetadata> labels = storage.metadata(parentIds);
     Map<String, TypeRef<?>> wanted = new LinkedHashMap<>();
     Label joined = null;
     for (int position = 0; position < parents.size(); position++) {
@@ -213,8 +226,7 @@ final class Deriving {
   private record Read<O>(List<Object> inputs, Derived.Refused<O> refusal) {}
 
   /** Decodes only what every check above let through, and refuses a parent erased meanwhile. */
-  private <O> Read<O> reading(List<Occluded<?>> parents, Map<String, TypeRef<?>> wanted) {
-    Map<String, Object> read = storage.values(wanted);
+  private <O> Read<O> reading(List<Occluded<?>> parents, Map<String, Object> read) {
     List<Object> inputs = new ArrayList<>();
     for (Occluded<?> parent : parents) {
       Object input = read.get(parent.id());

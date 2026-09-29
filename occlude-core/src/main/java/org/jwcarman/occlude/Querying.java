@@ -75,7 +75,15 @@ final class Querying {
       return new Answer.Refused(
           Answer.Reason.NOT_AVAILABLE_HERE, "'" + name + "' is not offered here");
     }
-    StoredMetadata entry = storage.metadata(held.id()).orElse(null);
+    StoredMetadata entry =
+        trail
+            .reading(
+                AuditRecord.Operation.QUERY,
+                held.id(),
+                name,
+                context,
+                () -> storage.metadata(held.id()))
+            .orElse(null);
     if (entry == null) {
       return new Answer.Refused(Answer.Reason.NO_SUCH_VALUE, Gate.NOT_HOLDING + held.id());
     }
@@ -96,7 +104,15 @@ final class Querying {
           "'%s' asks about a %s, but %s is a %s"
               .formatted(name, spec.inputType().name(), held.id(), entry.typeName()));
     }
-    I subject = storage.value(held.id(), spec.inputType().type()).orElse(null);
+    I subject =
+        trail
+            .reading(
+                AuditRecord.Operation.QUERY,
+                held.id(),
+                name,
+                context,
+                () -> storage.value(held.id(), spec.inputType().type()))
+            .orElse(null);
     if (subject == null) {
       return new Answer.Refused(Answer.Reason.NO_SUCH_VALUE, Gate.NOT_HOLDING + held.id());
     }

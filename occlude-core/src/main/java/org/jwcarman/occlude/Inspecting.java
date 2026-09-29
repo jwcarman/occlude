@@ -39,7 +39,15 @@ final class Inspecting {
   Inspected inspect(Occluded<?> held, InspectionSpec inspection) {
     AccessContext asking = gate.asking();
     String by = inspection.name();
-    StoredMetadata entry = storage.metadata(held.id()).orElse(null);
+    StoredMetadata entry =
+        trail
+            .reading(
+                AuditRecord.Operation.INSPECT,
+                held.id(),
+                by,
+                asking,
+                () -> storage.metadata(held.id()))
+            .orElse(null);
     if (entry == null) {
       trail.audit(
           AuditRecord.Operation.INSPECT,

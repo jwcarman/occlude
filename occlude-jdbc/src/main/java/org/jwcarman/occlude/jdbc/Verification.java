@@ -16,6 +16,7 @@
 
 package org.jwcarman.occlude.jdbc;
 
+import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -32,6 +33,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import javax.sql.DataSource;
+import org.jwcarman.codec.CodecException;
+import org.jwcarman.codec.versioned.VersionedFormatException;
+import org.jwcarman.occlude.StorageIntegrityException;
 
 /**
  * Whether what a store holds still agrees with what it signed: the trail, the value graph, and the
@@ -42,10 +46,102 @@ final class Verification {
 
   private final DataSource dataSource;
   private final Signer signer;
+  private final Fields fields;
 
-  Verification(DataSource dataSource, Signer signer) {
+  Verification(DataSource dataSource, Signer signer, Fields fields) {
     this.dataSource = dataSource;
     this.signer = signer;
+    this.fields = fields;
+  }
+
+  /**
+   * Every stored field decrypted and checked against what was signed for it.
+   *
+   * <p>The digests cover commitments, not ciphertext, so {@link #brokenValues()} cannot see a
+   * ciphertext swapped in from another row; a read refuses one, but only when somebody reads it.
+   * This reads everything, which needs the keys.
+   */
+  Sweep sweep() {
+    List<String> alteredValues = new ArrayList<>();
+    List<String> unreadableValues = new ArrayList<>();
+    List<Long> alteredLines = new ArrayList<>();
+    List<Long> unreadableLines = new ArrayList<>();
+    try (Connection connection = dataSource.getConnection()) {
+      try (PreparedStatement statement =
+              connection.prepareStatement(
+                  """
+                  SELECT value_id, value_type, derivation, payload, label, payload_commitment,
+                         label_commitment, root_id, mac
+                    FROM occlude_value ORDER BY value_id
+                  """);
+          ResultSet rows = statement.executeQuery()) {
+        while (rows.next()) {
+          String id = rows.getString(Columns.VALUE_ID);
+          Finding finding =
+              check(
+                  () -> {
+                    fields.payloadOf(rows);
+                    fields.labelPlaintextOf(rows, Fields.parentsOf(connection, id));
+                  });
+          finding.file(id, alteredValues, unreadableValues);
+        }
+      }
+      try (PreparedStatement statement =
+              connection.prepareStatement(
+                  """
+                  SELECT entry_id, recorded_at, previous, detail, label, context, commitment,
+                         root_id, mac
+                    FROM occlude_audit ORDER BY entry_id
+                  """);
+          ResultSet rows = statement.executeQuery()) {
+        while (rows.next()) {
+          check(() -> fields.lineOf(rows))
+              .file(rows.getLong(Columns.ENTRY_ID), alteredLines, unreadableLines);
+        }
+      }
+      return new Sweep(alteredValues, unreadableValues, alteredLines, unreadableLines);
+    } catch (SQLException e) {
+      throw new IllegalStateException("could not sweep the store", e);
+    }
+  }
+
+  /** A check over one row that reads the database, so it may throw what reading does. */
+  @FunctionalInterface
+  private interface RowCheck {
+    void run() throws SQLException;
+  }
+
+  /** What checking one row found. */
+  private enum Finding {
+    FAITHFUL,
+    ALTERED,
+    UNREADABLE;
+
+    <K> void file(K key, List<K> altered, List<K> unreadable) {
+      if (this == ALTERED) {
+        altered.add(key);
+      } else if (this == UNREADABLE) {
+        unreadable.add(key);
+      }
+    }
+  }
+
+  /**
+   * Whether a row's fields are what was signed for them.
+   *
+   * <p>Altered when they decrypt and fail their commitment, or are not a frame this store writes.
+   * Unreadable when they will not decrypt -- which a destroyed key and a damaged ciphertext both
+   * look like -- or were written by a pipeline newer than this one.
+   */
+  private static Finding check(RowCheck check) throws SQLException {
+    try {
+      check.run();
+      return Finding.FAITHFUL;
+    } catch (StorageIntegrityException | VersionedFormatException _) {
+      return Finding.ALTERED;
+    } catch (CodecException _) {
+      return Finding.UNREADABLE;
+    }
   }
 
   /**
@@ -88,7 +184,7 @@ final class Verification {
             connection.prepareStatement("SELECT digest FROM occlude_audit WHERE entry_id = ?")) {
       statement.setLong(1, anchor.entryId());
       try (ResultSet rows = statement.executeQuery()) {
-        return rows.next() && Arrays.equals(rows.getBytes(Columns.DIGEST), anchor.digest());
+        return rows.next() && MessageDigest.isEqual(rows.getBytes(Columns.DIGEST), anchor.digest());
       }
     } catch (SQLException e) {
       throw new IllegalStateException("could not look for the anchor in the trail", e);
@@ -148,7 +244,9 @@ final class Verification {
               rows.getTimestamp("recorded_at").toInstant(),
               facts,
               rows.getBytes(Columns.COMMITMENT));
-      if (digest.isEmpty() || !Arrays.equals(digest.get(), rows.getBytes(Columns.DIGEST))) {
+      // Constant-time: the stored side is whatever a writer put there, and the computed side is a
+      // MAC under the root, so a comparison that stops at the first difference is a timing oracle.
+      if (digest.isEmpty() || !MessageDigest.isEqual(digest.get(), rows.getBytes(Columns.DIGEST))) {
         return Optional.of(rows.getLong(Columns.ENTRY_ID));
       }
       expected = digest.get();
@@ -321,8 +419,8 @@ final class Verification {
         }
         List<byte[]> parents = checkable.get();
         ValueRow row = byId.get(id);
-        byte[] computed =
-            signer.digestOfOrNull(
+        Optional<byte[]> computed =
+            signer.digestIfSigned(
                 row.rootId(),
                 row.mac(),
                 id,
@@ -330,8 +428,10 @@ final class Verification {
                 row.commitments(),
                 row.derivation(),
                 parents);
-        if (Arrays.equals(computed, row.digest())) {
-          seen.put(id, computed);
+        // Unverifiable is broken. It is never "equal to an empty digest", which a writer could
+        // arrange by blanking the stored one.
+        if (computed.isPresent() && MessageDigest.isEqual(computed.get(), row.digest())) {
+          seen.put(id, computed.get());
         } else {
           broken.add(id);
         }

@@ -16,6 +16,7 @@
 package org.jwcarman.occlude;
 
 import java.util.Optional;
+import java.util.function.Supplier;
 import org.jwcarman.occlude.lattice.Label;
 
 /**
@@ -47,6 +48,38 @@ final class Trail {
       Label label,
       AccessContext context) {
     storage.append(entry(operation, value, target, outcome, why, label, context));
+  }
+
+  /** The reason a line gives when what a store holds turned out not to be what it signed. */
+  static final String NOT_AS_SIGNED = "NOT_AS_SIGNED";
+
+  /**
+   * Reads from storage, and records it if what came back was not what was signed.
+   *
+   * <p>A store refuses to hand over a field that fails its check, by throwing. Left alone, that
+   * exception would pass the audit by: the operation stops, the caller sees a stack trace, and the
+   * one party that must know tampering was found -- the record -- never hears of it. So the attempt
+   * is written down as refused, and the exception carries on.
+   */
+  <T> T reading(
+      AuditRecord.Operation operation,
+      String value,
+      String target,
+      AccessContext context,
+      Supplier<T> read) {
+    try {
+      return read.get();
+    } catch (StorageIntegrityException e) {
+      audit(
+          operation,
+          value,
+          target,
+          AuditRecord.Outcome.REFUSED,
+          Why.of(NOT_AS_SIGNED, e.getMessage()),
+          null,
+          context);
+      throw e;
+    }
   }
 
   /**

@@ -133,6 +133,7 @@ public final class JdbcStorageConfig {
   /** The same, for an application that has only ever had one root. */
   public JdbcStorageConfig rootedIn(String id, byte[] secret) {
     Objects.requireNonNull(secret, "a root needs a secret");
+    requireStrong(id, secret);
     byte[] only = secret.clone();
     return rootedIn(id, asked -> id.equals(asked) ? only : null);
   }
@@ -164,6 +165,10 @@ public final class JdbcStorageConfig {
                     + " call rootedIn(...)"),
             roots,
             mac);
+    // Checked here as well as when set, so a lookup that cannot supply the current root, or
+    // supplies
+    // a short one, stops the store from being built rather than every write failing afterwards.
+    requireStrong(rootId, roots.apply(rootId));
     if (migrate) {
       storage.migrate();
     }
@@ -181,6 +186,18 @@ public final class JdbcStorageConfig {
         .version(ENVELOPE, EnvelopeCodec.builder(dataKeys).build())
         .writing(ENVELOPE)
         .build();
+  }
+
+  /** Whether a root's secret is long enough to be one: a chain is exactly as strong as its key. */
+  private static void requireStrong(String id, byte[] secret) {
+    if (secret == null || secret.length < Signer.MINIMUM_ROOT_BYTES) {
+      throw new IllegalStateException(
+          "the root '"
+              + id
+              + "' needs a secret of at least "
+              + Signer.MINIMUM_ROOT_BYTES
+              + " bytes -- a random one, kept outside this database");
+    }
   }
 
   private static <T> T require(T value, String said) {

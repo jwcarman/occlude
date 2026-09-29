@@ -25,4 +25,16 @@ import org.jwcarman.occlude.lattice.Label;
  * @param label how it is labelled -- the store is the only authority on this
  * @param lineage where it came from
  */
-public record StoredValue(Object value, OccludedType<?> type, Label label, Lineage lineage) {}
+public record StoredValue(Object value, OccludedType<?> type, Label label, Lineage lineage) {
+
+  /**
+   * Says nothing about the value.
+   *
+   * <p>A record's generated {@code toString} would print it, and this object passes through every
+   * storage implementation, where it is exactly the sort of thing that ends up in a log line.
+   */
+  @Override
+  public String toString() {
+    return "StoredValue[type=%s, value=<held>]".formatted(type.name());
+  }
+}

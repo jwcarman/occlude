@@ -33,7 +33,8 @@ final class TestKeys {
 
   static final String ROOT_ID = "test";
 
-  private static final byte[] ROOT = "a root this test holds".getBytes(StandardCharsets.UTF_8);
+  private static final byte[] ROOT =
+      "a root this test holds -- long enough to be a root".getBytes(StandardCharsets.UTF_8);
 
   private TestKeys() {}
 

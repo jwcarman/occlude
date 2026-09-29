@@ -45,7 +45,15 @@ final class Erasing {
    */
   Erased erase(Occluded<?> root, ErasureSpec erasure) {
     AccessContext asking = gate.asking();
-    StoredMetadata entry = storage.metadata(root.id()).orElse(null);
+    StoredMetadata entry =
+        trail
+            .reading(
+                AuditRecord.Operation.ERASE,
+                root.id(),
+                erasure.name(),
+                asking,
+                () -> storage.metadata(root.id()))
+            .orElse(null);
     if (entry == null) {
       // Recorded like every other operation. Asking to destroy something that is not here is an
       // event worth seeing -- a probe looks exactly like this, repeatedly -- and a trail that
@@ -75,7 +83,7 @@ final class Erasing {
           erasure.name(),
           AuditRecord.Outcome.REFUSED,
           Why.of("not permitted to erase"),
-          null,
+          entry.label(),
           asking);
       return new Erased.Refused(
           Erased.Reason.NOT_PERMITTED, "'" + erasure.name() + "' may not erase " + root.id());
@@ -101,7 +109,9 @@ final class Erasing {
                     root.id(),
                     AuditRecord.Outcome.ALLOWED,
                     Why.of("erased"),
-                    null,
+                    // The root's label, on the root's own line: whose data this erasure was about.
+                    // A descendant's label is not in hand, and guessing it would be worse.
+                    id.equals(root.id()) ? entry.label() : null,
                     asking));
     return new Erased.Removed(removed.size());
   }

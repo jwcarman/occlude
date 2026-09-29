@@ -21,6 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -75,8 +76,15 @@ final class Signer {
   enum Domain {
     VALUE,
     LINE,
-    COMMITMENT
+    VALUE_COMMITMENT,
+    LINE_COMMITMENT
   }
+
+  /**
+   * The least a root may be. A keyed chain is exactly as strong as the secret keying it, and 32
+   * bytes is what HMAC-SHA-256 was built to take; anything shorter makes forging a search.
+   */
+  static final int MINIMUM_ROOT_BYTES = 32;
 
   /**
    * Keyed by a root, which is why none of this can be recomputed by whoever can write.
@@ -92,6 +100,10 @@ final class Signer {
     if (secret == null || secret.length == 0) {
       throw new IllegalStateException(
           "nothing supplies the root '" + id + "', which some of this was written under");
+    }
+    if (secret.length < MINIMUM_ROOT_BYTES) {
+      throw new IllegalStateException(
+          "the root '" + id + "' is shorter than " + MINIMUM_ROOT_BYTES + " bytes");
     }
     try {
       Mac mac = Mac.getInstance(algorithm.jcaName());
@@ -152,14 +164,52 @@ final class Signer {
    * <p>Keyed, because an unkeyed hash of a small value -- a last-4, a role -- is found by trying
    * them all. Bound to the value's id and to which field it is, so equal plaintexts in two rows
    * commit differently and a label's commitment cannot stand in for a payload's.
+   *
+   * <p>And bound to the facts a read acts on beside the field: see {@link #payloadFacts} and {@link
+   * #labelFacts}. Those columns sit in the clear next to the ciphertext, and a read that trusted
+   * them unchecked could be steered by whoever rewrote them.
    */
   byte[] valueCommitment(
-      String under, MacAlgorithm algorithm, String id, String field, byte[] plaintext) {
-    Mac commitment = keyed(Domain.COMMITMENT, under, algorithm);
+      String under,
+      MacAlgorithm algorithm,
+      String id,
+      String field,
+      List<byte[]> facts,
+      byte[] plaintext) {
+    Mac commitment = keyed(Domain.VALUE_COMMITMENT, under, algorithm);
     feed(commitment, id.getBytes(UTF_8));
     feed(commitment, field.getBytes(UTF_8));
+    feedCount(commitment, facts.size());
+    for (byte[] fact : facts) {
+      feed(commitment, fact);
+    }
     feed(commitment, plaintext);
     return commitment.doFinal();
+  }
+
+  /**
+   * What a payload's commitment binds besides the bytes: the type it was stored as.
+   *
+   * <p>Every operation takes the stored type name as ground truth -- a reader declared for notes
+   * decodes whatever says it is a note -- so a row retyped underneath its commitment must not read.
+   */
+  static List<byte[]> payloadFacts(String type) {
+    return List.of(type.getBytes(UTF_8));
+  }
+
+  /**
+   * What a label's commitment binds besides the bytes: the type, what made the value, and from
+   * which parents, in order.
+   *
+   * <p>All of it comes back with the label on every metadata read, and all of it is acted on: the
+   * type decides which readers may decode, and the parentage decides what an erasure reaches.
+   */
+  static List<byte[]> labelFacts(String type, String derivation, List<String> parents) {
+    List<byte[]> facts = new ArrayList<>();
+    facts.add(type.getBytes(UTF_8));
+    facts.add(derivation == null ? null : derivation.getBytes(UTF_8));
+    parents.forEach(parent -> facts.add(parent.getBytes(UTF_8)));
+    return facts;
   }
 
   /** A keyed commitment to a line's protected fields, bound to its place in the chain. */
@@ -171,7 +221,7 @@ final class Signer {
       byte[] detail,
       byte[] label,
       byte[] context) {
-    Mac commitment = keyed(Domain.COMMITMENT, under, algorithm);
+    Mac commitment = keyed(Domain.LINE_COMMITMENT, under, algorithm);
     feed(commitment, previous);
     feed(commitment, recordedAt.toString().getBytes(UTF_8));
     feed(commitment, detail);
@@ -188,7 +238,7 @@ final class Signer {
    * root_id and the whole report becomes an exception. It is also what an ordinary rotation looks
    * like once an old root is retired.
    */
-  byte[] digestOfOrNull(
+  Optional<byte[]> digestIfSigned(
       String under,
       String algorithm,
       String id,
@@ -196,15 +246,18 @@ final class Signer {
       ValueCommitments commitments,
       String derivation,
       List<byte[]> parents) {
+    // A row naming a MAC this store will not verify with, or a root nothing supplies, is broken
+    // -- and says so as an absence. It used to be an empty digest, which a row whose own digest had
+    // been blanked matched exactly: rewrite the MAC name, clear the digest, and the verifier called
+    // any row intact.
     MacAlgorithm named = MacAlgorithm.named(algorithm);
     if (named == null) {
-      // A row naming a MAC this store will not verify with is broken, not a reason to use it.
-      return new byte[0];
+      return Optional.empty();
     }
     try {
-      return digestOf(under, named, id, type, commitments, derivation, parents);
+      return Optional.of(digestOf(under, named, id, type, commitments, derivation, parents));
     } catch (IllegalStateException _) {
-      return new byte[0];
+      return Optional.empty();
     }
   }
 

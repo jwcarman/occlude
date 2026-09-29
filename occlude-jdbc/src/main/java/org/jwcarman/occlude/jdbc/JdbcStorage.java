@@ -105,7 +105,7 @@ public final class JdbcStorage implements Storage {
           + " FROM occlude_value WHERE value_id = ?";
 
   private static final String SELECT_PAYLOAD =
-      "SELECT value_id, payload, payload_commitment, root_id, mac"
+      "SELECT value_id, value_type, payload, payload_commitment, root_id, mac"
           + " FROM occlude_value WHERE value_id = ?";
 
   private static final String SELECT_METADATA_MANY =
@@ -113,7 +113,7 @@ public final class JdbcStorage implements Storage {
           + " FROM occlude_value WHERE value_id = ANY (?)";
 
   private static final String SELECT_PAYLOAD_MANY =
-      "SELECT value_id, payload, payload_commitment, root_id, mac"
+      "SELECT value_id, value_type, payload, payload_commitment, root_id, mac"
           + " FROM occlude_value WHERE value_id = ANY (?)";
 
   private static final String INSERT_PARENT =
@@ -164,8 +164,8 @@ public final class JdbcStorage implements Storage {
     this.signer = new Signer(rootId, roots, mac);
     this.transactions = new Transactions(dataSource);
     this.fields = new Fields(codecs, storageCodec, axes, signer);
-    this.verification = new Verification(dataSource, signer);
-    this.reencryption = new Reencryption(transactions, fields, signer);
+    this.verification = new Verification(dataSource, signer, fields);
+    this.reencryption = new Reencryption(transactions, fields);
   }
 
   /** Creates the tables if they are not there. */
@@ -270,8 +270,23 @@ public final class JdbcStorage implements Storage {
     byte[] label = fields.serialisedMap(value.label().encode());
     Signer.ValueCommitments commitments =
         new Signer.ValueCommitments(
-            signer.valueCommitment(signer.rootId(), signer.mac(), id, Signer.PAYLOAD, payload),
-            signer.valueCommitment(signer.rootId(), signer.mac(), id, Signer.LABEL, label));
+            signer.valueCommitment(
+                signer.rootId(),
+                signer.mac(),
+                id,
+                Signer.PAYLOAD,
+                Signer.payloadFacts(value.type().name()),
+                payload),
+            signer.valueCommitment(
+                signer.rootId(),
+                signer.mac(),
+                id,
+                Signer.LABEL,
+                Signer.labelFacts(
+                    value.type().name(),
+                    value.lineage().derivation().orElse(null),
+                    value.lineage().parents()),
+                label));
     // From the parents, which are immutable and already written, so nothing here is locked and two
     // derivations never wait on each other. A fresh value has none and starts its own graph.
     byte[] digest =
@@ -561,5 +576,21 @@ public final class JdbcStorage implements Storage {
    */
   public int reencrypt() {
     return reencryption.reencrypt();
+  }
+
+  /**
+   * Every stored field decrypted and checked against what was signed for it.
+   *
+   * <p>The other half of verifying. {@link #brokenValues()} and {@link #firstBrokenEntry()} check
+   * the digests, which cover commitments rather than ciphertext and so need only the root; this
+   * checks each ciphertext against its commitment, which needs the keys. A ciphertext copied in
+   * from another row is found here, and by any read of it, and nowhere else.
+   *
+   * <p>What was <i>altered</i> is proof of tampering. What was <i>unreadable</i> would not decrypt
+   * with the keys at hand -- a destroyed key, or a damaged ciphertext -- and only whoever manages
+   * the keys can say which.
+   */
+  public Sweep sweep() {
+    return verification.sweep();
   }
 }

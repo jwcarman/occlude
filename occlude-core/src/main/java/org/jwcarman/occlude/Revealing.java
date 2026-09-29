@@ -46,7 +46,15 @@ final class Revealing {
   <T> Revealed<T> reveal(Occluded<T> held, OccludedType<T> expected, SinkSpec sink) {
     AccessContext context = gate.asking();
     String to = sink.name();
-    StoredMetadata entry = storage.metadata(held.id()).orElse(null);
+    StoredMetadata entry =
+        trail
+            .reading(
+                AuditRecord.Operation.REVEAL,
+                held.id(),
+                to,
+                context,
+                () -> storage.metadata(held.id()))
+            .orElse(null);
     if (entry == null) {
       return denied(
           Revealed.Reason.NO_SUCH_VALUE,
@@ -101,8 +109,13 @@ final class Revealing {
         entry.label(),
         context);
     // The type was confirmed against what the store wrote, so this decodes a verified fact.
-    return storage
-        .value(held.id(), expected.type())
+    return trail
+        .reading(
+            AuditRecord.Operation.REVEAL,
+            held.id(),
+            to,
+            context,
+            () -> storage.value(held.id(), expected.type()))
         .<Revealed<T>>map(Revealed.Allowed::new)
         .orElseGet(
             () ->

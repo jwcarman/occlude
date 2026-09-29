@@ -300,6 +300,32 @@ class JdbcStorageWhiteboxTest {
         .hasToString("ValueCommitments");
   }
 
+  /**
+   * A line's decrypted fields name the label a refusal turned away; printing them would leak it.
+   */
+  @Test
+  @DisplayName("a line's checked fields compare by content and print without their bytes")
+  void line_compares_by_content_and_prints_nothing() throws ReflectiveOperationException {
+    Constructor<?> ctor =
+        Class.forName("org.jwcarman.occlude.jdbc.Fields$Line")
+            .getDeclaredConstructor(byte[].class, byte[].class, byte[].class);
+    ctor.setAccessible(true);
+    byte[] detail = "detail".getBytes(StandardCharsets.UTF_8);
+    byte[] label = "label".getBytes(StandardCharsets.UTF_8);
+    byte[] context = "context".getBytes(StandardCharsets.UTF_8);
+    byte[] other = "other".getBytes(StandardCharsets.UTF_8);
+    Object line = ctor.newInstance(detail, label, context);
+
+    assertThat(line)
+        .isEqualTo(ctor.newInstance(detail.clone(), label.clone(), context.clone()))
+        .hasSameHashCodeAs(ctor.newInstance(detail.clone(), label.clone(), context.clone()))
+        .isNotEqualTo(ctor.newInstance(other, label, context))
+        .isNotEqualTo(ctor.newInstance(detail, other, context))
+        .isNotEqualTo(ctor.newInstance(detail, label, other))
+        .isNotEqualTo("not a line")
+        .hasToString("Line");
+  }
+
   /** Never the bytes: a payload is the value this library exists to keep out of a log line. */
   @Test
   @DisplayName("a value row prints its type, derivation and root, and never its bytes")

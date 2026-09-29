@@ -206,6 +206,21 @@ class JdbcCharterAutoConfigurationTest {
                     .hasStackTraceContaining("key 'k1' is not valid base64"));
   }
 
+  /** A root is only as strong as its secret, so a short one stops the application starting. */
+  @Test
+  @DisplayName("refuses a root shorter than 32 bytes, naming it")
+  void refuses_a_short_root() {
+    runner
+        .withPropertyValues("occlude.roots.secrets.r1=" + base64(16))
+        .withUserConfiguration(AnApplication.class)
+        .run(
+            context ->
+                assertThat(context)
+                    .hasFailed()
+                    .getFailure()
+                    .hasStackTraceContaining("the root 'r1' needs a secret of at least 32 bytes"));
+  }
+
   @Test
   @DisplayName("refuses a signing algorithm it does not know, naming the ones it does")
   void refuses_an_unknown_mac() {
