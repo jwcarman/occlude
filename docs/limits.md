@@ -95,11 +95,27 @@ discloses its value's creation time to the millisecond. An occluded reference is
 to travel — into logs, other services, a model — so that is a real disclosure. A store that would
 rather leak nothing overrides `Storage.freshId()` and pays for the scattered index.
 
-## No transaction participation
+## It never joins your transaction, on purpose
 
-Storage opens its own connection. An `occlude` inside an `@Transactional` method **will not roll
-back with it**. This is the largest missing feature, and it is a correctness surprise rather than a
-philosophical position.
+Every act the store performs is its own transaction, on its own connection, committed before the
+operation returns. An `occlude` inside an `@Transactional` method **does not roll back with it** —
+and neither does anything else the store records.
+
+That is the point. The record is evidence of what happened, and what happened does not roll back:
+a `@Transactional` method that reveals a card number, sends it to the processor and then throws has
+still disclosed the card, and a run of refused attempts that ends in an exception was still a run of
+refused attempts. Joined to the caller's transaction, both lines would vanish with it — and anyone
+who could make a transaction fail could erase their own trail. It cannot be split either, keeping
+values in the caller's transaction and lines out of it: the record is one chain behind one lock,
+and an independent append would wait on the lock its own transaction holds.
+
+What this costs is an orphan now and then: a value occluded in a transaction that rolled back, which
+nothing in the application refers to. It is encrypted, harmless, and erasable. If the application
+must never keep one, record the reference in the same place as the rest of its work and erase what
+a rolled-back transaction left behind.
+
+Give the store a plain `DataSource`, as Spring Boot's is. One wrapped to hand out the connection of
+the transaction already open on the thread would have the store commit that transaction early.
 
 ## Every operation costs round trips, and the record is serial
 
