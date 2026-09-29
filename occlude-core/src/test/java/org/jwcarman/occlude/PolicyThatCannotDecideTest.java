@@ -16,8 +16,10 @@
 package org.jwcarman.occlude;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
@@ -131,6 +133,23 @@ class PolicyThatCannotDecideTest {
           STRING_TYPE,
           value -> boom(),
           d -> d.accepting(ctx -> Ceiling.of(TENANT, Constraint.any())));
+
+  /** Fails with the value in its message, the way an application's own validation often does. */
+  private final Derivation<String, String> functionThrowsTheValue =
+      config.derivation(
+          "function-with-the-value",
+          STRING_TYPE,
+          STRING_TYPE,
+          value -> {
+            throw new IllegalArgumentException("cannot shout " + value);
+          },
+          d -> d.accepting(ctx -> Ceiling.of(TENANT, Constraint.any())));
+
+  private final Occlude<String> sourceThatCannotLabel =
+      config.source("cannot-label", STRING_TYPE, ctx -> boom());
+
+  private final Erasure erasureWhosePolicyThrows =
+      config.erasure("erasure-policy", (label, ctx) -> boom());
 
   {
     config.bind(Bindings.of(storage).withoutIdentity());
@@ -285,5 +304,88 @@ class PolicyThatCannotDecideTest {
     assertThat(storage.audit()).hasSize(9);
     assertThat(storage.audit())
         .allSatisfy(entry -> assertThat(entry.outcome()).isEqualTo(AuditRecord.Outcome.REFUSED));
+  }
+
+  /**
+   * A bug in a ceiling and a policy saying no used to read the same. The class tells them apart;
+   * the message is left out, because it is the application's and can carry the value.
+   */
+  @Nested
+  @DisplayName("says which exception it threw")
+  class SaysWhichExceptionItThrew {
+
+    private static final String THREW = "it threw java.lang.IllegalStateException";
+
+    @Test
+    @DisplayName("in a sink's refusal, and in the record")
+    void in_a_sinks_refusal() {
+      storage.clearAudit();
+
+      Revealed<String> result = sinkWhoseCeilingThrows.reveal(held);
+
+      assertThat(((Revealed.Denied<String>) result).detail())
+          .contains(THREW)
+          .doesNotContain("blew up");
+      assertThat(storage.audit().getFirst().detail()).hasValueSatisfying(d -> d.contains(THREW));
+    }
+
+    @Test
+    @DisplayName("in a query's refusal, for its ceiling and its gate")
+    void in_a_querys_refusal() {
+      storage.clearAudit();
+
+      assertThat(((Answer.Refused) queryWhoseCeilingThrows.ask(held, "secret")).detail())
+          .contains(THREW);
+      assertThat(((Answer.Refused) queryWhoseGateThrows.ask(held, "secret")).detail())
+          .contains(THREW);
+      assertThat(storage.audit())
+          .allSatisfy(line -> assertThat(line.detail()).hasValueSatisfying(d -> d.contains(THREW)));
+    }
+
+    @Test
+    @DisplayName("in a derivation's refusal, for its ceiling and its lowering")
+    void in_a_derivations_refusal() {
+      storage.clearAudit();
+
+      assertThat(((Derived.Refused<String>) derivationWhoseCeilingThrows.derive(held)).detail())
+          .contains(THREW);
+      assertThat(((Derived.Refused<String>) loweringThrows.derive(held)).detail()).contains(THREW);
+      assertThat(storage.audit())
+          .allSatisfy(line -> assertThat(line.detail()).hasValueSatisfying(d -> d.contains(THREW)));
+    }
+
+    @Test
+    @DisplayName("and never the value a failing function put in its message")
+    void never_the_value_in_its_message() {
+      Derived<String> result = functionThrowsTheValue.derive(held);
+
+      assertThat(((Derived.Refused<String>) result).detail())
+          .contains("it threw java.lang.IllegalArgumentException")
+          .doesNotContain("secret");
+      assertThat(storage.audit().getLast().detail())
+          .hasValue("it threw java.lang.IllegalArgumentException");
+    }
+
+    @Test
+    @DisplayName("when a source cannot label what it was given")
+    void when_a_source_cannot_label() {
+      assertThatThrownBy(() -> sourceThatCannotLabel.occlude("secret"))
+          .isInstanceOf(AccessDeniedException.class)
+          .hasMessageContaining(THREW);
+    }
+
+    @Test
+    @DisplayName("when an erasure's policy cannot decide")
+    void when_an_erasure_cannot_decide() {
+      Erased result = erasureWhosePolicyThrows.erase(held);
+
+      assertThat(((Erased.Refused) result).detail()).contains(THREW);
+    }
+
+    @Test
+    @DisplayName("in the manifest, for a door that cannot say what it accepts")
+    void in_the_manifest() {
+      assertThat(config.manifest().toString()).contains(THREW);
+    }
   }
 }

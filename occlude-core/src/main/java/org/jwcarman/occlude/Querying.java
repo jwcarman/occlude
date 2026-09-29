@@ -74,9 +74,11 @@ final class Querying {
       AtomicReference<Label> refused,
       AtomicReference<String> because) {
     String name = spec.name();
-    if (!gate.offeredHere(() -> spec.availableTo().test(context))) {
+    Gate.Consulted<Boolean> offered = gate.offeredHere(() -> spec.availableTo().test(context));
+    if (!offered.saidYes()) {
+      because.set(offered.failure());
       return new Answer.Refused(
-          Answer.Reason.NOT_AVAILABLE_HERE, "'" + name + "' is not offered here");
+          Answer.Reason.NOT_AVAILABLE_HERE, "'" + name + "' is not offered here" + offered.threw());
     }
     StoredMetadata entry =
         trail
@@ -91,10 +93,13 @@ final class Querying {
       return new Answer.Refused(Answer.Reason.NO_SUCH_VALUE, Gate.NOT_HOLDING + held.id());
     }
     refused.set(entry.label());
-    Ceiling ceiling = gate.ceilingOf(() -> spec.ceilingFor(context));
+    Gate.Consulted<Ceiling> consulted = gate.ceilingOf(() -> spec.ceilingFor(context));
+    Ceiling ceiling = consulted.answer();
     if (ceiling == null) {
+      because.set(consulted.failure());
       return new Answer.Refused(
-          Answer.Reason.ABOVE_CEILING, "'" + name + Gate.COULD_NOT_SAY_WHAT_IT_ACCEPTS);
+          Answer.Reason.ABOVE_CEILING,
+          "'" + name + Gate.COULD_NOT_SAY_WHAT_IT_ACCEPTS + consulted.threw());
     }
     if (!gate.admits(ceiling, entry.label())) {
       because.set(Gate.because(entry.label(), ceiling));
@@ -122,10 +127,12 @@ final class Querying {
     boolean answer;
     try {
       answer = spec.asking().test(subject, against, context);
-    } catch (RuntimeException _) {
+    } catch (RuntimeException e) {
       // It has already read the plaintext, so this refusal is recorded like any other.
+      because.set(Gate.failure(e));
       return new Answer.Refused(
-          Answer.Reason.NOT_AVAILABLE_HERE, "'" + name + "' failed while reading the value");
+          Answer.Reason.NOT_AVAILABLE_HERE,
+          "'" + name + "' failed while reading the value" + Gate.threw(e));
     }
     // The answer, never what was asked: the argument can itself be sensitive.
     trail.audit(

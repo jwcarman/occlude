@@ -54,23 +54,19 @@ final class Occluding {
       throw new IllegalArgumentException("a store holds values, not nulls");
     }
     AccessContext asking = gate.asking();
-    Label label;
-    try {
-      label = labelling.apply(value, asking);
-    } catch (RuntimeException _) {
-      label = null;
-    }
+    Gate.Consulted<Label> consulted = Gate.Consulted.asking(() -> labelling.apply(value, asking));
+    Label label = consulted.answer();
     if (label == null) {
+      String detail = "'" + source + "' could not say what it labels values" + consulted.threw();
       trail.audit(
           AuditRecord.Operation.CONCEAL,
           storage.freshId(),
           source,
           AuditRecord.Outcome.REFUSED,
-          Why.of("the source could not say how to label this"),
+          Why.of("the source could not say how to label this", detail),
           null,
           asking);
-      throw new AccessDeniedException(
-          "SOURCE_CANNOT_LABEL", "'" + source + "' could not say what it labels values");
+      throw new AccessDeniedException("SOURCE_CANNOT_LABEL", detail);
     }
     // One of two places a label can be incomplete. Join only moves up, so an ordinary derivation
     // cannot lose what was said here -- but a privileged one may relabel, so deriving checks too.

@@ -62,18 +62,20 @@ final class Inspecting {
           asking);
       return new Inspected.Refused(Inspected.Reason.NO_SUCH_VALUE, Gate.NOT_HOLDING + held.id());
     }
-    Ceiling ceiling = gate.ceilingOf(() -> inspection.ceilingFor(asking));
+    Gate.Consulted<Ceiling> consulted = gate.ceilingOf(() -> inspection.ceilingFor(asking));
+    Ceiling ceiling = consulted.answer();
     if (ceiling == null) {
       trail.audit(
           AuditRecord.Operation.INSPECT,
           held.id(),
           by,
           AuditRecord.Outcome.REFUSED,
-          Why.of(Inspected.Reason.ABOVE_CEILING.name()),
+          Why.of(Inspected.Reason.ABOVE_CEILING.name(), consulted.failure()),
           entry.label(),
           asking);
       return new Inspected.Refused(
-          Inspected.Reason.ABOVE_CEILING, "'" + by + Gate.COULD_NOT_SAY_WHAT_IT_ACCEPTS);
+          Inspected.Reason.ABOVE_CEILING,
+          "'" + by + Gate.COULD_NOT_SAY_WHAT_IT_ACCEPTS + consulted.threw());
     }
     if (!gate.admits(ceiling, entry.label())) {
       trail.audit(

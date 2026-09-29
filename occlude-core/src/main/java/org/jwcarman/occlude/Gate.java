@@ -82,12 +82,8 @@ final class Gate {
    * <p>Treated as a refusal rather than allowed to propagate: a policy that cannot be evaluated has
    * not said yes, and a caller assembling a prompt should get a handle rather than a stack trace.
    */
-  Ceiling ceilingOf(SinkSpec sink, AccessContext context) {
-    try {
-      return sink.ceiling(context);
-    } catch (RuntimeException _) {
-      return null;
-    }
+  Consulted<Ceiling> ceilingOf(SinkSpec sink, AccessContext context) {
+    return Consulted.asking(() -> sink.ceiling(context));
   }
 
   /**
@@ -101,21 +97,61 @@ final class Gate {
    * anything -- nothing could produce that empty on purpose, but application code ending in {@code
    * .orElse(null)} produced it by accident, and the check was skipped.
    */
-  Ceiling ceilingOf(Supplier<Ceiling> ceiling) {
-    try {
-      return ceiling.get();
-    } catch (RuntimeException _) {
-      return null;
-    }
+  Consulted<Ceiling> ceilingOf(Supplier<Ceiling> ceiling) {
+    return Consulted.asking(ceiling);
   }
 
   /** A gate that cannot say whether it is open has not said it is open. */
-  boolean offeredHere(BooleanSupplier availableTo) {
-    try {
-      return availableTo.getAsBoolean();
-    } catch (RuntimeException _) {
-      return false;
+  Consulted<Boolean> offeredHere(BooleanSupplier availableTo) {
+    return Consulted.asking(availableTo::getAsBoolean);
+  }
+
+  /**
+   * What application code answered, or which exception it threw instead.
+   *
+   * <p>Either way it is treated as not having said yes. But a refusal that cannot say it came from
+   * a thrown exception makes a bug in a ceiling look exactly like a policy doing its job, and in
+   * production those are very different things to be told.
+   *
+   * @param answer what it said, or {@code null} when it said nothing or threw
+   * @param failure {@code null} when it answered; otherwise which exception it threw, for the
+   *     record's detail
+   */
+  record Consulted<T>(T answer, String failure) {
+
+    static <T> Consulted<T> asking(Supplier<T> question) {
+      try {
+        return new Consulted<>(question.get(), null);
+      } catch (RuntimeException e) {
+        return new Consulted<>(null, Gate.failure(e));
+      }
     }
+
+    /** The failure, ready to append to a refusal's detail; empty when it answered. */
+    String threw() {
+      return failure == null ? "" : " (" + failure + ")";
+    }
+
+    /** Whether it answered yes; for a question with a yes-or-no answer. */
+    boolean saidYes() {
+      return Boolean.TRUE.equals(answer);
+    }
+  }
+
+  /**
+   * Which exception application code threw, for a refusal's detail.
+   *
+   * <p>Its class, never its message. The message is the application's and can carry the very value
+   * being decided about -- {@code "bad card " + card.number()} -- and a detail reaches the caller
+   * in the refusal and the trail, which holds no plaintext.
+   */
+  static String failure(RuntimeException e) {
+    return "it threw " + e.getClass().getName();
+  }
+
+  /** The same, ready to append to a refusal's detail. */
+  static String threw(RuntimeException e) {
+    return " (" + failure(e) + ")";
   }
 
   /**

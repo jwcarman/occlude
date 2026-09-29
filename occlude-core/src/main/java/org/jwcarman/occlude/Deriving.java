@@ -86,17 +86,20 @@ final class Deriving {
       AtomicReference<Label> refused,
       AtomicReference<String> because) {
     String id = spec.name();
-    Derived.Refused<O> unusable = unusable(spec, parents, context);
+    Derived.Refused<O> unusable = unusable(spec, parents, context, because);
     if (unusable != null) {
       return unusable;
     }
     // Once, not once per parent: a ceiling that reads ambient context is doing real work. Before
     // any parent is looked at, and deliberately before the type check: a caller who may not reach
     // a value must not learn what kind of value it is.
-    Ceiling ceiling = gate.ceilingOf(() -> spec.ceilingFor(context));
+    Gate.Consulted<Ceiling> consulted = gate.ceilingOf(() -> spec.ceilingFor(context));
+    Ceiling ceiling = consulted.answer();
     if (ceiling == null) {
+      because.set(consulted.failure());
       return new Derived.Refused<>(
-          Derived.Reason.ABOVE_CEILING, "'" + id + Gate.COULD_NOT_SAY_WHAT_IT_ACCEPTS);
+          Derived.Reason.ABOVE_CEILING,
+          "'" + id + Gate.COULD_NOT_SAY_WHAT_IT_ACCEPTS + consulted.threw());
     }
 
     List<String> parentIds = parents.stream().map(Occluded::id).toList();
@@ -125,7 +128,7 @@ final class Deriving {
       return read.refusal();
     }
 
-    Produced<O> produced = producing(spec, read.inputs(), context);
+    Produced<O> produced = producing(spec, read.inputs(), context, because);
     if (produced.refusal() != null) {
       return produced.refusal();
     }
@@ -150,7 +153,10 @@ final class Deriving {
    * not there.
    */
   private <O> Derived.Refused<O> unusable(
-      DerivationSpec<O> spec, List<Occluded<?>> parents, AccessContext context) {
+      DerivationSpec<O> spec,
+      List<Occluded<?>> parents,
+      AccessContext context,
+      AtomicReference<String> because) {
     String id = spec.name();
     if (parents.isEmpty()) {
       return new Derived.Refused<>(
@@ -161,9 +167,11 @@ final class Deriving {
           "'%s' reads %d values and was given %d"
               .formatted(id, spec.inputTypes().size(), parents.size()));
     }
-    if (!gate.offeredHere(() -> spec.availableTo().test(context))) {
+    Gate.Consulted<Boolean> offered = gate.offeredHere(() -> spec.availableTo().test(context));
+    if (!offered.saidYes()) {
+      because.set(offered.failure());
       return new Derived.Refused<>(
-          Derived.Reason.NOT_AVAILABLE_HERE, "'" + id + "' is not offered here");
+          Derived.Reason.NOT_AVAILABLE_HERE, "'" + id + "' is not offered here" + offered.threw());
     }
     return null;
   }
@@ -258,18 +266,23 @@ final class Deriving {
    * way it can end has to be something the trail can record.
    */
   private <O> Produced<O> producing(
-      DerivationSpec<O> spec, List<Object> inputs, AccessContext context) {
+      DerivationSpec<O> spec,
+      List<Object> inputs,
+      AccessContext context,
+      AtomicReference<String> because) {
     try {
       return new Produced<>(
           Objects.requireNonNullElse(
               spec.function().apply(List.copyOf(inputs), context), Optional.empty()),
           null);
-    } catch (RuntimeException _) {
+    } catch (RuntimeException e) {
       // It has already seen the plaintext, so this refusal has to be recorded like any other.
+      because.set(Gate.failure(e));
       return new Produced<>(
           Optional.empty(),
           new Derived.Refused<>(
-              Derived.Reason.DECLINED, "'" + spec.name() + "' failed while reading the value"));
+              Derived.Reason.DECLINED,
+              "'" + spec.name() + "' failed while reading the value" + Gate.threw(e)));
     }
   }
 
@@ -305,17 +318,15 @@ final class Deriving {
     if (spec.relabel() == null) {
       return new Relabelled<>(joined, null);
     }
-    Label label;
-    try {
-      label = spec.relabel().apply(joined);
-    } catch (RuntimeException _) {
-      label = null;
-    }
+    Gate.Consulted<Label> consulted = Gate.Consulted.asking(() -> spec.relabel().apply(joined));
+    Label label = consulted.answer();
     // Answering with nothing is not answering, and is the same event as throwing. The plaintext has
     // already been read, so this has to be a recorded refusal rather than a NullPointerException
     // thrown past the audit.
     if (label == null) {
-      return Relabelled.refusing("'" + id + "' could not say what it was lowering to");
+      because.set(consulted.failure());
+      return Relabelled.refusing(
+          "'" + id + "' could not say what it was lowering to" + consulted.threw());
     }
     if (!label.atOrBelow(joined)) {
       because.set(Gate.because(label, joined));

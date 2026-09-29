@@ -73,23 +73,19 @@ final class Erasing {
     }
     // Application code, so it throws, and a gate that could not decide has not said yes. Left to
     // propagate, an erasure nobody was allowed to attempt left no line saying it was attempted.
-    boolean permitted;
-    try {
-      permitted = erasure.mayErase().test(entry.label(), asking);
-    } catch (RuntimeException _) {
-      permitted = false;
-    }
-    if (!permitted) {
+    Gate.Consulted<Boolean> permitted =
+        Gate.Consulted.asking(() -> erasure.mayErase().test(entry.label(), asking));
+    if (!permitted.saidYes()) {
+      String detail = "'" + erasure.name() + "' may not erase " + root.id() + permitted.threw();
       trail.audit(
           AuditRecord.Operation.ERASE,
           root.id(),
           erasure.name(),
           AuditRecord.Outcome.REFUSED,
-          Why.of("not permitted to erase"),
+          Why.of("not permitted to erase", detail),
           entry.label(),
           asking);
-      return new Erased.Refused(
-          Erased.Reason.NOT_PERMITTED, "'" + erasure.name() + "' may not erase " + root.id());
+      return new Erased.Refused(Erased.Reason.NOT_PERMITTED, detail);
     }
     // One line per value, not one per call, and written by the storage inside the same
     // transaction as the deletes. Every other operation writes a line naming the value it acted

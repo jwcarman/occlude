@@ -317,8 +317,8 @@ final class Manifests {
     try {
       Ceiling ceiling = door.apply(as);
       return ceiling == null ? "(said nothing for this access)" : ceiling.toString();
-    } catch (RuntimeException _) {
-      return "(could not decide for this access)";
+    } catch (RuntimeException e) {
+      return "(could not decide for this access" + Gate.threw(e) + ")";
     }
   }
 

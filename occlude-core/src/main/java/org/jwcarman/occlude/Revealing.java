@@ -75,12 +75,13 @@ final class Revealing {
     // learn what kind of value it is: "is a card, not an email" is the disclosure this library
     // exists to prevent, handed over in the refusal. Being told the wrong type is now something
     // only a reader already entitled to the value can be told.
-    Ceiling ceiling = gate.ceilingOf(sink, context);
+    Gate.Consulted<Ceiling> consulted = gate.ceilingOf(sink, context);
+    Ceiling ceiling = consulted.answer();
     if (ceiling == null) {
       return denied(
           Revealed.Reason.ABOVE_CEILING,
-          "'" + to + Gate.COULD_NOT_SAY_WHAT_IT_ACCEPTS,
-          null,
+          "'" + to + Gate.COULD_NOT_SAY_WHAT_IT_ACCEPTS + consulted.threw(),
+          consulted.failure(),
           held.id(),
           to,
           entry.label(),
