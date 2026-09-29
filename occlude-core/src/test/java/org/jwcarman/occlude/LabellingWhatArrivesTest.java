@@ -55,8 +55,7 @@ class LabellingWhatArrivesTest {
 
   private final AtomicReference<AccessContext> edge = new AtomicReference<>(AccessContext.empty());
 
-  private final DefaultCharter config =
-      new DefaultCharter(TENANT, INTEGRITY).currentAccess(edge::get);
+  private final DefaultCharter config = new DefaultCharter(TENANT, INTEGRITY);
 
   /** The tenant comes from the access; the trust comes from the message. */
   private final Occlude<Mail> mail =
@@ -71,8 +70,10 @@ class LabellingWhatArrivesTest {
                       INTEGRITY,
                       message.senderVerified() ? Integrity.ENDORSED : Integrity.UNENDORSED));
 
+  private final MemoryStorage storage = new MemoryStorage();
+
   {
-    config.seal(new MemoryStorage());
+    config.bind(storage, edge::get);
   }
 
   // there is no direct way left to ask what a stored label says on a given axis. Label.toString()
@@ -89,8 +90,9 @@ class LabellingWhatArrivesTest {
     Occluded<Mail> verified = mail.occlude(new Mail("known@acme.example", "hello", true));
     Occluded<Mail> anonymous = mail.occlude(new Mail("who@nowhere.example", "hello", false));
 
-    assertThat(config.label(verified.id()).says(INTEGRITY, Integrity.ENDORSED)).isTrue();
-    assertThat(config.label(anonymous.id()).says(INTEGRITY, Integrity.UNENDORSED)).isTrue();
+    assertThat(Stored.label(storage, verified.id()).says(INTEGRITY, Integrity.ENDORSED)).isTrue();
+    assertThat(Stored.label(storage, anonymous.id()).says(INTEGRITY, Integrity.UNENDORSED))
+        .isTrue();
   }
 
   /** The rest of the label is still the access's business, and the value cannot touch it. */
@@ -100,6 +102,6 @@ class LabellingWhatArrivesTest {
     edge.set(AccessContext.of(Map.of("tenant", "acme")));
     Occluded<Mail> acmeMail = mail.occlude(new Mail("x@y.example", "globex globex globex", true));
 
-    assertThat(config.label(acmeMail.id()).says(TENANT, "acme")).isTrue();
+    assertThat(Stored.label(storage, acmeMail.id()).says(TENANT, "acme")).isTrue();
   }
 }

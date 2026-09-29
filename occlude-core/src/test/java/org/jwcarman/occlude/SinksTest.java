@@ -25,63 +25,47 @@ import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
 
 /**
- * A sink declared outside a charter, the way {@link DefaultCharter} never declares one itself -- it
- * only ever registers the {@code varying} shape. {@code fixed} is for an application that builds a
- * {@link SinkSpec} to hand to {@link Charter#sink(SinkSpec)}.
+ * The one shape a charter builds every sink in: a ceiling that may depend on who is asking, and
+ * never answers with nothing.
  */
-@DisplayName("A sink declared with Sinks")
+@DisplayName("A sink built with Sinks")
 class SinksTest {
 
   private static final Axis<String> TENANT = Axis.matching("tenant");
 
   @Test
-  @DisplayName("fixed refuses a null name")
-  void fixed_refuses_a_null_name() {
-    Ceiling ceiling = Ceiling.nothing();
-
-    assertThatThrownBy(() -> Sinks.fixed(null, ceiling)).isInstanceOf(NullPointerException.class);
-  }
-
-  @Test
-  @DisplayName("fixed refuses a null ceiling")
-  void fixed_refuses_a_null_ceiling() {
-    assertThatThrownBy(() -> Sinks.fixed("somewhere", null))
+  @DisplayName("refuses a null name")
+  void refuses_a_null_name() {
+    assertThatThrownBy(() -> Sinks.varying(null, ctx -> Ceiling.nothing()))
         .isInstanceOf(NullPointerException.class);
   }
 
   @Test
-  @DisplayName("fixed names itself and hands back the same ceiling regardless of who is asking")
-  void fixed_names_itself_and_ignores_who_is_asking() {
-    Ceiling ceiling = Ceiling.of(TENANT, Constraint.any());
-    SinkSpec spec = Sinks.fixed("archive", ceiling);
-
-    assertThat(spec.name()).isEqualTo("archive");
-    assertThat(spec.ceiling(AccessContext.empty())).isEqualTo(ceiling);
-    assertThat(spec.ceiling(AccessContext.of("tenant", "acme"))).isEqualTo(ceiling);
-  }
-
-  /**
-   * The overload a charter offers for a sink declared elsewhere: it only has to register the spec,
-   * because {@code fixed} and {@code varying} already know how to be one.
-   */
-  @Test
-  @DisplayName("is registered on a charter through the SinkSpec overload")
-  void is_registered_on_a_charter_through_the_sink_spec_overload() {
-    DefaultCharter charter = new DefaultCharter(TENANT);
-    SinkSpec archive = Sinks.fixed("archive", Ceiling.of(TENANT, Constraint.any()));
-
-    Charter returned = charter.sink(archive);
-
-    assertThat(returned).isSameAs(charter);
-    assertThat(charter.sinks()).contains(archive);
-  }
-
-  @Test
-  @DisplayName("refuses a null SinkSpec")
-  void refuses_a_null_sink_spec() {
-    DefaultCharter charter = new DefaultCharter(TENANT);
-
-    assertThatThrownBy(() -> charter.sink((SinkSpec) null))
+  @DisplayName("refuses a null ceiling function")
+  void refuses_a_null_ceiling() {
+    assertThatThrownBy(() -> Sinks.varying("somewhere", null))
         .isInstanceOf(NullPointerException.class);
+  }
+
+  @Test
+  @DisplayName("names itself and asks its function what this access may see")
+  void names_itself_and_asks_its_function() {
+    Ceiling acme = Ceiling.of(TENANT, Constraint.atMost("acme"));
+    SinkSpec spec =
+        Sinks.varying(
+            "desk", ctx -> ctx.has("tenant", "acme") ? acme : Ceiling.of(TENANT, Constraint.any()));
+
+    assertThat(spec.name()).isEqualTo("desk");
+    assertThat(spec.ceiling(AccessContext.of("tenant", "acme"))).isEqualTo(acme);
+  }
+
+  /** Null is not "no ceiling": it is a function that did not decide, and a gate treats it so. */
+  @Test
+  @DisplayName("refuses to hand back a ceiling that is not there")
+  void refuses_to_hand_back_nothing() {
+    SinkSpec spec = Sinks.varying("desk", ctx -> null);
+    AccessContext nobody = AccessContext.empty();
+
+    assertThatThrownBy(() -> spec.ceiling(nobody)).isInstanceOf(NullPointerException.class);
   }
 }

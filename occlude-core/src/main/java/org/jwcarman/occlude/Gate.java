@@ -37,12 +37,10 @@ final class Gate {
 
   private final Axes axes;
   private final AccessContextProvider ambient;
-  private final Storage storage;
 
-  Gate(Axes axes, AccessContextProvider ambient, Storage storage) {
+  Gate(Axes axes, AccessContextProvider ambient) {
     this.axes = axes;
     this.ambient = ambient;
-    this.storage = storage;
   }
 
   /**
@@ -139,19 +137,5 @@ final class Gate {
    */
   static String because(Label label, Object ceiling) {
     return "labelled " + label + "; accepts " + ceiling;
-  }
-
-  // ------------------------------------------------------------------ lookups, for administration
-
-  Label label(String id) {
-    return metadataOf(id).label();
-  }
-
-  Lineage lineage(String id) {
-    return metadataOf(id).lineage();
-  }
-
-  private StoredMetadata metadataOf(String id) {
-    return storage.metadata(id).orElseThrow(() -> new IllegalArgumentException(NOT_HOLDING + id));
   }
 }

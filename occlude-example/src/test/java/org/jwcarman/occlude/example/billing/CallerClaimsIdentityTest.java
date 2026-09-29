@@ -83,12 +83,12 @@ class CallerClaimsIdentityTest {
    * authority" is a grep for this type rather than one file.
    *
    * <p>This application does not create it. It says what its axes are and the starter constructs
-   * the charter from them, which is why nothing here has to remember to seal anything.
+   * the charter from them, which is why nothing here has to remember to bind anything.
    *
-   * <p><b>What this does not yet close:</b> a published charter still carries {@code seal} and
-   * {@code erase}, so any bean willing to name the type can reach them. Moving construction was
-   * necessary for that and is not sufficient -- the authority to seal has to become something held
-   * rather than something on the type everybody is handed.
+   * <p>The published type carries neither {@code bind} nor {@code erase}: bringing a charter into
+   * force stays with the starter, and erasing takes an {@code Erasure} somebody declared and handed
+   * over. What remains is a cast to the implementation, which is a statement of intent a reviewer
+   * can see rather than something this can prevent.
    */
   @Test
   @DisplayName("can obtain the charter, because declaring a portal is what it is for")

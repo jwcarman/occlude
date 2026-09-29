@@ -45,6 +45,8 @@ public record Manifest(
     List<Entry> sinks,
     List<Entry> derivations,
     List<Entry> questions,
+    List<Entry> erasures,
+    List<Entry> inspections,
     List<Finding> findings,
     AccessContext renderedFor) {
 
@@ -95,6 +97,8 @@ public record Manifest(
     sinks = List.copyOf(sinks);
     derivations = List.copyOf(derivations);
     questions = List.copyOf(questions);
+    erasures = List.copyOf(erasures);
+    inspections = List.copyOf(inspections);
   }
 
   /** Findings of one kind, for a build that cares about some and not others. */
@@ -116,6 +120,10 @@ public record Manifest(
         sinks.stream().filter(entry -> entry.touches(type)).toList(),
         derivations.stream().filter(entry -> entry.touches(type)).toList(),
         questions.stream().filter(entry -> entry.touches(type)).toList(),
+        // Neither is about a type: an erasure or an inspection reaches any value its policy or
+        // ceiling admits, so both belong in the answer to "what can happen to a card".
+        erasures,
+        inspections,
         findings.stream().filter(finding -> finding.detail().contains("'" + type + "'")).toList(),
         renderedFor);
   }
@@ -159,6 +167,8 @@ public record Manifest(
           "    (each answer is one bit and the asker chooses the question, so enough questions"
               + " read the value; a ceiling is what limits who may ask at all)");
     }
+    section(lines, "erasures", erasures, "  nothing can be erased");
+    section(lines, "inspections", inspections, "  no label can be read without the value");
     lines.add("");
     List<Entry> weakening = weakening();
     lines.add("  " + weakening.size() + " operation(s) can WEAKEN a label:");

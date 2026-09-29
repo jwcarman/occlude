@@ -15,53 +15,37 @@
  */
 package org.jwcarman.occlude;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Label;
 
 /**
  * Handing plaintext to a sink.
  *
- * <p>The order below is the contract: an unknown sink, then a value not held, then a ceiling that
- * cannot be evaluated, then the ceiling itself -- and <b>only then</b> the type. A reader who may
- * not see a value must not learn what kind of value it is. Audit, then decode.
+ * <p>The order below is the contract: a value not held, then a ceiling that cannot be evaluated,
+ * then the ceiling itself -- and <b>only then</b> the type. A reader who may not see a value must
+ * not learn what kind of value it is. Audit, then decode.
  */
 final class Revealing {
 
   private final Gate gate;
   private final Trail trail;
   private final Storage storage;
-  private final Map<String, SinkSpec> sinks;
 
-  Revealing(Gate gate, Trail trail, Storage storage, List<SinkSpec> declared) {
+  Revealing(Gate gate, Trail trail, Storage storage) {
     this.gate = gate;
     this.trail = trail;
     this.storage = storage;
-    Map<String, SinkSpec> byId = new LinkedHashMap<>();
-    for (SinkSpec sink : declared) {
-      if (byId.put(sink.name(), sink) != null) {
-        throw new IllegalStateException("two sinks are registered as '" + sink.name() + "'");
-      }
-    }
-    this.sinks = Collections.unmodifiableMap(byId);
   }
 
-  <T> Revealed<T> reveal(Occluded<T> held, OccludedType<T> expected, String to) {
+  /**
+   * Hands the value to the sink the caller's portal was minted for.
+   *
+   * <p>The sink arrives whole, from the portal, rather than as a name to be looked up. A reader
+   * therefore cannot name a sink that does not exist, and there is no refusal for one.
+   */
+  <T> Revealed<T> reveal(Occluded<T> held, OccludedType<T> expected, SinkSpec sink) {
     AccessContext context = gate.asking();
-    SinkSpec sink = sinks.get(to);
-    if (sink == null) {
-      return denied(
-          Revealed.Reason.NO_SUCH_SINK,
-          "no sink is registered as '" + to + "'",
-          null,
-          held.id(),
-          to,
-          null,
-          context);
-    }
+    String to = sink.name();
     StoredMetadata entry = storage.metadata(held.id()).orElse(null);
     if (entry == null) {
       return denied(

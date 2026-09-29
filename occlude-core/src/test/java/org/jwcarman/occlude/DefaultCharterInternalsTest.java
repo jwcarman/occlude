@@ -40,47 +40,60 @@ class DefaultCharterInternalsTest {
   private static final Axis<String> TENANT = Axis.matching("tenant");
 
   @Nested
-  @DisplayName("sealing")
-  class Sealing {
+  @DisplayName("binding")
+  class Binding {
 
     @Test
-    @DisplayName("refuses to be sealed twice")
-    void refuses_to_be_sealed_twice() {
+    @DisplayName("refuses to be bound twice")
+    void refuses_to_be_bound_twice() {
       DefaultCharter charter = new DefaultCharter(TENANT);
-      charter.seal(new MemoryStorage());
+      charter.bind(new MemoryStorage(), AccessContextProvider.none());
       MemoryStorage secondStorage = new MemoryStorage();
+      AccessContextProvider nobody = AccessContextProvider.none();
 
-      assertThatThrownBy(() -> charter.seal(secondStorage))
+      assertThatThrownBy(() -> charter.bind(secondStorage, nobody))
           .isInstanceOf(IllegalStateException.class)
-          .hasMessageContaining("already sealed");
+          .hasMessageContaining("already bound");
+    }
+
+    @Test
+    @DisplayName("refuses a storage or an access source that is not there")
+    void refuses_nulls() {
+      DefaultCharter charter = new DefaultCharter(TENANT);
+      MemoryStorage storage = new MemoryStorage();
+      AccessContextProvider nobody = AccessContextProvider.none();
+
+      assertThatThrownBy(() -> charter.bind(null, nobody)).isInstanceOf(NullPointerException.class);
+      assertThatThrownBy(() -> charter.bind(storage, null))
+          .isInstanceOf(NullPointerException.class);
     }
 
     /**
-     * The one true race: two threads both observe {@code Configuring} before either publishes, both
-     * build a configuration, and only one write can win the compare-and-set. The loser must say so
-     * rather than silently discard its engine.
+     * The one true race: two threads both observe an unbound charter before either publishes, both
+     * build the operations, and only one write can win the compare-and-set. The loser must say so
+     * rather than silently discard what it built.
      */
     @Test
-    @DisplayName("refuses when two threads race to seal it at once")
-    void refuses_when_two_threads_race_to_seal_it() throws InterruptedException {
+    @DisplayName("refuses when two threads race to bind it at once")
+    void refuses_when_two_threads_race_to_bind_it() throws InterruptedException {
       DefaultCharter charter = new DefaultCharter(TENANT);
       CountDownLatch ready = new CountDownLatch(2);
       CountDownLatch go = new CountDownLatch(1);
       AtomicInteger failures = new AtomicInteger();
       AtomicInteger successes = new AtomicInteger();
-      Runnable sealAttempt =
+      Runnable bindAttempt =
           () -> {
             ready.countDown();
             awaitUninterruptibly(go);
             try {
-              charter.seal(new MemoryStorage());
+              charter.bind(new MemoryStorage(), AccessContextProvider.none());
               successes.incrementAndGet();
             } catch (IllegalStateException _) {
               failures.incrementAndGet();
             }
           };
-      Thread first = new Thread(sealAttempt);
-      Thread second = new Thread(sealAttempt);
+      Thread first = new Thread(bindAttempt);
+      Thread second = new Thread(bindAttempt);
       first.start();
       second.start();
       ready.await();
@@ -90,7 +103,9 @@ class DefaultCharterInternalsTest {
 
       assertThat(successes.get()).isEqualTo(1);
       assertThat(failures.get()).isEqualTo(1);
-      assertThat(charter.sealed()).isTrue();
+      assertThatThrownBy(() -> charter.erasure("late", (label, ctx) -> true))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("has been bound");
     }
 
     private void awaitUninterruptibly(CountDownLatch latch) {
@@ -164,13 +179,34 @@ class DefaultCharterInternalsTest {
     private final Occlude<String> source =
         charter.source("mail", STRING_TYPE, Label.of(TENANT, "acme"));
 
-    private final Reveal<String> outbox =
-        charter
-            .sink("outbox", Ceiling.of(TENANT, Constraint.any()), STRING_TYPE)
-            .reading(STRING_TYPE);
+    private final Sink outboxSink =
+        charter.sink("outbox", Ceiling.of(TENANT, Constraint.any()), STRING_TYPE);
+
+    private final Reveal<String> outbox = outboxSink.reading(STRING_TYPE);
+
+    private final Derivation<String, String> upper =
+        charter.derivation(
+            "upper",
+            STRING_TYPE,
+            STRING_TYPE,
+            String::toUpperCase,
+            d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
+
+    private final Fold<String, String> joined =
+        charter.fold(
+            "joined",
+            STRING_TYPE,
+            STRING_TYPE,
+            values -> String.join(",", values),
+            d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
+
+    private final Erasure compliance = charter.erasure("compliance", (label, ctx) -> true);
+
+    private final Inspection desk =
+        charter.inspection("desk", Ceiling.of(TENANT, Constraint.any()));
 
     {
-      charter.seal(new MemoryStorage());
+      charter.bind(new MemoryStorage(), AccessContextProvider.none());
     }
 
     @Test
@@ -184,6 +220,16 @@ class DefaultCharterInternalsTest {
     void a_reader_says_what_it_reads_and_names_its_door() {
       assertThat(outbox.type()).isEqualTo(STRING_TYPE);
       assertThat(outbox.toString()).contains("outbox").contains("string");
+    }
+
+    @Test
+    @DisplayName("every other portal names itself too")
+    void every_other_portal_names_itself() {
+      assertThat(outboxSink).hasToString("sink 'outbox'");
+      assertThat(upper).hasToString("derivation 'upper'");
+      assertThat(joined).hasToString("fold 'joined'");
+      assertThat(compliance).hasToString("erasure 'compliance'");
+      assertThat(desk).hasToString("inspection 'desk'");
     }
   }
 
@@ -213,7 +259,7 @@ class DefaultCharterInternalsTest {
           STRING_TYPE,
           String::toUpperCase,
           d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
-      charter.seal(storage);
+      charter.bind(storage, AccessContextProvider.none());
     }
 
     @Test
@@ -223,27 +269,31 @@ class DefaultCharterInternalsTest {
     }
 
     @Test
-    @DisplayName("the types it was told it may keep")
-    void the_types_it_was_told_it_may_keep() {
-      assertThat(charter.types()).extracting(OccludedType::name).contains("string");
-    }
-
-    @Test
-    @DisplayName("the sources it was declared with")
+    @DisplayName("the sources it was declared with, and the type each accepts")
     void the_sources_it_was_declared_with() {
-      assertThat(charter.sources()).containsExactly("mail");
+      assertThat(charter.manifest().sources())
+          .singleElement()
+          .satisfies(
+              entry -> {
+                assertThat(entry.name()).isEqualTo("mail");
+                assertThat(entry.writes()).isEqualTo("string");
+              });
     }
 
     @Test
     @DisplayName("the derivations it was declared with")
     void the_derivations_it_was_declared_with() {
-      assertThat(charter.derivations()).extracting(spec -> spec.name()).containsExactly("upper");
+      assertThat(charter.manifest().derivations())
+          .extracting(Manifest.Entry::name)
+          .containsExactly("upper");
     }
 
     @Test
     @DisplayName("the questions it was declared with")
     void the_questions_it_was_declared_with() {
-      assertThat(charter.queries()).extracting(QuerySpec::name).containsExactly("mentions");
+      assertThat(charter.manifest().questions())
+          .extracting(Manifest.Entry::name)
+          .containsExactly("mentions");
     }
 
     @Test
@@ -252,25 +302,17 @@ class DefaultCharterInternalsTest {
       assertThat(mentions.toString()).contains("mentions");
     }
 
+    /**
+     * An application that declares no erasure keeps a store nothing can erase from -- not a policy
+     * that says no, but no portal to ask -- and the manifest says so.
+     */
     @Test
-    @DisplayName("where it was told the access happening right now comes from")
-    void where_it_was_told_the_access_comes_from() {
-      assertThat(charter.currentAccess()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("who it was told may erase, before it is ever told anything")
-    void who_it_was_told_may_erase_before_it_is_ever_told_anything() {
-      assertThat(charter.mayErase().test(Label.nothing(), AccessContext.empty())).isFalse();
-    }
-
-    /** An application that never calls {@code mayErase(...)} keeps a store that cannot. */
-    @Test
-    @DisplayName("refuses every erasure until told otherwise")
-    void refuses_every_erasure_until_told_otherwise() {
+    @DisplayName("says nothing can be erased when no erasure was declared")
+    void says_nothing_can_be_erased_without_an_erasure() {
       Occluded<String> held = source.occlude("hello");
 
-      assertThatThrownBy(() -> charter.erase(held)).isInstanceOf(AccessDeniedException.class);
+      assertThat(charter.manifest().erasures()).isEmpty();
+      assertThat(charter.manifest().toString()).contains("nothing can be erased");
       assertThat(storage.contains(held.id())).isTrue();
     }
   }
@@ -280,30 +322,31 @@ class DefaultCharterInternalsTest {
   class ManifestFindings {
 
     /**
-     * Distinct from a ceiling that threw: {@code Sinks.varying} refuses to hand back a null
-     * ceiling, so this can only be reached with a {@link SinkSpec} that answers with nothing
-     * directly, the way an application might if it modelled "not applicable" as null rather than as
-     * a refusal.
+     * Distinct from a ceiling that threw, the way an application might answer if it modelled "not
+     * applicable" as null rather than as a refusal. A sink's ceiling refuses to hand back null, so
+     * an inspection's is where this can happen.
      */
     @Test
     @DisplayName("a ceiling that answers with nothing says so, not that it could not decide")
     void a_ceiling_that_answers_with_nothing_says_so() {
       DefaultCharter charter = new DefaultCharter(TENANT);
-      SinkSpec saysNothing =
-          new SinkSpec() {
-            @Override
-            public String name() {
-              return "outbox";
-            }
-
-            @Override
-            public Ceiling ceiling(AccessContext context) {
-              return null;
-            }
-          };
-      charter.sink(saysNothing);
+      charter.inspection("desk", ctx -> null);
 
       assertThat(charter.manifest().toString()).contains("said nothing for this access");
+    }
+
+    @Test
+    @DisplayName("a ceiling that throws says it could not decide")
+    void a_ceiling_that_throws_says_it_could_not_decide() {
+      DefaultCharter charter = new DefaultCharter(TENANT);
+      charter.sink(
+          "outbox",
+          ctx -> {
+            throw new IllegalStateException("no tenant");
+          },
+          STRING_TYPE);
+
+      assertThat(charter.manifest().toString()).contains("could not decide for this access");
     }
 
     @Test

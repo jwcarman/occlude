@@ -15,99 +15,52 @@
  */
 package org.jwcarman.occlude;
 
-import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiFunction;
 import org.jwcarman.occlude.lattice.Label;
 
 /**
- * The portals a charter hands back, each closed over the lifecycle it acts through.
+ * Mints every portal a charter hands out, each holding its own declaration and the operations it
+ * will reach once the charter is bound.
  *
- * <p>Minting is all this does. What a portal may do was settled when it was declared, and whether
- * it may do it now is the lifecycle's answer; the checks themselves belong to the operations.
+ * <p>Its own type so the charter depends on one factory rather than on every portal class, and
+ * every method returns the public interface: nothing outside this package can tell a portal's class
+ * or reach what it holds.
  */
 final class Portals {
 
-  private final Lifecycle lifecycle;
+  private final Operations operations;
 
-  Portals(Lifecycle lifecycle) {
-    this.lifecycle = lifecycle;
+  Portals(Operations operations) {
+    this.operations = operations;
   }
 
   <T> Occlude<T> source(
       String name, OccludedType<T> type, BiFunction<T, AccessContext, Label> labelling) {
-    String what = "source '" + name + "'";
-    return new Occlude<T>() {
-      @Override
-      public Occluded<T> occlude(T value) {
-        return lifecycle.operations().occluding().occlude(name, type, labelling, value);
-      }
-
-      @Override
-      public String toString() {
-        return what;
-      }
-    };
+    return new SourcePortal<>(name, type, labelling, operations);
   }
 
-  Sink sink(String name, Set<String> reads) {
-    return new Door(name, reads, lifecycle);
+  Sink sink(SinkSpec sink, Set<String> reads) {
+    return new SinkPortal(sink, reads, operations);
   }
 
   <I, O> Derivation<I, O> derivation(DerivationSpec<O> spec) {
-    return parent -> lifecycle.operations().deriving().derive(spec, List.of(parent));
+    return new DerivationPortal<>(spec, operations);
   }
 
   <I, O> Fold<I, O> fold(DerivationSpec<O> spec) {
-    return parents -> lifecycle.operations().deriving().derive(spec, List.copyOf(parents));
+    return new FoldPortal<>(spec, operations);
   }
 
   <I, Q> Query<I, Q> query(QuerySpec<I, Q> spec) {
-    String what = "query '" + spec.name() + "'";
-    return new Query<I, Q>() {
-      @Override
-      public Answer ask(Occluded<I> about, Q against) {
-        return lifecycle.operations().querying().ask(spec, about, against);
-      }
-
-      @Override
-      public String toString() {
-        return what;
-      }
-    };
+    return new QueryPortal<>(spec, operations);
   }
 
-  /** The implementation of a sink: a name, what it reads, and what it is attached to. */
-  private record Door(String name, Set<String> reads, Lifecycle lifecycle) implements Sink {
+  Erasure erasure(ErasureSpec spec) {
+    return new ErasurePortal(spec, operations);
+  }
 
-    @Override
-    public <T> Reveal<T> reading(OccludedType<T> type) {
-      Objects.requireNonNull(type, "a reader needs to say what comes out of it");
-      if (!reads.contains(type.name())) {
-        throw new IllegalStateException(
-            ("'%s' does not read %s. It was declared to read %s, and a reader cannot add to that"
-                    + " list.")
-                .formatted(name, type.name(), reads));
-      }
-      String door = name;
-      String what = "'" + door + "' reading " + type.name();
-      return new Reveal<>() {
-        @Override
-        public OccludedType<T> type() {
-          return type;
-        }
-
-        @Override
-        public Revealed<T> reveal(Occluded<T> occluded) {
-          return lifecycle.operations().revealing().reveal(occluded, type, door);
-        }
-
-        @Override
-        public String toString() {
-          return what;
-        }
-      };
-    }
+  Inspection inspection(InspectionSpec spec) {
+    return new InspectionPortal(spec, operations);
   }
 }

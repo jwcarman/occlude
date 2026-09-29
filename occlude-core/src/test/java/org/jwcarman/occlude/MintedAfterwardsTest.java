@@ -26,7 +26,7 @@ import org.jwcarman.occlude.lattice.Constraint;
 import org.jwcarman.occlude.lattice.Label;
 
 /**
- * Nothing can be declared after a charter is sealed.
+ * Nothing can be declared after a charter is bound.
  *
  * <p>This is what makes holding a portal mean anything. A charter constitutes authority, so anyone
  * still holding one could otherwise manufacture a door at any label, or a derivation reading
@@ -40,7 +40,7 @@ import org.jwcarman.occlude.lattice.Label;
  * the declaration fails, which is the same property found one step earlier: at startup, rather than
  * at whichever request first reached the forged portal.
  */
-@DisplayName("A charter that has been sealed")
+@DisplayName("A charter that has been bound")
 class MintedAfterwardsTest {
 
   private static final OccludedType<Token> TOKEN_TYPE = OccludedType.of(Token.class);
@@ -56,8 +56,10 @@ class MintedAfterwardsTest {
   private final Occlude<Token> acmeTokens =
       config.source("acme-tokens", TOKEN_TYPE, ctx -> Label.of(TENANT, "acme"));
 
+  private final MemoryStorage storage = new MemoryStorage();
+
   {
-    config.seal(new MemoryStorage());
+    config.bind(storage, AccessContextProvider.none());
   }
 
   private final Occluded<Token> secret = acmeTokens.occlude(new Token("acme's cardholder token"));
@@ -65,7 +67,7 @@ class MintedAfterwardsTest {
   @Test
   @DisplayName("still works, so the refusals below mean something")
   void the_charter_itself_still_works() {
-    assertThat(config.label(secret.id())).isEqualTo(Label.of(TENANT, "acme"));
+    assertThat(Stored.label(storage, secret.id())).isEqualTo(Label.of(TENANT, "acme"));
   }
 
   @Test
@@ -73,7 +75,7 @@ class MintedAfterwardsTest {
   void cannot_be_a_source() {
     assertThatThrownBy(() -> config.source("forged", TOKEN_TYPE, ctx -> Label.of(TENANT, "globex")))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("has been sealed");
+        .hasMessageContaining("has been bound");
   }
 
   @Test
@@ -88,7 +90,7 @@ class MintedAfterwardsTest {
                     t -> new Token(t.value()),
                     d -> d.accepting(ctx -> Ceiling.of(TENANT, Constraint.any()))))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("has been sealed");
+        .hasMessageContaining("has been bound");
   }
 
   @Test
@@ -96,7 +98,7 @@ class MintedAfterwardsTest {
   void cannot_be_a_sink() {
     assertThatThrownBy(this::forgedSinkReadingTokens)
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("has been sealed");
+        .hasMessageContaining("has been bound");
   }
 
   private Reveal<Token> forgedSinkReadingTokens() {
@@ -115,7 +117,7 @@ class MintedAfterwardsTest {
                     all -> all.getFirst(),
                     d -> d.accepting(ctx -> Ceiling.of(TENANT, Constraint.any()))))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("has been sealed");
+        .hasMessageContaining("has been bound");
   }
 
   @Test
@@ -130,6 +132,6 @@ class MintedAfterwardsTest {
                     (token, against, ctx) -> token.value().contains(against),
                     d -> d.accepting(ctx -> Ceiling.nothing())))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("has been sealed");
+        .hasMessageContaining("has been bound");
   }
 }

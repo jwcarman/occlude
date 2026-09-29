@@ -50,8 +50,6 @@ public sealed interface Revealed<T> {
   enum Reason {
     /** No such value. Also what a manufactured id gets. */
     NO_SUCH_VALUE,
-    /** No sink registered under that name. */
-    NO_SUCH_SINK,
     /** The handle claimed a type the stored value does not have. */
     WRONG_TYPE,
     /** The label is above what this sink accepts. The ordinary refusal. */

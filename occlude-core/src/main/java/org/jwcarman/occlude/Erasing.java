@@ -16,14 +16,12 @@
 package org.jwcarman.occlude;
 
 import java.util.List;
-import java.util.function.BiPredicate;
-import org.jwcarman.occlude.lattice.Label;
 
 /**
  * Forgetting a value and everything derived from it.
  *
- * <p>The order below is the contract: a value not held is a recorded no-op; the policy is
- * consulted, and one that throws is a recorded refusal; and the deletions and their lines are
+ * <p>The order below is the contract: a value not held is a recorded refusal; the erasure's policy
+ * is consulted, and one that throws is a recorded refusal; and the deletions and their lines are
  * written in one transaction.
  */
 final class Erasing {
@@ -31,16 +29,21 @@ final class Erasing {
   private final Gate gate;
   private final Trail trail;
   private final Storage storage;
-  private final BiPredicate<Label, AccessContext> mayErase;
 
-  Erasing(Gate gate, Trail trail, Storage storage, BiPredicate<Label, AccessContext> mayErase) {
+  Erasing(Gate gate, Trail trail, Storage storage) {
     this.gate = gate;
     this.trail = trail;
     this.storage = storage;
-    this.mayErase = mayErase;
   }
 
-  int erase(Occluded<?> root) {
+  /**
+   * Erases through the portal the caller holds, whose policy arrives with it.
+   *
+   * <p>A refused line names the erasure that refused, because an application may declare several
+   * and the record should say whose policy said no. An allowed line names the root instead, which
+   * is what ties every descendant's line to the value its erasure was about.
+   */
+  Erased erase(Occluded<?> root, ErasureSpec erasure) {
     AccessContext asking = gate.asking();
     StoredMetadata entry = storage.metadata(root.id()).orElse(null);
     if (entry == null) {
@@ -50,18 +53,18 @@ final class Erasing {
       trail.audit(
           AuditRecord.Operation.ERASE,
           root.id(),
-          null,
+          erasure.name(),
           AuditRecord.Outcome.REFUSED,
           Why.of("no such value"),
           null,
           asking);
-      return 0;
+      return new Erased.Refused(Erased.Reason.NO_SUCH_VALUE, Gate.NOT_HOLDING + root.id());
     }
     // Application code, so it throws, and a gate that could not decide has not said yes. Left to
     // propagate, an erasure nobody was allowed to attempt left no line saying it was attempted.
     boolean permitted;
     try {
-      permitted = mayErase.test(entry.label(), asking);
+      permitted = erasure.mayErase().test(entry.label(), asking);
     } catch (RuntimeException _) {
       permitted = false;
     }
@@ -69,14 +72,13 @@ final class Erasing {
       trail.audit(
           AuditRecord.Operation.ERASE,
           root.id(),
-          null,
+          erasure.name(),
           AuditRecord.Outcome.REFUSED,
           Why.of("not permitted to erase"),
           null,
           asking);
-      throw new AccessDeniedException(
-          Revealed.Reason.ABOVE_CEILING,
-          "erasing is refused: this store was not told who may erase");
+      return new Erased.Refused(
+          Erased.Reason.NOT_PERMITTED, "'" + erasure.name() + "' may not erase " + root.id());
     }
     // One line per value, not one per call, and written by the storage inside the same
     // transaction as the deletes. Every other operation writes a line naming the value it acted
@@ -101,6 +103,6 @@ final class Erasing {
                     Why.of("erased"),
                     null,
                     asking));
-    return removed.size();
+    return new Erased.Removed(removed.size());
   }
 }

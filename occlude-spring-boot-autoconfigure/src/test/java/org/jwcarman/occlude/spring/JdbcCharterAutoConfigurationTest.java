@@ -16,6 +16,7 @@
 package org.jwcarman.occlude.spring;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -103,15 +104,18 @@ class JdbcCharterAutoConfigurationTest {
   }
 
   @Test
-  @DisplayName("contributes storage, and the charter is sealed to it")
-  void contributes_storage_and_the_charter_is_sealed() {
+  @DisplayName("contributes storage, and the charter is bound to it")
+  void contributes_storage_and_the_charter_is_bound() {
     runner
         .withUserConfiguration(AnApplication.class)
         .run(
             context -> {
               assertThat(context).hasNotFailed();
               assertThat(context).hasSingleBean(JdbcStorage.class);
-              assertThat(context.getBean(Charter.class).sealed()).isTrue();
+              Charter charter = context.getBean(Charter.class);
+              assertThatThrownBy(() -> charter.erasure("probe", (label, ctx) -> true))
+                  .isInstanceOf(IllegalStateException.class)
+                  .hasMessageContaining("has been bound");
             });
   }
 

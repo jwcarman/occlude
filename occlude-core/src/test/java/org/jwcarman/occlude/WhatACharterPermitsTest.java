@@ -31,7 +31,7 @@ import org.jwcarman.occlude.lattice.Label;
  *
  * <p>Not a convenience. It is what lets a build render the manifest, diff one release against the
  * last, and fail on a change nobody meant to make -- in a unit test, with no container, from a
- * charter that was never sealed to anything.
+ * charter that was never bound to anything.
  *
  * <p>Everything here runs against a charter in its configuring state. There is no storage in this
  * file at all, which is the point of it.
@@ -182,10 +182,8 @@ class WhatACharterPermitsTest {
   }
 
   @Test
-  @DisplayName("is answerable before it has been sealed to anything")
-  void is_answerable_before_sealing() {
-    assertThat(charter.sealed()).isFalse();
-
+  @DisplayName("is answerable before it has been bound to anything")
+  void is_answerable_before_binding() {
     assertThat(charter.manifest()).isNotNull();
   }
 
@@ -245,9 +243,9 @@ class WhatACharterPermitsTest {
   /**
    * A snapshot cannot be changed once anyone can see it.
    *
-   * <p>Declaring is one atomic transition over an immutable configuration, which is what stops it
-   * racing a seal. That rests on the snapshot really being immutable rather than on every future
-   * edit to those methods remembering to copy.
+   * <p>A manifest can be rendered from a request thread while nothing else touches the charter, and
+   * handed to code that may keep it. That rests on what it hands out really being immutable rather
+   * than on every future edit remembering to copy.
    */
   @Test
   @DisplayName("hands out a view of itself that nothing can change underneath it")
@@ -262,14 +260,14 @@ class WhatACharterPermitsTest {
 
   /** Portals exist and are inert: the charter can be read, but nothing it made can act. */
   @Test
-  @DisplayName("does not let anything it constituted act until it is sealed")
-  void nothing_acts_before_sealing() {
+  @DisplayName("does not let anything it constituted act until it is bound")
+  void nothing_acts_before_binding() {
     Card card = new Card("4111111111114821");
     Occluded<Card> cardHandle = Occluded.of("occ_x");
     Occluded<Last4> last4Handle = Occluded.of("occ_x");
     Assertions.assertThatThrownBy(() -> cards.occlude(card))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("before its charter is sealed");
+        .hasMessageContaining("before its charter is bound");
     Assertions.assertThatThrownBy(() -> truncate.derive(cardHandle))
         .isInstanceOf(IllegalStateException.class);
     Assertions.assertThatThrownBy(() -> approvalDesk.reveal(last4Handle))

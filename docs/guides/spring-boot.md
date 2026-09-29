@@ -22,18 +22,17 @@ rather than a guessed one.
 
 ## Who constructs what
 
-The starter constructs the charter and is therefore **the only thing able to seal it**. The
-application receives a `Charter` to declare on — never one it could bring into force or erase
-through.
+The starter constructs the charter and is therefore **the only thing able to bind it**. The
+application receives a `Charter` to declare on — never one it could bring into force.
 
-`Charter` declares portals and reports on the *declarations*: `axes()` and `manifest()`. It cannot
-seal, cannot erase, and cannot report on any held value — no `label`, no `lineage`, no `holds`.
-Those stay with whoever constructed it, which here is the starter.
+`Charter` declares portals and reports on the *declarations*: `axes()` and `manifest()`. Erasing a
+value takes an `Erasure` and reading its label takes an `Inspection`, declared like any other
+portal and handed to whatever needs them.
 
 !!! note "It is a statement of intent, not a sandbox"
     The implementation's privileged methods are public, so a cast on the injected bean defeats
-    this. What the interface buys is that a class asking for the ability to erase has to say so in
-    a way a reviewer can see.
+    this. What the interface buys is that a class asking for the ability to bring authority into
+    force has to say so in a way a reviewer can see.
 
 ## Declaring portals
 
@@ -53,8 +52,8 @@ DisputeService disputeService(Charter charter, Invoices invoices) {
 }
 ```
 
-Nothing here knows when the charter is sealed, and nothing has to: a portal is attached when it is,
-and none of these is used before the context is ready.
+Nothing here knows when the charter is bound, and nothing has to: every portal comes into force when
+it is, and none of these is used before the context is ready.
 
 ## Where identity comes from
 
@@ -67,8 +66,9 @@ AccessContextProvider currentAccess() {
 }
 ```
 
-The tenant reaches the gate without being threaded through every call, and nothing a caller passes
-can influence it.
+The starter binds the charter with this, beside the storage. The tenant reaches the gate without
+being threaded through every call, and nothing a caller passes can influence it. Without one, every
+access is nobody in particular.
 
 ## Storage
 
@@ -76,7 +76,7 @@ Contribute a `Storage` bean, or put `occlude-jdbc` on the classpath and give it 
 `CodecFactory` and a `StorageCodec`. See [Storage](storage.md).
 
 If an application declares a charter and nothing supplies storage, startup fails with a message
-saying so. It used to seal silently and every portal refused at request time instead.
+saying so. It used to carry on silently and every portal refused at request time instead.
 
 ## The charter endpoint
 
@@ -145,5 +145,5 @@ occlude:
   log-manifest: true
 ```
 
-Prints the manifest as the application seals. Pair it with a build that renders one per
+Prints the manifest as the charter is bound. Pair it with a build that renders one per
 representative access and diffs it — see [Reviewing a Charter](reviewing.md).

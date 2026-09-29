@@ -43,6 +43,8 @@ import org.springframework.boot.actuate.endpoint.annotation.Selector;
  * /actuator/charter/sinks/{name}  one door out
  * /actuator/charter/derivations/{name}   one way of making a value from another
  * /actuator/charter/questions/{name}     one question
+ * /actuator/charter/erasures/{name}      one authority to erase
+ * /actuator/charter/inspections/{name}   one authority to read labels
  * /actuator/charter/findings             what is provably unreachable
  * </pre>
  *
@@ -68,6 +70,8 @@ public class CharterEndpoint {
   private static final String SINKS = "sinks";
   private static final String DERIVATIONS = "derivations";
   private static final String QUESTIONS = "questions";
+  private static final String ERASURES = "erasures";
+  private static final String INSPECTIONS = "inspections";
   private static final String FINDINGS = "findings";
 
   private final Charter charter;
@@ -81,13 +85,16 @@ public class CharterEndpoint {
   public Map<String, Object> charter() {
     Manifest manifest = charter.manifest();
     Map<String, Object> report = new LinkedHashMap<>();
-    report.put("sealed", charter.sealed());
     report.put("axes", axes());
     report.put(TYPES, types(manifest));
     report.put(SOURCES, entries(manifest.sources()));
     report.put(SINKS, doors(manifest.sinks()));
     report.put(DERIVATIONS, entries(manifest.derivations()));
     report.put(QUESTIONS, entries(manifest.questions()));
+    report.put(ERASURES, entries(manifest.erasures()));
+    // An inspection's detail is its ceiling evaluated for an access, which this endpoint will not
+    // render, for the reason a sink's is not.
+    report.put(INSPECTIONS, doors(manifest.inspections()));
     report.put("weakening", entries(manifest.weakening()));
     // What an auditor came for: a door nobody can reach, or one reading a type nothing makes.
     // Provable from the declarations, so a finding is a fact rather than a suspicion.
@@ -112,6 +119,8 @@ public class CharterEndpoint {
       case SINKS -> report.put(SINKS, doors(manifest.sinks()));
       case DERIVATIONS -> report.put(DERIVATIONS, entries(manifest.derivations()));
       case QUESTIONS -> report.put(QUESTIONS, entries(manifest.questions()));
+      case ERASURES -> report.put(ERASURES, entries(manifest.erasures()));
+      case INSPECTIONS -> report.put(INSPECTIONS, doors(manifest.inspections()));
       case FINDINGS -> report.put(FINDINGS, findings(manifest));
       default -> {
         return null; // 404: this endpoint has no such section.
@@ -161,6 +170,8 @@ public class CharterEndpoint {
           case SINKS -> manifest.sinks();
           case DERIVATIONS -> manifest.derivations();
           case QUESTIONS -> manifest.questions();
+          case ERASURES -> manifest.erasures();
+          case INSPECTIONS -> manifest.inspections();
           default -> null;
         };
     if (in == null) {

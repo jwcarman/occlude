@@ -158,10 +158,11 @@ Saving a row is not worth a rule with an exception in it.
 
 Identity is known at the edge and needed at the gate, which may be many layers down. Threading a
 context through all of them makes the safety feature the most annoying thing in the codebase, and
-annoying safety features get routed around. So say once where the answer lives:
+annoying safety features get routed around. So say once where the answer lives, when the charter
+is bound to its storage:
 
 ```java
-charter.currentAccess(() -> AccessContext.of(Map.of(
+charter.bind(storage, () -> AccessContext.of(Map.of(
     "tenant", CurrentTenant.get(),
     "principal", SecurityContextHolder.getContext().getAuthentication().getName())));
 ```
@@ -202,8 +203,8 @@ chain that verifies. Detecting it needs an anchor kept somewhere the writer cann
 ## Erasing
 
 A label has nothing to say about whether a value may be *destroyed* — "possession is not authority"
-is a rule about reading. So the authority to erase is named separately with `mayErase(...)`, or it
-is not granted, and an application that never erases gets a charter that cannot.
+is a rule about reading. So the authority to erase is a portal of its own, `charter.erasure(name,
+policy)`, and an application that declares none keeps a store nothing can erase from.
 
 The policy sees the label of the value being destroyed as well as who is asking, because who alone
 is not enough: a rule checking only the caller's role lets one tenant's compliance officer destroy
@@ -255,8 +256,8 @@ A `MemoryStorage` exists for tests and for proving a policy before a database is
 
 ## Spring Boot
 
-Declare the axes. The starter constructs the charter and is therefore the only thing able to seal
-it, so nothing in the application can bring one into force or erase through one.
+Declare the axes. The starter constructs the charter and is therefore the only thing able to bind
+it, so nothing in the application can bring one into force.
 
 ```java
 @Bean
@@ -266,11 +267,12 @@ Axes billingAxes() {
 ```
 
 `Charter` is the interface every bean is handed. It declares portals and reports on the
-*declarations* — `axes()`, `manifest()`. It cannot seal, cannot erase, and cannot report on any
-held value: no `label`, no `lineage`, no `holds`. Those stay with whoever constructed it.
+*declarations* — `axes()`, `manifest()`. It cannot bind, and it answers nothing about a held value:
+erasing one takes an `Erasure` and reading its label takes an `Inspection`, portals somebody
+declared and handed over like any other.
 
 `manifest()` is meant to be printed at startup and pasted into a review. It answers before the
-charter is sealed to any storage, because it describes the declarations rather than any value — so
+charter is bound to any storage, because it describes the declarations rather than any value — so
 a build can render it, diff it against the last release, and fail on a change nobody meant to make.
 
 ## Building

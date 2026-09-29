@@ -1,6 +1,6 @@
 # Portals activate on binding
 
-Status: agreed, in progress.
+Status: landed.
 
 ## What prompted this
 

@@ -15,13 +15,9 @@
  */
 package org.jwcarman.occlude;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -35,40 +31,22 @@ import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Label;
 
 /**
- * How a store is built: the axes its labels are said on, and the sinks values may reach.
+ * Where an application declares its authority, and nothing more.
  *
- * <p>Both are wiring-time decisions on purpose. An axis supplied later could reorder what is
- * permitted underneath values already stored, and a sink supplied at a call site would let any code
- * invent its own permission.
+ * <p>Every declaration hands back a portal that carries everything its operation needs. Binding the
+ * charter to storage brings them all into force at once, and after that the charter has no further
+ * part to play: the portals hold the operations, and nothing looks anything up by name.
+ *
+ * <p>The axes are a constructor argument because an axis supplied later could reorder what is
+ * permitted underneath values already stored; the rest is declared on one thread while the
+ * application wires itself, and refused once the charter is bound.
  */
 public final class DefaultCharter implements Charter {
 
   private final Axes axes;
-
-  // Written only while this charter is being configured, which is single-threaded by contract: an
-  // application wires itself on one thread, and nothing it constitutes can act until it is sealed.
-  // Sealing copies all of it into an immutable snapshot and publishes that with one atomic write,
-  // which is the only moment any of it crosses to the threads that will use a portal.
-  private final Map<String, OccludedType<?>> types = new LinkedHashMap<>();
-  private final Map<String, OccludedType<?>> sources = new LinkedHashMap<>();
-
-  /**
-   * What each door hands out, which the charter did not used to know.
-   *
-   * <p>The readable types lived only in the object handed back to whoever declared the door, so
-   * nothing could report what a sink produces or work out whether anything produces what it reads.
-   * A door nobody can reach is dead authority, and it is also the shape a half-applied rename
-   * takes.
-   */
-  private final Map<String, Set<String>> sinkReads = new LinkedHashMap<>();
-
-  private final List<SinkSpec> sinks = new ArrayList<>();
-  private final List<DerivationSpec<?>> derivations = new ArrayList<>();
-  private final List<QuerySpec<?, ?>> queries = new ArrayList<>();
-  private AccessContextProvider currentAccess = AccessContextProvider.none();
-  private BiPredicate<Label, AccessContext> mayErase = (label, context) -> false;
-  private final Lifecycle lifecycle = new Lifecycle();
-  private final Portals portals = new Portals(lifecycle);
+  private final Declarations declarations = new Declarations();
+  private final Operations operations = new Operations();
+  private final Portals portals = new Portals(operations);
 
   /**
    * The questions this charter asks about every value it holds.
@@ -86,90 +64,67 @@ public final class DefaultCharter implements Charter {
     this(Axes.of(axes));
   }
 
-  /** The schema this charter was constituted with. */
+  @Override
   public Axes axes() {
     return axes;
   }
 
   /**
-   * Brings every portal this charter constituted into force at once, against this storage.
+   * Brings every portal this charter constituted into force at once, against this storage, with
+   * identity coming from {@code currentAccess}.
    *
    * <p>Irreversible. After it returns, nothing further may be declared and everything already
-   * declared works. There is no way back: no unseal, no rebind, no replacing the storage.
+   * declared works. There is no way back: no unbinding, no rebinding, no replacing the storage.
+   *
+   * <p>Where the access happening right now comes from is supplied here rather than declared,
+   * because it is not authority: it is where identity lives in this environment, exactly as storage
+   * is where values live.
+   *
+   * <p>Identity is known at the edge -- a request, a message, a session -- and needed at the gate,
+   * which may be many layers down. Threading an {@code AccessContext} parameter through all of them
+   * would make the safety feature the most annoying thing in the codebase, and annoying safety
+   * features get routed around.
+   *
+   * <p>So the application says once where the answer lives. A {@code ThreadLocal}, a {@code
+   * ScopedValue}, Spring's {@code SecurityContextHolder} -- a store does not care, and has no
+   * opinion about how a request scope works.
+   *
+   * <p>Whatever this returns is taken as fact. It is the one input a caller cannot argue with,
+   * which is why it must come from somewhere a caller does not control.
+   *
+   * <pre>{@code
+   * charter.bind(storage, () -> AccessContext.of(Map.of(
+   *     "tenant", CurrentTenant.get(),
+   *     "principal", SecurityContextHolder.getContext().getAuthentication().getName()))))
+   * }</pre>
+   *
+   * <p>An application with no notion of identity passes {@link AccessContextProvider#none()}, and
+   * says so where it binds rather than getting it by forgetting.
    */
-  public void seal(Storage storage) {
-    Objects.requireNonNull(storage, "a charter is sealed to a storage");
-    lifecycle.seal(axes, this::declared, storage);
+  public void bind(Storage storage, AccessContextProvider currentAccess) {
+    Objects.requireNonNull(storage, "a charter is bound to a storage");
+    Objects.requireNonNull(currentAccess, "a charter is told where identity comes from");
+    operations.bind(axes, storage, currentAccess);
   }
-
-  /** Whether this charter has been brought into force. */
-  public boolean sealed() {
-    return lifecycle.sealed();
-  }
-
-  Lifecycle lifecycle() {
-    return lifecycle;
-  }
-
-  /** What has been declared, from wherever it currently lives. */
-  private Configuration configuration() {
-    return lifecycle.configuration(this::declared);
-  }
-
-  /** The fields as they stand, copied, which is what sealing publishes. */
-  private Configuration declared() {
-    return new Configuration(
-        types, sources, sinkReads, sinks, derivations, queries, currentAccess, mayErase);
-  }
-
-  /** Somewhere values may go. Registered once; referenced by name forever after. */
-  @Override
-  public DefaultCharter sink(SinkSpec sink) {
-    Objects.requireNonNull(sink, "a sink must not be null");
-    lifecycle.stillWriting();
-    sinks.add(sink);
-    return this;
-  }
-
-  // ------------------------------------------------------------------ the types it will keep
 
   /**
-   * Records a type and refuses a name that already means something else.
+   * Refuses anything further once this charter is in force.
    *
-   * <p>Called by every declaration, so the check does not depend on how the type was declared. A
-   * name has to identify one type: two of them sharing a name means a reader is handed the wrong
-   * one, and finding that out at startup beats finding it out from a decode failure in production.
+   * <p>A security invariant rather than an ergonomic one: an authority graph that can still grow is
+   * not one anybody can reason about.
    */
-  <T> OccludedType<T> registered(OccludedType<T> declared) {
-    OccludedType<?> existing = types.get(declared.name());
-    if (existing != null && !existing.type().getType().equals(declared.type().getType())) {
+  private void stillWriting() {
+    if (operations.bound()) {
       throw new IllegalStateException(
-          ("two types both want the name '%s': %s and %s. A stored name has to identify one type,"
-                  + " or a reader gets handed the wrong one. Name one of them explicitly.")
-              .formatted(
-                  declared.name(),
-                  existing.type().getType().getTypeName(),
-                  declared.type().getType().getTypeName()));
-    }
-    return declared;
-  }
-
-  /** Everything this charter was told it may keep, for the manifest. */
-  Collection<OccludedType<?>> types() {
-    return List.copyOf(configuration().types().values());
-  }
-
-  /** Validates each type and folds it into the configuration the caller is about to leave. */
-  void recording(OccludedType<?>... declared) {
-    for (OccludedType<?> type : declared) {
-      registered(type);
-      types.put(type.name(), type);
+          "nothing further can be declared: this charter has been bound, and an authority graph"
+              + " that can still grow is not one anybody can reason about");
     }
   }
 
   // ------------------------------------------------------------------ declaring capabilities
 
   /** A source whose label depends on neither what arrives nor who is acting. */
+  @Override
   public <T> Occlude<T> source(String name, OccludedType<T> type, Label label) {
     Objects.requireNonNull(label, "a source needs a label");
     return source(name, type, (value, context) -> label);
@@ -182,21 +137,21 @@ public final class DefaultCharter implements Charter {
    * says. Reach for the other form when the label is a property of the value -- a classification
    * marking inside a document, a sender the ingest verified, a scan that found card numbers.
    */
+  @Override
   public <T> Occlude<T> source(
       String name, OccludedType<T> type, Function<AccessContext, Label> labelling) {
+    Objects.requireNonNull(labelling, "a source needs to say how it labels what arrives");
     return source(name, type, (value, context) -> labelling.apply(context));
   }
 
+  @Override
   public <T> Occlude<T> source(
       String name, OccludedType<T> type, BiFunction<T, AccessContext, Label> labelling) {
     Objects.requireNonNull(name, "a source needs a name");
     Objects.requireNonNull(type, "a source needs to know what it accepts");
     Objects.requireNonNull(labelling, "a source needs to say how it labels what arrives");
-    lifecycle.stillWriting();
-    if (sources.putIfAbsent(name, type) != null) {
-      throw new IllegalStateException("two sources are registered as '" + name + "'");
-    }
-    recording(type);
+    stillWriting();
+    declarations.source(name, type);
     return portals.source(name, type, labelling);
   }
 
@@ -211,6 +166,7 @@ public final class DefaultCharter implements Charter {
    *
    * @param reads every type this sink will hand over, and no others
    */
+  @Override
   public Sink sink(
       String name, Function<AccessContext, Ceiling> ceiling, OccludedType<?>... reads) {
     Objects.requireNonNull(name, "a sink needs a name");
@@ -228,14 +184,14 @@ public final class DefaultCharter implements Charter {
     for (OccludedType<?> type : reads) {
       names.add(type.name());
     }
-    lifecycle.stillWriting();
-    recording(reads);
-    sinks.add(Sinks.varying(name, ceiling));
-    sinkReads.put(name, Collections.unmodifiableSet(names));
-    return portals.sink(name, Collections.unmodifiableSet(names));
+    stillWriting();
+    SinkSpec sink = Sinks.varying(name, ceiling);
+    declarations.sink(sink, names, reads);
+    return portals.sink(sink, Collections.unmodifiableSet(names));
   }
 
   /** The same, for a ceiling that does not depend on who is asking. */
+  @Override
   public Sink sink(String name, Ceiling ceiling, OccludedType<?>... reads) {
     Objects.requireNonNull(ceiling, "a sink needs a ceiling");
     return sink(name, context -> ceiling, reads);
@@ -355,94 +311,9 @@ public final class DefaultCharter implements Charter {
             settings.relabel(),
             settings.availableTo(),
             fold);
-    lifecycle.stillWriting();
-    OccludedType<?>[] declared = new OccludedType<?>[inputTypes.size() + 1];
-    inputTypes.toArray(declared);
-    declared[inputTypes.size()] = outputType;
-    recording(declared);
-    derivations.add(spec);
+    stillWriting();
+    declarations.derivation(spec);
     return capability.apply(spec);
-  }
-
-  List<DerivationSpec<?>> derivations() {
-    return configuration().derivations();
-  }
-
-  /**
-   * Where the access happening right now comes from.
-   *
-   * <p>Identity is known at the edge -- a request, a message, a session -- and needed at the gate,
-   * which may be many layers down. Threading an {@code AccessContext} parameter through all of them
-   * would make the safety feature the most annoying thing in the codebase, and annoying safety
-   * features get routed around.
-   *
-   * <p>So the application says once where the answer lives. A {@code ThreadLocal}, a {@code
-   * ScopedValue}, Spring's {@code SecurityContextHolder} -- a store does not care, and has no
-   * opinion about how a request scope works.
-   *
-   * <p>Whatever this returns is taken as fact. It is the one input a caller cannot argue with,
-   * which is why it must come from somewhere a caller does not control.
-   *
-   * <pre>{@code
-   * .currentAccess(() -> AccessContext.of(Map.of(
-   *     "tenant", CurrentTenant.get(),
-   *     "principal", SecurityContextHolder.getContext().getAuthentication().getName())))
-   * }</pre>
-   *
-   * <p>An application with no notion of identity says nothing and every context is empty.
-   */
-  @Override
-  public DefaultCharter currentAccess(AccessContextProvider currentAccess) {
-    Objects.requireNonNull(currentAccess, "an access source must not be null");
-    lifecycle.stillWriting();
-    this.currentAccess = currentAccess;
-    return this;
-  }
-
-  AccessContextProvider currentAccess() {
-    return currentAccess;
-  }
-
-  /**
-   * Who may erase what.
-   *
-   * <p>Takes the label of the value being erased as well as who is asking, because who alone is not
-   * enough: a policy that only asks the caller's role lets one tenant's compliance officer destroy
-   * another tenant's records. Whatever the rule, it has to see what is about to be destroyed.
-   *
-   * <pre>{@code
-   * .mayErase((label, ctx) ->
-   *     ctx.has("role", "compliance") && LATTICE.permits(label, everythingIMayRead(ctx)))
-   * }</pre>
-   *
-   * <p>Refuses everyone until this says otherwise, because erasure is the one operation a label
-   * does not govern on its own. Every other gate asks whether a value may be <i>disclosed</i>
-   * somewhere; a label has nothing to say about whether it may be <i>destroyed</i>, and "possession
-   * is not authority" is a rule about reading. An application that never erases says nothing and
-   * keeps a store that cannot.
-   *
-   * <p><b>Descendants go regardless.</b> The check is against the root, and everything derived from
-   * it is removed whether or not it is labelled more constrained -- which is what erasure means. A
-   * value derived from two customers dies with either of them.
-   */
-  @Override
-  public DefaultCharter mayErase(BiPredicate<Label, AccessContext> mayErase) {
-    Objects.requireNonNull(mayErase, "an erasure policy must not be null");
-    lifecycle.stillWriting();
-    this.mayErase = mayErase;
-    return this;
-  }
-
-  BiPredicate<Label, AccessContext> mayErase() {
-    return mayErase;
-  }
-
-  List<SinkSpec> sinks() {
-    return configuration().sinks();
-  }
-
-  Set<String> sources() {
-    return configuration().sources().keySet();
   }
 
   /**
@@ -473,15 +344,57 @@ public final class DefaultCharter implements Charter {
     }
     QuerySpec<I, Q> spec =
         new QuerySpec<>(name, input, asking, settings.ceiling(), settings.availableTo());
-    lifecycle.stillWriting();
-    recording(input);
-    queries.add(spec);
+    stillWriting();
+    declarations.query(spec);
     return portals.query(spec);
   }
 
-  /** What a query still needs said about it before it becomes a capability. */
-  List<QuerySpec<?, ?>> queries() {
-    return configuration().queries();
+  /**
+   * Mints the authority to forget a value and everything derived from it.
+   *
+   * <p>The policy sees the label of what is about to be destroyed as well as who is asking, because
+   * who alone is not enough: a policy that only asks the caller's role lets one tenant's compliance
+   * officer destroy another tenant's records.
+   *
+   * <pre>{@code
+   * Erasure compliance = charter.erasure("compliance", (label, ctx) ->
+   *     ctx.has("role", "compliance") && LATTICE.permits(label, everythingIMayRead(ctx)));
+   * }</pre>
+   *
+   * <p>An application that declares none keeps a store nothing can erase from, and one that
+   * declares several -- a compliance officer, a retention job -- gets each named in the record.
+   */
+  @Override
+  public Erasure erasure(String name, BiPredicate<Label, AccessContext> mayErase) {
+    Objects.requireNonNull(name, "an erasure needs a name");
+    Objects.requireNonNull(mayErase, "an erasure needs a policy");
+    ErasureSpec spec = new ErasureSpec(name, mayErase);
+    stillWriting();
+    declarations.erasure(spec);
+    return portals.erasure(spec);
+  }
+
+  /**
+   * Mints the authority to read what a value is labelled and where it came from.
+   *
+   * <p>Checked against this ceiling and recorded like every other access, because a label names a
+   * tenant or a project codeword and is protected everywhere else as though it were the value.
+   */
+  @Override
+  public Inspection inspection(String name, Function<AccessContext, Ceiling> ceiling) {
+    Objects.requireNonNull(name, "an inspection needs a name");
+    Objects.requireNonNull(ceiling, "an inspection needs a ceiling");
+    InspectionSpec spec = new InspectionSpec(name, ceiling);
+    stillWriting();
+    declarations.inspection(spec);
+    return portals.inspection(spec);
+  }
+
+  /** The same, for a ceiling that does not depend on who is asking. */
+  @Override
+  public Inspection inspection(String name, Ceiling ceiling) {
+    Objects.requireNonNull(ceiling, "an inspection needs a ceiling");
+    return inspection(name, context -> ceiling);
   }
 
   // ------------------------------------------------------------------ what a charter reports
@@ -492,6 +405,7 @@ public final class DefaultCharter implements Charter {
    * <p>Administrative, and deliberately not something a portal offers. Reading it tells you what
    * the system can do; it is not a way to do any of it.
    */
+  @Override
   public Manifest manifest() {
     return manifest(AccessContext.empty());
   }
@@ -499,43 +413,6 @@ public final class DefaultCharter implements Charter {
   @Override
   public Manifest manifest(AccessContext as) {
     Objects.requireNonNull(as, "a manifest is rendered for some access, even an empty one");
-    return Manifests.of(configuration(), as);
-  }
-
-  /**
-   * How a value is labelled. For a report or an operator, never for a decision.
-   *
-   * <p>Deliberately not on {@link Charter}. A label names a tenant or a project codeword, which is
-   * why storage encrypts it and the audit protects it like a value; handing it out from the object
-   * every bean holds, with no ceiling and no line in the record, would say it is ordinary. Whoever
-   * constructs a charter keeps this, the same way it keeps {@code seal} and {@code erase}.
-   */
-  public Label label(Occluded<?> occluded) {
-    return label(occluded.id());
-  }
-
-  /** The same, for an identifier that arrived without its type. */
-  public Label label(String id) {
-    return lifecycle.operations().gate().label(id);
-  }
-
-  /** Where a value came from. */
-  public Lineage lineage(Occluded<?> occluded) {
-    return lineage(occluded.id());
-  }
-
-  /** The same, for an identifier that arrived without its type. */
-  public Lineage lineage(String id) {
-    return lifecycle.operations().gate().lineage(id);
-  }
-
-  /**
-   * Forgets a value and everything derived from it.
-   *
-   * <p>Still guarded by {@code mayErase} against the acting context rather than by holding a
-   * portal, which makes it the last authority here that is checked rather than held.
-   */
-  public int erase(Occluded<?> root) {
-    return lifecycle.operations().erasing().erase(root);
+    return Manifests.of(declarations, as);
   }
 }

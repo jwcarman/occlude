@@ -131,7 +131,7 @@ class PolicyThatCannotDecideTest {
           d -> d.accepting(ctx -> Ceiling.of(TENANT, Constraint.any())));
 
   {
-    config.seal(storage);
+    config.bind(storage, AccessContextProvider.none());
   }
 
   private final Occluded<String> held = source.occlude("secret");

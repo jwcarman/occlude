@@ -24,12 +24,13 @@ import org.jwcarman.occlude.lattice.Ceiling;
  * a log, a person looking at an approval. Its <b>ceiling</b> says, per axis, the most it tolerates,
  * so a value may go there when every axis of its label satisfies it.
  *
- * <p>Ceilings are declared once, at wiring, and resolved by name. That is not tidiness: a ceiling
- * constructed at a call site would let any code grant itself permission in one line.
+ * <p>Ceilings are declared once, at wiring, and carried by the sink's portal from then on. That is
+ * not tidiness: a ceiling constructed at a call site would let any code grant itself permission in
+ * one line.
  */
-public interface SinkSpec {
+interface SinkSpec {
 
-  /** The name this is registered and audited under. */
+  /** The name this is declared and audited under. */
   String name();
 
   /**

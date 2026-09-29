@@ -73,8 +73,10 @@ class DeclaredAtTheDoorTest {
           cardType,
           last4Type);
 
+  private final MemoryStorage storage = new MemoryStorage();
+
   {
-    config.seal(new MemoryStorage());
+    config.bind(storage, AccessContextProvider.none());
   }
 
   @Test
@@ -110,7 +112,7 @@ class DeclaredAtTheDoorTest {
   void a_value_it_was_never_meant_to_see_stays_out_of_reach() {
     Occluded<SessionToken> token = tokens.occlude(new SessionToken("sess_abc"));
 
-    assertThat(config.label(token.id())).isEqualTo(Label.of(TENANT, "acme"));
+    assertThat(Stored.label(storage, token.id())).isEqualTo(Label.of(TENANT, "acme"));
     assertThatThrownBy(() -> processor.reading(tokenType))
         .isInstanceOf(IllegalStateException.class);
   }

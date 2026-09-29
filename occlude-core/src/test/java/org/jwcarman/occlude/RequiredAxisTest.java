@@ -58,7 +58,7 @@ class RequiredAxisTest {
 
   private final AtomicReference<AccessContext> edge = new AtomicReference<>(AccessContext.empty());
 
-  private final DefaultCharter config = new DefaultCharter(TENANT, LEVEL).currentAccess(edge::get);
+  private final DefaultCharter config = new DefaultCharter(TENANT, LEVEL);
 
   /** Exactly what an application would naturally write, including the part that was the leak. */
   private final Occlude<Note> notes =
@@ -74,7 +74,7 @@ class RequiredAxisTest {
   private final MemoryStorage kept = new MemoryStorage();
 
   {
-    config.seal(kept);
+    config.bind(kept, edge::get);
   }
 
   // that used to read `.tenant()` / `.level()` off a stored label are re-expressed against
@@ -88,7 +88,7 @@ class RequiredAxisTest {
 
     Occluded<Note> note = notes.occlude(new Note("ours"));
 
-    assertThat(config.label(note.id()).says(TENANT, "acme")).isTrue();
+    assertThat(Stored.label(kept, note.id()).says(TENANT, "acme")).isTrue();
   }
 
   /** The whole point: a value nobody can attribute is a value everybody can read. */
@@ -107,7 +107,7 @@ class RequiredAxisTest {
   @Test
   @DisplayName("and says so in the record")
   void and_says_so_in_the_record() {
-    DefaultCharter own = new DefaultCharter(TENANT, LEVEL).currentAccess(edge::get);
+    DefaultCharter own = new DefaultCharter(TENANT, LEVEL);
     Occlude<Note> watched =
         own.source(
             "notes",
@@ -118,7 +118,7 @@ class RequiredAxisTest {
                     .orElseGet(Label::nothing)
                     .with(LEVEL, Level.HIGH));
     MemoryStorage storage = new MemoryStorage();
-    own.seal(storage);
+    own.bind(storage, edge::get);
     edge.set(AccessContext.empty());
     Note orphan = new Note("orphan");
 
@@ -139,9 +139,11 @@ class RequiredAxisTest {
     DefaultCharter own = new DefaultCharter(TENANT, LEVEL);
     Occlude<Note> low =
         own.source("low", NOTE_TYPE, ctx -> Label.of(TENANT, "acme").with(LEVEL, Level.LOW));
-    own.seal(new MemoryStorage());
+    MemoryStorage storage = new MemoryStorage();
+    own.bind(storage, AccessContextProvider.none());
 
-    assertThat(own.label(low.occlude(new Note("fine")).id()).says(LEVEL, Level.LOW)).isTrue();
+    assertThat(Stored.label(storage, low.occlude(new Note("fine"))).says(LEVEL, Level.LOW))
+        .isTrue();
   }
 
   /**
@@ -156,7 +158,7 @@ class RequiredAxisTest {
   @Test
   @DisplayName("cannot be dropped by a lowering, which is where atOrBelow cannot see it")
   void cannot_be_dropped_by_a_lowering() {
-    DefaultCharter own = new DefaultCharter(TENANT, LEVEL).currentAccess(edge::get);
+    DefaultCharter own = new DefaultCharter(TENANT, LEVEL);
     Occlude<Note> door =
         own.source("notes", NOTE_TYPE, ctx -> Label.of(TENANT, "acme").with(LEVEL, Level.HIGH));
     Derivation<Note, Note> redact =
@@ -173,7 +175,7 @@ class RequiredAxisTest {
                     // `of` where `with` was meant: the level survives, the tenant vanishes.
                     .lowering(joined -> Label.of(LEVEL, Level.LOW)));
     MemoryStorage storage = new MemoryStorage();
-    own.seal(storage);
+    own.bind(storage, edge::get);
     edge.set(AccessContext.of(Map.of("tenant", "acme")));
 
     Derived<Note> result = redact.derive(door.occlude(new Note("ours")));
@@ -201,14 +203,14 @@ class RequiredAxisTest {
   @DisplayName("is enforced when a stored label is read back, not only when one is written")
   void is_enforced_when_a_stored_label_is_read_back() {
     MemoryStorage storage = new MemoryStorage();
-    DefaultCharter own = new DefaultCharter(TENANT, LEVEL).currentAccess(edge::get);
+    DefaultCharter own = new DefaultCharter(TENANT, LEVEL);
     Reveal<Note> anyTenant =
         own.sink(
                 "reporting",
                 Ceiling.of(TENANT, Constraint.any()).with(LEVEL, Constraint.atMost(Level.HIGH)),
                 NOTE_TYPE)
             .reading(NOTE_TYPE);
-    own.seal(storage);
+    own.bind(storage, edge::get);
 
     // A row from before the tenant axis was required: it says nothing about tenant at all.
     storage.put(

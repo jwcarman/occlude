@@ -18,7 +18,6 @@ package org.jwcarman.occlude;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,9 +56,8 @@ class AmbientContextTest {
   record Wired(Charter store, Occlude<String> cards, Reveal<String> card) {}
 
   private static Wired wire(
-      Consumer<Charter> settings, Function<AccessContext, Clearance> ceiling) {
+      AccessContextProvider access, Function<AccessContext, Clearance> ceiling) {
     DefaultCharter config = new DefaultCharter(CLEARANCE);
-    settings.accept(config);
     Occlude<String> cards =
         config.source("cards", STRING_TYPE, ctx -> Label.of(CLEARANCE, Clearance.FINANCE));
     Reveal<String> card =
@@ -69,7 +67,7 @@ class AmbientContextTest {
                 ctx -> Ceiling.of(CLEARANCE, Constraint.atMost(ceiling.apply(ctx))),
                 STRING_TYPE)
             .reading(STRING_TYPE);
-    config.seal(new MemoryStorage());
+    config.bind(new MemoryStorage(), access);
     return new Wired(config, cards, card);
   }
 
@@ -78,7 +76,7 @@ class AmbientContextTest {
   // where the answer lives.
   private final Wired wired =
       wire(
-          c -> c.currentAccess(() -> AccessContext.of("clearance", currentUser.get())),
+          () -> AccessContext.of("clearance", currentUser.get()),
           ctx -> ctx.has("clearance", "finance") ? Clearance.FINANCE : Clearance.NONE);
 
   private Occluded<String> last4() {
@@ -103,7 +101,7 @@ class AmbientContextTest {
     AtomicReference<AccessContext> seen = new AtomicReference<>();
     Wired anonymous =
         wire(
-            c -> {},
+            AccessContextProvider.none(),
             ctx -> {
               seen.set(ctx);
               return Clearance.FINANCE;

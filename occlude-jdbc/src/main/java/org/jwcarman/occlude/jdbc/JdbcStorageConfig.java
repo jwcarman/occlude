@@ -30,7 +30,7 @@ import org.jwcarman.occlude.lattice.Axes;
  * labels, the doors, who may reach them -- without knowing or caring where the values end up, and
  * the code declaring portals should compile against the generic thing. This is the other half:
  * where the tables are, how bytes are serialised, and how they are sealed. Both are asked for the
- * {@link JdbcStorage} a charter is sealed to.
+ * {@link JdbcStorage} a charter is bound to.
  *
  * @param <A> the application's label type, which is stored encrypted like any other value
  */
@@ -122,7 +122,7 @@ public final class JdbcStorageConfig {
   }
 
   /**
-   * The storage a charter with these axes is sealed to.
+   * The storage a charter with these axes is bound to.
    *
    * <p>The only way to build one, so that what happens to the bytes on the way to disk stays a
    * decision somebody made rather than a default they inherited.

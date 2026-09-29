@@ -24,16 +24,11 @@ operation is called lowering.
 ## 2. Constitute a charter
 
 ```java
-DefaultCharter charter =
-    new DefaultCharter(Axes.of(TENANT, INTEGRITY, SENSITIVITY))
-        .currentAccess(() -> AccessContext.of(Map.of(
-            "tenant", CurrentTenant.get(),
-            "role", currentRole())))
-        .mayErase((label, ctx) -> ctx.has("role", "compliance"));
+DefaultCharter charter = new DefaultCharter(Axes.of(TENANT, INTEGRITY, SENSITIVITY));
 ```
 
-`currentAccess` is how identity reaches the gate without being threaded through every call.
-A `ThreadLocal`, a `ScopedValue`, Spring's holders — occlude has no opinion.
+A charter is where authority is declared. It knows nothing yet about where values live or who is
+asking; both arrive when it is brought into force.
 
 ## 3. Declare the doors
 
@@ -58,16 +53,35 @@ Reveal<Mail> vendorLlm = charter.sink("vendor-llm",
     MAIL).reading(MAIL);
 ```
 
-Hold onto these. They are the authority; there is no way to look them up later.
+Erasing a value and reading its label are portals too, each declared with what decides it:
+
+```java
+Erasure compliance = charter.erasure("compliance", (label, ctx) -> ctx.has("role", "compliance"));
+Inspection supportDesk = charter.inspection("support-desk",
+    ctx -> Ceiling.of(TENANT, Constraint.atMost(ctx.get("tenant").orElseThrow()))
+                  .with(INTEGRITY, Constraint.any())
+                  .with(SENSITIVITY, Constraint.any()));
+```
+
+Hold onto these. They are the authority, and each carries everything it needs; there is no way to
+look them up later.
 
 ## 4. Bring it into force
 
 ```java
-charter.seal(new MemoryStorage());
+charter.bind(new MemoryStorage(), () -> AccessContext.of(Map.of(
+    "tenant", CurrentTenant.get(),
+    "role", currentRole())));
 ```
 
 Once, irreversibly. Before this, no portal works; after it, no further authority can be
-constituted.
+constituted, and the charter itself is no longer needed.
+
+The second argument is how identity reaches the gate without being threaded through every call. A
+`ThreadLocal`, a `ScopedValue`, Spring's holders — occlude has no opinion. It is supplied here,
+beside the storage, because it is where identity lives in this environment rather than authority
+the application grants. An application with no notion of identity passes
+`AccessContextProvider.none()`.
 
 ## 5. Use it
 

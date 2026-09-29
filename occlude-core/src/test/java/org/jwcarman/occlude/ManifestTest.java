@@ -73,6 +73,8 @@ class ManifestTest {
             List.of(SINK),
             List.of(DERIVATION),
             List.of(QUESTION),
+            List.of(),
+            List.of(),
             List.of(
                 new Manifest.Finding(
                     "no-writer", "some-door", "reads 'card', which nothing produces"),
@@ -125,6 +127,8 @@ class ManifestTest {
         new Manifest(
             "{}",
             List.of(SOURCE),
+            List.of(),
+            List.of(),
             List.of(),
             List.of(),
             List.of(),

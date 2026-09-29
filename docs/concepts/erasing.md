@@ -3,7 +3,7 @@
 "Erase this customer" is a reachability question, which is why lineage is kept.
 
 ```java
-int removed = charter.erase(occluded);
+Erased erased = compliance.erase(occluded);   // compliance is an Erasure you were handed
 ```
 
 Erasing a value takes everything ever derived from it, however deeply. Descendants go regardless of
@@ -13,10 +13,11 @@ of them.
 ## Who may erase
 
 A label has nothing to say about whether a value may be *destroyed* — "possession is not authority"
-is a rule about reading. So the authority to erase is named separately, or it is not granted:
+is a rule about reading. So the authority to erase is a portal of its own, declared with the policy
+that decides it:
 
 ```java
-charter.mayErase((label, ctx) ->
+Erasure compliance = charter.erasure("compliance", (label, ctx) ->
     ctx.has("role", "compliance")
         && ctx.get("tenant")
               .map(t -> Ceiling.of(TENANT, Constraint.atMost(t)).with(LEVEL, Constraint.any())
@@ -28,11 +29,14 @@ The policy sees **the label of the value being destroyed** as well as who is ask
 alone is not enough: a rule checking only the caller's role lets one tenant's compliance officer
 destroy another tenant's records.
 
-An application that never erases says nothing and gets a charter that cannot.
+An application that declares no erasure keeps a store nothing can erase from. One that declares
+several — a compliance officer, a retention job — gets each under its own name, and a refusal in
+the record says whose policy said no.
 
-Erasure is also absent from the `Charter` interface that beans are handed. Nothing in an
-application has needed it, and leaving it off means the answer to *"which code can destroy customer
-data?"* is **none, structurally**.
+`erase` returns `Erased`: `Removed` with how many values went, or `Refused` with a reason
+(`NO_SUCH_VALUE`, `NOT_PERMITTED`). Both outcomes are in the record either way. The answer to
+*"which code can destroy customer data?"* is **whoever was handed an `Erasure`**, and the manifest
+names every one.
 
 ## What survives
 

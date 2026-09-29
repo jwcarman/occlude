@@ -16,13 +16,11 @@
 package org.jwcarman.occlude;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jwcarman.codec.TypeRef;
 import org.jwcarman.occlude.lattice.Ceiling;
@@ -43,17 +41,10 @@ final class Deriving {
   private final Trail trail;
   private final Storage storage;
 
-  Deriving(Gate gate, Trail trail, Storage storage, List<DerivationSpec<?>> declared) {
+  Deriving(Gate gate, Trail trail, Storage storage) {
     this.gate = gate;
     this.trail = trail;
     this.storage = storage;
-    Set<String> names = new HashSet<>();
-    for (DerivationSpec<?> derivation : declared) {
-      if (!names.add(derivation.name())) {
-        throw new IllegalStateException(
-            "two derivations are registered as '" + derivation.name() + "'");
-      }
-    }
   }
 
   /**

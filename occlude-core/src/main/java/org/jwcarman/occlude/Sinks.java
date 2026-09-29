@@ -19,35 +19,19 @@ import java.util.Objects;
 import java.util.function.Function;
 import org.jwcarman.occlude.lattice.Ceiling;
 
-/** Ways to declare a {@link SinkSpec}, which is always done at wiring and never at a call site. */
-public final class Sinks {
+/** Ways to make a {@link SinkSpec}, which is always done at wiring and never at a call site. */
+final class Sinks {
 
   private Sinks() {}
 
-  /** A sink that accepts the same thing regardless of who is asking: nearly all of them. */
-  public static SinkSpec fixed(String name, Ceiling ceiling) {
-    Objects.requireNonNull(name, "a sink needs a name");
-    Objects.requireNonNull(ceiling, "a sink needs a ceiling");
-    return new SinkSpec() {
-      @Override
-      public String name() {
-        return name;
-      }
-
-      @Override
-      public Ceiling ceiling(AccessContext context) {
-        return ceiling;
-      }
-    };
-  }
-
   /**
-   * A sink whose ceiling depends on who is asking.
+   * A sink whose ceiling may depend on who is asking. A fixed ceiling is the function that ignores
+   * the access, which is how {@link DefaultCharter} declares one.
    *
    * <p>For people. An approval card may show a finance approver more than it shows anyone else, and
    * that is a decision only the application can make, from context only the application supplied.
    */
-  public static SinkSpec varying(String name, Function<AccessContext, Ceiling> ceiling) {
+  static SinkSpec varying(String name, Function<AccessContext, Ceiling> ceiling) {
     Objects.requireNonNull(name, "a sink needs a name");
     Objects.requireNonNull(ceiling, "a sink needs a ceiling");
     return new SinkSpec() {

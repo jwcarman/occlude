@@ -60,8 +60,7 @@ class WritingAtAnothersLabelTest {
 
   private final MemoryStorage storage = new MemoryStorage();
 
-  private final DefaultCharter config =
-      new DefaultCharter(TENANT, INTEGRITY).currentAccess(edge::get);
+  private final DefaultCharter config = new DefaultCharter(TENANT, INTEGRITY);
 
   /** One source, used by whoever is acting. It is the access that decides, never the caller. */
   private final Occlude<Note> notes =
@@ -87,7 +86,7 @@ class WritingAtAnothersLabelTest {
           .reading(NOTE_TYPE);
 
   {
-    config.seal(storage);
+    config.bind(storage, edge::get);
   }
 
   // read `.tenant()` off the stored label is re-expressed against Label.toString(), which is
@@ -101,7 +100,7 @@ class WritingAtAnothersLabelTest {
     Occluded<Note> written = notes.occlude(new Note("globex owes us 1,000,000"));
 
     // Acme wrote it and acme owns it. There was no argument through which to claim otherwise.
-    assertThat(config.label(written.id()).says(TENANT, "acme")).isTrue();
+    assertThat(Stored.label(storage, written.id()).says(TENANT, "acme")).isTrue();
 
     // And globex does not read it as its own.
     edge.set(AccessContext.of(Map.of("tenant", "globex")));

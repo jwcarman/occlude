@@ -66,7 +66,9 @@ public record AuditRecord(
     /** A question was answered about a value without the value leaving. */
     QUERY,
     /** A value and everything derived from it were removed. */
-    ERASE
+    ERASE,
+    /** A value's label and lineage were read, without the value. */
+    INSPECT
   }
 
   public enum Outcome {

@@ -80,7 +80,7 @@ class SpecDefaultsTest {
             String.class,
             (v, q, ctx) -> v.contains(q),
             d -> d.accepting(ceiling));
-    charter.seal(new MemoryStorage());
+    charter.bind(new MemoryStorage(), AccessContextProvider.none());
 
     Occluded<String> held = source.occlude("hello world");
 

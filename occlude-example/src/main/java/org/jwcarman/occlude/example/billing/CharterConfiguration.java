@@ -58,9 +58,9 @@ public class CharterConfiguration {
    * The questions this business asks about every value it holds.
    *
    * <p>All this application says about its charter. The charter itself is constructed from these,
-   * by the starter, which is therefore the only thing able to seal it -- so nothing here can bring
-   * one into force, and nothing here can erase through one. Authority arrives the same way it does
-   * everywhere else in this file: because somebody handed it over.
+   * by the starter, which is therefore the only thing able to bind it -- so nothing here can bring
+   * one into force. Authority arrives the same way it does everywhere else in this file: because
+   * somebody handed it over.
    */
   @Bean
   public Axes billingAxes() {

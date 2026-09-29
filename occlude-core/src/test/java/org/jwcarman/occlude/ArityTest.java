@@ -62,8 +62,10 @@ class ArityTest {
           parts -> new Note(parts.stream().map(Note::text).reduce("", String::concat)),
           d -> d.accepting(ctx -> Ceiling.of(TENANT, Constraint.any())));
 
+  private final MemoryStorage storage = new MemoryStorage();
+
   {
-    config.seal(new MemoryStorage());
+    config.bind(storage, AccessContextProvider.none());
   }
 
   private final Occluded<Note> first = notes.occlude(new Note("a"));
@@ -92,7 +94,7 @@ class ArityTest {
   void carries_the_join_of_every_parents_label() {
     Occluded<Note> result = joined.fold(List.of(first, second)).orThrow();
 
-    assertThat(config.label(result.id())).isEqualTo(Label.of(TENANT, "acme"));
+    assertThat(Stored.label(storage, result.id())).isEqualTo(Label.of(TENANT, "acme"));
   }
 
   /**
@@ -117,7 +119,7 @@ class ArityTest {
             NOTE,
             parts -> new Note(parts.size() + " notes"),
             d -> d.accepting(Ceiling.of(TENANT, Constraint.atMost("acme"))));
-    counted.seal(counting);
+    counted.bind(counting, AccessContextProvider.none());
 
     List<Occluded<Note>> parents = new ArrayList<>();
     for (int i = 0; i < 10; i++) {

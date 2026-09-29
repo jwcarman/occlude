@@ -66,6 +66,6 @@ written by one pre-release commit is not necessarily readable by the next.
 
 ## The privileged methods are public on the implementation
 
-`Charter` is the interface every bean is handed, and it cannot seal, erase, or report on a held
-value. The implementation can, and its methods are public — so a cast on an injected bean defeats
+`Charter` is the interface every bean is handed, and it cannot bind. The implementation can, and
+`bind` is public — so a cast on an injected bean defeats
 the guarantee. The interface is a statement of intent backed by what code asks for, not a sandbox.

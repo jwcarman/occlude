@@ -127,7 +127,7 @@ class StorageInconsistencyTest {
             String.class,
             (v, q, ctx) -> v.contains(q),
             d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
-    charter.seal(new ValueDisappears());
+    charter.bind(new ValueDisappears(), AccessContextProvider.none());
 
     Occluded<String> held = source.occlude("hello");
     Answer answer = mentions.ask(held, "hello");
@@ -150,7 +150,7 @@ class StorageInconsistencyTest {
             STRING_TYPE,
             String::toUpperCase,
             d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
-    charter.seal(new ValueDisappears());
+    charter.bind(new ValueDisappears(), AccessContextProvider.none());
 
     Occluded<String> held = source.occlude("hello");
     Derived<String> result = upper.derive(held);
@@ -170,7 +170,7 @@ class StorageInconsistencyTest {
         charter
             .sink("outbox", Ceiling.of(TENANT, Constraint.any()), STRING_TYPE)
             .reading(STRING_TYPE);
-    charter.seal(new ValueDisappears());
+    charter.bind(new ValueDisappears(), AccessContextProvider.none());
 
     Occluded<String> held = source.occlude("hello");
     Revealed<String> result = outbox.reveal(held);
@@ -199,7 +199,7 @@ class StorageInconsistencyTest {
             STRING_TYPE,
             String::toUpperCase,
             d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
-    charter.seal(storage);
+    charter.bind(storage, AccessContextProvider.none());
 
     Occluded<String> held = source.occlude("hello");
     Derived<String> result = upper.derive(held);

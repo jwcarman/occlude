@@ -1,7 +1,7 @@
 # Reviewing a Charter
 
 `manifest()` is meant to be printed at startup and pasted into a review. It is answerable before
-the charter has been sealed to any storage, because it describes the declarations rather than any
+the charter has been bound to any storage, because it describes the declarations rather than any
 value — so a build can render it, diff it against the last release, and fail on a change nobody
 meant to make.
 

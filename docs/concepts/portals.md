@@ -89,10 +89,12 @@ value is not told what kind of value it is.
 
 ## The lifecycle
 
-A charter is declared, then **sealed**, once and irreversibly. After sealing, no further authority
-can be constituted; before it, no portal will work.
+A charter is declared, then **bound** to storage and to where identity comes from, once and
+irreversibly. Before binding, no portal will work; after it, no further authority can be
+constituted — and the charter has no further part to play, because every portal carries everything
+its operation needs.
 
-Whoever constructs a charter keeps the ability to seal it, and that reference is not on the
-`Charter` interface every bean is handed. Nor is erasure, nor anything that reports on a *held
-value*. The interface declares portals and reports on the *declarations* — `axes()` and
-`manifest()` — which describe the system and never a value.
+Whoever constructs a charter keeps the ability to bind it, and that reference is not on the
+`Charter` interface every bean is handed. Erasing a value and reading its label are portals like
+the rest — `Erasure` and `Inspection` — so the interface declares portals and reports on the
+*declarations*, `axes()` and `manifest()`, which describe the system and never a value.

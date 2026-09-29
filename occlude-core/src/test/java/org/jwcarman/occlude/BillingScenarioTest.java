@@ -175,8 +175,7 @@ class BillingScenarioTest {
    */
   private final AtomicReference<AccessContext> edge = new AtomicReference<>(AccessContext.empty());
 
-  private final DefaultCharter config =
-      new DefaultCharter(TENANT, INTEGRITY, TLP, DATA_CLASS).currentAccess(edge::get);
+  private final DefaultCharter config = new DefaultCharter(TENANT, INTEGRITY, TLP, DATA_CLASS);
 
   // ---------------------------------------------------------------- doors in
 
@@ -377,7 +376,7 @@ class BillingScenarioTest {
           d -> d.accepting(reading(Integrity.ENDORSED, Tlp.AMBER, DataClass.PII)));
 
   {
-    config.seal(storage);
+    config.bind(storage, edge::get);
   }
 
   /** Every access in this system is made on behalf of a tenant, established at the edge. */
@@ -572,7 +571,7 @@ class BillingScenarioTest {
       acme();
       Occluded<Report> report = summarise.fold(List.of(acmeNote, globexNote)).orThrow();
 
-      assertThat(config.label(report).says(TENANT, "acme")).isFalse();
+      assertThat(Stored.label(storage, report).says(TENANT, "acme")).isFalse();
       acme();
       assertThat(vendorLlmReports.reveal(report).allowed()).isFalse();
       acme();
@@ -582,7 +581,8 @@ class BillingScenarioTest {
       AccessContext.of("tenant", "globex");
       assertThat(vendorLlmReports.reveal(report).allowed()).isFalse();
       // It exists, and it remembers where it came from.
-      assertThat(config.lineage(report).parents()).containsExactly(acmeNote.id(), globexNote.id());
+      assertThat(Stored.lineage(storage, report).parents())
+          .containsExactly(acmeNote.id(), globexNote.id());
     }
 
     @Test
@@ -619,7 +619,7 @@ class BillingScenarioTest {
       acme();
       Occluded<Report> report = summarise.fold(List.of(ordinary, personal)).orThrow();
 
-      assertThat(config.label(report).says(DATA_CLASS, DataClass.PII)).isTrue();
+      assertThat(Stored.label(storage, report).says(DATA_CLASS, DataClass.PII)).isTrue();
       acme();
       assertThat(vendorLlmReports.reveal(report).allowed()).isFalse();
       acme();
@@ -775,7 +775,7 @@ class BillingScenarioTest {
       acme();
       Occluded<InvoiceNumber> number = claimedInvoice.derive(claim()).orThrow();
 
-      assertThat(config.label(number))
+      assertThat(Stored.label(storage, number))
           .isEqualTo(label("acme", Integrity.UNENDORSED, Tlp.AMBER, DataClass.PII));
       acme();
       assertThat(quarantinedLlmInvoice.reveal(number).granted())
@@ -791,7 +791,7 @@ class BillingScenarioTest {
       acme();
       Occluded<InvoiceNumber> number = claimedInvoice.derive(claim()).orThrow();
 
-      assertThat(config.label(number).says(INTEGRITY, Integrity.UNENDORSED)).isTrue();
+      assertThat(Stored.label(storage, number).says(INTEGRITY, Integrity.UNENDORSED)).isTrue();
     }
 
     @Test
@@ -802,9 +802,9 @@ class BillingScenarioTest {
       acme();
       Occluded<InvoiceNumber> number = claimedInvoice.derive(parent).orThrow();
 
-      assertThat(config.lineage(number).parents()).containsExactly(parent.id());
-      assertThat(config.lineage(number).derivation()).contains(CLAIMED_INVOICE);
-      assertThat(config.lineage(parent).asserted()).isTrue();
+      assertThat(Stored.lineage(storage, number).parents()).containsExactly(parent.id());
+      assertThat(Stored.lineage(storage, number).derivation()).contains(CLAIMED_INVOICE);
+      assertThat(Stored.lineage(storage, parent).asserted()).isTrue();
     }
 
     /**
@@ -826,8 +826,8 @@ class BillingScenarioTest {
       Occluded<InvoiceNumber> twice = claimedInvoice.derive(parent).orThrow();
 
       assertThat(once.id()).isNotEqualTo(twice.id());
-      assertThat(config.lineage(once).parents()).containsExactly(parent.id());
-      assertThat(config.lineage(twice).parents()).containsExactly(parent.id());
+      assertThat(Stored.lineage(storage, once).parents()).containsExactly(parent.id());
+      assertThat(Stored.lineage(storage, twice).parents()).containsExactly(parent.id());
     }
 
     @Test
@@ -842,13 +842,13 @@ class BillingScenarioTest {
      * This used to invent a name and assert the config refused it. The name no longer buys anything
      * -- there is no method that takes one -- so what is worth asserting is the property that
      * replaced it, and it is the stronger one: a derivation cannot be run unless somebody handed
-     * you the portal, and a sealed charter constitutes no more of them.
+     * you the portal, and a bound charter constitutes no more of them.
      *
-     * <p>Not a policy. There is no check to disable: the authority graph of a sealed charter cannot
+     * <p>Not a policy. There is no check to disable: the authority graph of a bound charter cannot
      * grow, so there is nothing to hand out.
      */
     @Test
-    @DisplayName("a derivation cannot be declared after the charter was sealed")
+    @DisplayName("a derivation cannot be declared after the charter was bound")
     void a_derivation_cannot_be_declared_after_sealing() {
       assertThatThrownBy(
               () ->
@@ -865,7 +865,7 @@ class BillingScenarioTest {
                                       .with(TLP, Constraint.any())
                                       .with(DATA_CLASS, Constraint.any()))))
           .isInstanceOf(IllegalStateException.class)
-          .hasMessageContaining("has been sealed");
+          .hasMessageContaining("has been bound");
     }
   }
 
@@ -888,7 +888,7 @@ class BillingScenarioTest {
       preparingApproval();
       Occluded<Last4> last4 = cardLast4.derive(token()).orThrow();
 
-      assertThat(config.label(last4).says(DATA_CLASS, DataClass.PII)).isTrue();
+      assertThat(Stored.label(storage, last4).says(DATA_CLASS, DataClass.PII)).isTrue();
       acme("clearance", "finance");
       assertThat(approvalCardLast4.reveal(last4).granted()).contains(new Last4("4821"));
     }
@@ -899,8 +899,8 @@ class BillingScenarioTest {
       preparingApproval();
       Occluded<Last4> last4 = cardLast4.derive(token()).orThrow();
 
-      assertThat(config.label(last4).says(TENANT, "acme")).isTrue();
-      assertThat(config.label(last4).says(INTEGRITY, Integrity.ENDORSED)).isTrue();
+      assertThat(Stored.label(storage, last4).says(TENANT, "acme")).isTrue();
+      assertThat(Stored.label(storage, last4).says(INTEGRITY, Integrity.ENDORSED)).isTrue();
     }
 
     /**
@@ -913,8 +913,8 @@ class BillingScenarioTest {
       acme();
       Occluded<Last4> partly = cardLast4Partial.derive(token()).orThrow();
 
-      assertThat(config.label(partly).says(DATA_CLASS, DataClass.PII)).isTrue();
-      assertThat(config.label(partly).says(TLP, Tlp.RED)).isTrue();
+      assertThat(Stored.label(storage, partly).says(DATA_CLASS, DataClass.PII)).isTrue();
+      assertThat(Stored.label(storage, partly).says(TLP, Tlp.RED)).isTrue();
       acme("clearance", "finance");
       assertThat(approvalCardLast4.reveal(partly).allowed()).isFalse();
     }
@@ -1045,7 +1045,6 @@ class BillingScenarioTest {
     @DisplayName("refuses to look at a value it was never meant to see")
     void refuses_to_look_at_a_value_it_was_never_meant_to_see() {
       DefaultCharter choosyConfig = new DefaultCharter(TENANT, INTEGRITY, TLP, DATA_CLASS);
-      choosyConfig.currentAccess(edge::get);
       Occlude<Account> secretAccounts =
           choosyConfig.source(
               "secret-accounts",
@@ -1058,7 +1057,7 @@ class BillingScenarioTest {
               String.class,
               (account, sender, ctx) -> true,
               d -> d.accepting(reading(Integrity.ENDORSED, Tlp.CLEAR, DataClass.NONE)));
-      choosyConfig.seal(new MemoryStorage());
+      choosyConfig.bind(new MemoryStorage(), edge::get);
       Occluded<Account> secret = secretAccounts.occlude(new Account("ACC-2", "x@y.example"));
 
       acme();
@@ -1128,7 +1127,6 @@ class BillingScenarioTest {
     @DisplayName("a sink whose ceiling throws denies, rather than exploding")
     void a_sink_whose_ceiling_throws_denies() {
       DefaultCharter fragileConfig = new DefaultCharter(TENANT, INTEGRITY, TLP, DATA_CLASS);
-      fragileConfig.currentAccess(edge::get);
       Occlude<String> fragileMail =
           fragileConfig.source("mail", STRING_TYPE, BillingScenarioTest::labelFrom);
       Reveal<String> broken =
@@ -1140,7 +1138,7 @@ class BillingScenarioTest {
                   },
                   STRING_TYPE)
               .reading(STRING_TYPE);
-      fragileConfig.seal(new MemoryStorage());
+      fragileConfig.bind(new MemoryStorage(), edge::get);
       Occluded<String> held =
           holdAs("acme", Integrity.ENDORSED, Tlp.CLEAR, DataClass.NONE, fragileMail, "x");
 
@@ -1276,7 +1274,6 @@ class BillingScenarioTest {
     @DisplayName("an access that cannot be recorded does not happen, and stores nothing")
     void an_access_that_cannot_be_recorded_does_not_happen() {
       DefaultCharter watchedConfig = new DefaultCharter(TENANT, INTEGRITY, TLP, DATA_CLASS);
-      watchedConfig.currentAccess(edge::get);
       Occlude<String> watchedMail =
           watchedConfig.source("mail", STRING_TYPE, BillingScenarioTest::labelFrom);
       MemoryStorage kept = new MemoryStorage();
@@ -1312,7 +1309,7 @@ class BillingScenarioTest {
               return kept.erase(root, lineFor);
             }
           };
-      watchedConfig.seal(broken);
+      watchedConfig.bind(broken, edge::get);
 
       assertThatThrownBy(
               () ->

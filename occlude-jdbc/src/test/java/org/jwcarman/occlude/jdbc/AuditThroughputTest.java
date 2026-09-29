@@ -29,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
+import org.jwcarman.occlude.AccessContextProvider;
 import org.jwcarman.occlude.DefaultCharter;
 import org.jwcarman.occlude.Occlude;
 import org.jwcarman.occlude.Occluded;
@@ -88,7 +89,7 @@ class AuditThroughputTest {
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
             .storedPlainly()
             .storage(charter.axes());
-    charter.seal(storage);
+    charter.bind(storage, AccessContextProvider.none());
   }
 
   /**

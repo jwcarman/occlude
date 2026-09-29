@@ -24,12 +24,11 @@ import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
 
 /**
- * Two declarations that cannot both be registered under the same name, found the moment the charter
- * is sealed rather than the first time a reader picks the wrong one.
+ * Two declarations that cannot both be registered under the same name, found the moment the second
+ * is declared rather than the first time a reader picks the wrong one.
  *
- * <p>Sinks are named because a {@link Reveal} is reached by holding it, not by naming it again; but
- * the {@code SinkSpec} form and the two-arg {@code sink(...)} form both feed the same map, and
- * nothing earlier stops two declarations claiming one name.
+ * <p>Nothing looks a declaration up by its name -- every portal carries its own -- but a name is
+ * what the record and the manifest say, and two doors answering to one name make both lie.
  */
 @DisplayName("Two declarations claiming the same name")
 class DuplicateRegistrationTest {
@@ -38,21 +37,20 @@ class DuplicateRegistrationTest {
   private static final Axis<String> TENANT = Axis.matching("tenant");
 
   @Test
-  @DisplayName("two sinks registered as the same name are refused at sealing")
-  void two_sinks_with_the_same_name_are_refused_at_sealing() {
+  @DisplayName("two sinks registered as the same name are refused when declared")
+  void two_sinks_with_the_same_name_are_refused() {
     DefaultCharter charter = new DefaultCharter(TENANT);
     charter.sink("outbox", ctx -> Ceiling.nothing(), STRING_TYPE);
-    charter.sink(Sinks.fixed("outbox", Ceiling.of(TENANT, Constraint.any())));
-    MemoryStorage storage = new MemoryStorage();
+    Ceiling anything = Ceiling.of(TENANT, Constraint.any());
 
-    assertThatThrownBy(() -> charter.seal(storage))
+    assertThatThrownBy(() -> charter.sink("outbox", anything, STRING_TYPE))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("outbox");
   }
 
   @Test
-  @DisplayName("two derivations registered as the same name are refused at sealing")
-  void two_derivations_with_the_same_name_are_refused_at_sealing() {
+  @DisplayName("two derivations registered as the same name are refused when declared")
+  void two_derivations_with_the_same_name_are_refused() {
     DefaultCharter charter = new DefaultCharter(TENANT);
     charter.derivation(
         "upper",
@@ -60,16 +58,50 @@ class DuplicateRegistrationTest {
         STRING_TYPE,
         String::toUpperCase,
         d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
-    charter.derivation(
-        "upper",
-        STRING_TYPE,
-        STRING_TYPE,
-        String::toLowerCase,
-        d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
-    MemoryStorage storage = new MemoryStorage();
-
-    assertThatThrownBy(() -> charter.seal(storage))
+    assertThatThrownBy(
+            () ->
+                charter.derivation(
+                    "upper",
+                    STRING_TYPE,
+                    STRING_TYPE,
+                    String::toLowerCase,
+                    d -> d.accepting(Ceiling.of(TENANT, Constraint.any()))))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("upper");
+  }
+
+  @Test
+  @DisplayName("two questions registered as the same name are refused when declared")
+  void two_questions_with_the_same_name_are_refused() {
+    DefaultCharter charter = new DefaultCharter(TENANT);
+    charter.query(
+        "mentions",
+        STRING_TYPE,
+        String.class,
+        (v, q, ctx) -> true,
+        d -> d.accepting(Ceiling.of(TENANT, Constraint.any())));
+
+    assertThatThrownBy(
+            () ->
+                charter.query(
+                    "mentions",
+                    STRING_TYPE,
+                    String.class,
+                    (v, q, ctx) -> false,
+                    d -> d.accepting(Ceiling.of(TENANT, Constraint.any()))))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("two queries are registered as 'mentions'");
+  }
+
+  @Test
+  @DisplayName("two inspections registered as the same name are refused when declared")
+  void two_inspections_with_the_same_name_are_refused() {
+    DefaultCharter charter = new DefaultCharter(TENANT);
+    Ceiling anything = Ceiling.of(TENANT, Constraint.any());
+    charter.inspection("desk", anything);
+
+    assertThatThrownBy(() -> charter.inspection("desk", anything))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("two inspections are registered as 'desk'");
   }
 }

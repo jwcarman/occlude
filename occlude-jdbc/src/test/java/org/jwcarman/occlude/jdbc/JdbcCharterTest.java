@@ -52,10 +52,11 @@ import org.jwcarman.codec.crypto.JceDataKeyProvider;
 import org.jwcarman.codec.jackson.JacksonCodecFactory;
 import org.jwcarman.codec.transform.compress.GzipCodec;
 import org.jwcarman.occlude.AccessContext;
-import org.jwcarman.occlude.AccessDeniedException;
 import org.jwcarman.occlude.AuditRecord;
 import org.jwcarman.occlude.DefaultCharter;
 import org.jwcarman.occlude.Derivation;
+import org.jwcarman.occlude.Erased;
+import org.jwcarman.occlude.Erasure;
 import org.jwcarman.occlude.Lineage;
 import org.jwcarman.occlude.Occlude;
 import org.jwcarman.occlude.Occluded;
@@ -119,7 +120,7 @@ class JdbcCharterTest {
   private static final OccludedType<Last4> LAST4 = OccludedType.of(Last4.class);
 
   private DataSource dataSource;
-  private DefaultCharter store;
+  private Erasure compliance;
   private JdbcStorage storage;
   private Derivation<Card, Last4> cardLast4;
   private Occlude<Card> cards;
@@ -198,9 +199,10 @@ class JdbcCharterTest {
                             EnvelopeCodec.builder(new JceDataKeyProvider("k1", Map.of("k1", kek)))
                                 .build())));
 
-    c.currentAccess(edge::get)
-        // Erasure is the one operation a label cannot decide, so it is named here.
-        .mayErase(
+    // Erasure is the one operation a label cannot decide, so its policy is named here.
+    compliance =
+        c.erasure(
+            "compliance",
             (label, ctx) ->
                 ctx.has("role", "compliance")
                     && ctx.get("tenant").map(t -> label.says(TENANT, t)).orElse(false));
@@ -253,8 +255,16 @@ class JdbcCharterTest {
                     .lowering(joined -> joined.with(DATA, DataClass.PII)));
 
     storage = jdbc.storage(c.axes());
-    c.seal(storage);
-    store = c;
+    c.bind(storage, edge::get);
+  }
+
+  /** What was written about a value, read beneath the charter, for assertions about state. */
+  private Label labelOf(Occluded<?> occluded) {
+    return storage.metadata(occluded.id()).orElseThrow().label();
+  }
+
+  private Lineage lineageOf(Occluded<?> occluded) {
+    return storage.metadata(occluded.id()).orElseThrow().lineage();
   }
 
   private Occluded<Card> card() {
@@ -409,7 +419,7 @@ class JdbcCharterTest {
     Occluded<Last4> last4 = cardLast4.derive(card).orThrow();
 
     edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
-    assertThat(store.erase(card)).isEqualTo(2);
+    assertThat(compliance.erase(card).orThrow()).isEqualTo(2);
 
     assertThat(storage.contains(card.id())).isFalse();
     assertThat(storage.contains(last4.id())).isFalse();
@@ -520,7 +530,7 @@ class JdbcCharterTest {
             Callable<Void> erasing =
                 () -> {
                   edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
-                  store.erase(card);
+                  compliance.erase(card).orThrow();
                   return null;
                 };
             // Through futures rather than bare threads, so a failure on either side fails the
@@ -667,22 +677,20 @@ class JdbcCharterTest {
     Axes axes = Axes.of(TENANT, INTEGRITY, DATA);
 
     DefaultCharter under1 = new DefaultCharter(axes);
-    under1.currentAccess(edge::get);
     Occlude<Card> early =
         under1.source(
             "cards", CARD, ctx -> labelFor(ctx, Integrity.ENDORSED, DataClass.CARDHOLDER));
-    under1.seal(rooted("r1", Map.of("r1", first), axes));
+    under1.bind(rooted("r1", Map.of("r1", first), axes), edge::get);
     edge.set(AccessContext.of("tenant", "acme"));
     early.occlude(new Card("4111111111114821", "CARMAN"));
 
     Map<String, byte[]> both = Map.of("r1", first, "r2", second);
     DefaultCharter under2 = new DefaultCharter(axes);
-    under2.currentAccess(edge::get);
     Occlude<Card> later =
         under2.source(
             "cards", CARD, ctx -> labelFor(ctx, Integrity.ENDORSED, DataClass.CARDHOLDER));
     JdbcStorage rotated = rooted("r2", both, axes);
-    under2.seal(rotated);
+    under2.bind(rotated, edge::get);
     later.occlude(new Card("4111111111119999", "CARMAN"));
 
     // Both eras, one verification, and nothing had to be re-signed.
@@ -740,7 +748,7 @@ class JdbcCharterTest {
     Occluded<Card> card = card();
 
     assertThat(storage.contains(card.id())).isTrue();
-    assertThat(store.label(card).says(DATA, DataClass.CARDHOLDER)).isTrue();
+    assertThat(labelOf(card).says(DATA, DataClass.CARDHOLDER)).isTrue();
   }
 
   @Test
@@ -751,9 +759,9 @@ class JdbcCharterTest {
     acme();
     Occluded<Last4> last4 = cardLast4.derive(card).orThrow();
 
-    assertThat(store.label(last4).says(DATA, DataClass.PII)).isTrue();
-    assertThat(store.lineage(last4).parents()).containsExactly(card.id());
-    assertThat(store.lineage(last4).derivation()).contains("Card.last4");
+    assertThat(labelOf(last4).says(DATA, DataClass.PII)).isTrue();
+    assertThat(lineageOf(last4).parents()).containsExactly(card.id());
+    assertThat(lineageOf(last4).derivation()).contains("Card.last4");
   }
 
   @Test
@@ -779,7 +787,7 @@ class JdbcCharterTest {
     Occluded<Last4> last4 = cardLast4.derive(card).orThrow();
 
     edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
-    int removed = store.erase(card);
+    int removed = compliance.erase(card).orThrow();
 
     assertThat(removed).isEqualTo(2);
     assertThat(storage.contains(card.id())).isFalse();
@@ -794,7 +802,7 @@ class JdbcCharterTest {
     Occluded<Last4> last4 = cardLast4.derive(card).orThrow();
 
     edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
-    assertThat(store.erase(last4)).isEqualTo(1);
+    assertThat(compliance.erase(last4).orThrow()).isEqualTo(1);
     assertThat(storage.contains(card.id())).isTrue();
   }
 
@@ -858,7 +866,7 @@ class JdbcCharterTest {
     int before = rowCount("occlude_audit");
 
     edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
-    store.erase(card);
+    compliance.erase(card).orThrow();
 
     // Two values erased, so two ERASE lines, and every earlier line is still there. ">= before"
     // was a tautology: the trail never shrinks, which is the property being claimed, not evidence.
@@ -904,17 +912,17 @@ class JdbcCharterTest {
     acme();
     edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
 
-    assertThat(store.erase(card)).isEqualTo(1);
+    assertThat(compliance.erase(card).orThrow()).isEqualTo(1);
     assertThat(rowCount("occlude_value")).isZero();
   }
 
   @Test
   @DisplayName("lineage of a held value says it was asserted, not computed")
   void lineage_of_a_held_value_says_asserted() {
-    assertThat(store.lineage(card()).asserted()).isTrue();
+    assertThat(lineageOf(card()).asserted()).isTrue();
     // Nothing made it, so it has no parents. This used to wrap the parents list in ANOTHER list
     // and assert that was non-empty, which is true of every list, and said the opposite besides.
-    assertThat(store.lineage(card()).parents()).isEmpty();
+    assertThat(lineageOf(card()).parents()).isEmpty();
   }
 
   /** Serialise, squeeze, seal. Reversing the last two would cost the same and save nothing. */
@@ -1007,8 +1015,8 @@ class JdbcCharterTest {
     Occluded<List<Card>> occluded = cardLists.occlude(List.of(new Card("4111111111114821", "A")));
 
     // No type is supplied here, and none is needed: the label is read without touching the payload.
-    assertThat(store.label(occluded).says(DATA, DataClass.CARDHOLDER)).isTrue();
-    assertThat(store.lineage(occluded).asserted()).isTrue();
+    assertThat(labelOf(occluded).says(DATA, DataClass.CARDHOLDER)).isTrue();
+    assertThat(lineageOf(occluded).asserted()).isTrue();
   }
 
   /** A label governs disclosure, not destruction, so erasure is named separately or not granted. */
@@ -1018,8 +1026,10 @@ class JdbcCharterTest {
     Occluded<Card> card = card();
     edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "agent")));
 
-    assertThat(Assertions.catchThrowable(() -> store.erase(card)))
-        .isInstanceOf(AccessDeniedException.class);
+    assertThat(compliance.erase(card))
+        .isInstanceOfSatisfying(
+            Erased.Refused.class,
+            refused -> assertThat(refused.reason()).isEqualTo(Erased.Reason.NOT_PERMITTED));
     assertThat(storage.contains(card.id())).isTrue();
   }
 

@@ -33,38 +33,28 @@ import org.jwcarman.occlude.lattice.Label;
  * entitled to see. Declaring one hands back the portal, and holding that portal is the only way to
  * perform the operation -- there is no registry and no lookup by name.
  *
- * <p><b>Two things are deliberately absent from this interface.</b>
+ * <p>Every portal carries everything its operation needs, and binding the charter to storage brings
+ * them all into force at once. After that the charter has no further part to play.
  *
- * <p>{@code seal}, which brings a charter into force, is not here. Whoever holds the thing that can
- * seal decides when an application's authority graph stops growing, and that is not a decision a
- * bean should be able to make by naming a type in its constructor. The implementation carries it,
- * and whatever constructs a charter keeps that reference; everything else is handed this.
+ * <p>{@code bind} is deliberately absent from this interface. Whoever holds the thing that can bind
+ * decides when an application's authority graph stops growing, and that is not a decision a bean
+ * should be able to make by naming a type in its constructor. The implementation carries it, and
+ * whatever constructs a charter keeps that reference; everything else is handed this.
  *
- * <p>{@code erase}, which forgets a value and everything derived from it, is not here either.
- * Nothing in an application has needed it, and leaving it off means the answer to "which code can
- * destroy customer data" is <i>none, structurally</i>. If that changes, erasure earns a portal like
- * every other operation, rather than a method on the object everybody is handed.
+ * <p>Erasing a value and reading its label are portals like every other operation. Each used to be
+ * a method on the object that constructed a charter, answered with no line in the record or checked
+ * against a policy nobody held; as portals, the answer to "which code can destroy customer data" or
+ * "which code can learn a tenant's classification" is whoever was handed one, and the manifest
+ * names them.
  *
- * <p>Nor is anything that reports on a <i>value</i>. {@code label} said how a value was labelled,
- * {@code lineage} said what it was made from, and {@code holds} said whether it was here at all --
- * none of them moved a value anywhere, which is why they looked harmless. But each answered a
- * question about real data with no ceiling, no {@code availableTo}, and no line in the record, and
- * each took a {@code String}, so any identifier could be asked about. A label names a tenant or a
- * project codeword; storage encrypts it and the audit protects it exactly like a value. Handing it
- * out from the object every bean is given said the opposite.
- *
- * <p>What is left is declaring, and reporting on the <i>declarations</i> rather than on anything
- * held. That distinction is the whole of it: a manifest says what this application can do, which is
- * safe to publish because it describes the system and never a value. Whoever constructs a charter
- * keeps the rest, the same way it keeps {@code seal} and {@code erase}.
+ * <p>What is reported here is the <i>declarations</i>, never anything held: a manifest says what
+ * this application can do, which is safe to publish because it describes the system and never a
+ * value.
  */
 public interface Charter {
 
   /** The questions this charter asks about every value it holds. */
   Axes axes();
-
-  /** Whether this charter has been brought into force. */
-  boolean sealed();
 
   // ------------------------------------------------------------------ constituting authority
 
@@ -84,9 +74,6 @@ public interface Charter {
 
   /** The same, for a ceiling that does not depend on who is asking. */
   Sink sink(String name, Ceiling ceiling, OccludedType<?>... reads);
-
-  /** A sink declared elsewhere. */
-  Charter sink(SinkSpec sink);
 
   /**
    * The authority to make one value from another.
@@ -127,20 +114,26 @@ public interface Charter {
       Query.Asking<I, Q> asking,
       Consumer<QueryConfig> customizer);
 
-  // ------------------------------------------------------------------ settling how it behaves
+  /**
+   * The authority to forget a value and everything derived from it.
+   *
+   * <p>The policy is asked about the root, with its label and who is asking; descendants go with
+   * it.
+   */
+  Erasure erasure(String name, BiPredicate<Label, AccessContext> mayErase);
 
-  /** Where the access happening right now comes from. */
-  Charter currentAccess(AccessContextProvider currentAccess);
+  /** The authority to read a value's label and lineage, up to what this ceiling admits. */
+  Inspection inspection(String name, Function<AccessContext, Ceiling> ceiling);
 
-  /** Who may forget a value, which is the one decision a label cannot make on its own. */
-  Charter mayErase(BiPredicate<Label, AccessContext> mayErase);
+  /** The same, for a ceiling that does not depend on who is asking. */
+  Inspection inspection(String name, Ceiling ceiling);
 
   // ------------------------------------------------------------------ what it reports
 
   /**
    * What this charter permits, rendered.
    *
-   * <p>Answerable before it has been sealed to anything, because it is a statement about the
+   * <p>Answerable before it has been bound to anything, because it is a statement about the
    * declarations rather than about any value: a build can render it, diff it against the last
    * release, and fail on a change nobody meant to make.
    */

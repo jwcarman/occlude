@@ -21,6 +21,7 @@ import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Label;
@@ -28,7 +29,7 @@ import org.jwcarman.occlude.lattice.Label;
 /**
  * Rendering a {@link Manifest} from what a charter has been told, and nothing else.
  *
- * <p>Package-private and entirely pure: it reads a frozen {@link Configuration} and produces a
+ * <p>Package-private and entirely pure: it reads a charter's {@link Declarations} and produces a
  * report. It decides nothing and holds nothing, which is why it does not live on the charter --
  * reporting is not one of a charter's powers, it is a reading of one.
  */
@@ -40,18 +41,50 @@ final class Manifests {
   private Manifests() {}
 
   /** What this configuration permits, rendered for one access. */
-  static Manifest of(Configuration configuration, AccessContext as) {
+  static Manifest of(Declarations configuration, AccessContext as) {
     return new Manifest(
         String.valueOf(Label.nothing()),
         sourceEntries(configuration),
         sinkEntries(configuration, as),
         derivationEntries(configuration),
         queryEntries(configuration),
+        erasureEntries(configuration),
+        inspectionEntries(configuration, as),
         findings(configuration),
         as);
   }
 
-  private static List<Manifest.Entry> sourceEntries(Configuration configuration) {
+  /** An erasure's policy is a function of the label and the access, so only its name can show. */
+  private static List<Manifest.Entry> erasureEntries(Declarations configuration) {
+    List<Manifest.Entry> erasures = new ArrayList<>();
+    for (ErasureSpec erasure : configuration.erasures()) {
+      erasures.add(
+          new Manifest.Entry(
+              erasure.name(),
+              "may erase what its policy allows, and everything derived from it",
+              false,
+              List.of(),
+              null));
+    }
+    return erasures;
+  }
+
+  private static List<Manifest.Entry> inspectionEntries(
+      Declarations configuration, AccessContext as) {
+    List<Manifest.Entry> inspections = new ArrayList<>();
+    for (InspectionSpec inspection : configuration.inspections()) {
+      inspections.add(
+          new Manifest.Entry(
+              inspection.name(),
+              "reads labels and lineage up to " + accepts(inspection::ceilingFor, as),
+              false,
+              List.of(),
+              null));
+    }
+    return inspections;
+  }
+
+  private static List<Manifest.Entry> sourceEntries(Declarations configuration) {
     List<Manifest.Entry> ways = new ArrayList<>();
     for (var source : configuration.sources().entrySet()) {
       ways.add(
@@ -65,13 +98,13 @@ final class Manifests {
     return ways;
   }
 
-  private static List<Manifest.Entry> sinkEntries(Configuration configuration, AccessContext as) {
+  private static List<Manifest.Entry> sinkEntries(Declarations configuration, AccessContext as) {
     List<Manifest.Entry> doors = new ArrayList<>();
     for (SinkSpec sink : configuration.sinks()) {
       doors.add(
           new Manifest.Entry(
               sink.name(),
-              "accepts up to " + accepts(sink, as),
+              "accepts up to " + accepts(sink::ceiling, as),
               false,
               List.copyOf(configuration.sinkReads().getOrDefault(sink.name(), Set.of())),
               null));
@@ -79,7 +112,7 @@ final class Manifests {
     return doors;
   }
 
-  private static List<Manifest.Entry> derivationEntries(Configuration configuration) {
+  private static List<Manifest.Entry> derivationEntries(Declarations configuration) {
     List<Manifest.Entry> entries = new ArrayList<>();
     for (DerivationSpec<?> derivation : configuration.derivations()) {
       entries.add(
@@ -93,7 +126,7 @@ final class Manifests {
     return entries;
   }
 
-  private static List<Manifest.Entry> queryEntries(Configuration configuration) {
+  private static List<Manifest.Entry> queryEntries(Declarations configuration) {
     List<Manifest.Entry> questions = new ArrayList<>();
     for (QuerySpec<?, ?> query : configuration.queries()) {
       questions.add(
@@ -120,7 +153,7 @@ final class Manifests {
    * functions of the access, so "can an unendorsed value reach the vendor model" has no general
    * answer -- only one per caller. That is what rendering a manifest for an access is for.
    */
-  private static List<Manifest.Finding> findings(Configuration configuration) {
+  private static List<Manifest.Finding> findings(Declarations configuration) {
     List<Manifest.Finding> findings = new ArrayList<>();
     Set<String> produced = producedTypes(configuration);
     Set<String> read = readTypes(configuration);
@@ -133,7 +166,7 @@ final class Manifests {
   }
 
   /** Every type something in this charter can produce: a source's, or a derivation's output. */
-  private static Set<String> producedTypes(Configuration configuration) {
+  private static Set<String> producedTypes(Declarations configuration) {
     Set<String> produced = new LinkedHashSet<>();
     configuration.sources().values().forEach(type -> produced.add(type.name()));
     for (DerivationSpec<?> derivation : configuration.derivations()) {
@@ -143,7 +176,7 @@ final class Manifests {
   }
 
   /** Every type something in this charter reads: a door's, a derivation's, or a question's. */
-  private static Set<String> readTypes(Configuration configuration) {
+  private static Set<String> readTypes(Declarations configuration) {
     Set<String> read = new LinkedHashSet<>();
     configuration.sinkReads().values().forEach(read::addAll);
     for (DerivationSpec<?> derivation : configuration.derivations()) {
@@ -157,7 +190,7 @@ final class Manifests {
 
   /** Whether this charter has any door in and any door out at all. */
   private static void declarationPresenceFindings(
-      Configuration configuration, List<Manifest.Finding> findings) {
+      Declarations configuration, List<Manifest.Finding> findings) {
     if (configuration.sources().isEmpty()) {
       findings.add(
           new Manifest.Finding(
@@ -175,7 +208,7 @@ final class Manifests {
    * door reads. Walked rather than assumed: a derivation in the middle is easy to miss.
    */
   private static void unreachableSourceFindings(
-      Configuration configuration, List<Manifest.Finding> findings) {
+      Declarations configuration, List<Manifest.Finding> findings) {
     for (var source : configuration.sources().entrySet()) {
       if (!reaches(source.getValue().name(), configuration)) {
         findings.add(
@@ -190,7 +223,7 @@ final class Manifests {
 
   /** A door that reads a type nothing in this charter can ever produce. */
   private static void unproducedSinkReadFindings(
-      Configuration configuration, Set<String> produced, List<Manifest.Finding> findings) {
+      Declarations configuration, Set<String> produced, List<Manifest.Finding> findings) {
     for (var door : configuration.sinkReads().entrySet()) {
       for (String type : door.getValue()) {
         if (!produced.contains(type)) {
@@ -206,7 +239,7 @@ final class Manifests {
 
   /** A derivation that reads what nothing produces, or makes what nothing reads. */
   private static void derivationFindings(
-      Configuration configuration,
+      Declarations configuration,
       Set<String> produced,
       Set<String> read,
       List<Manifest.Finding> findings) {
@@ -232,7 +265,7 @@ final class Manifests {
 
   /** A question that asks about a type nothing in this charter can ever produce. */
   private static void unproducedQueryFindings(
-      Configuration configuration, Set<String> produced, List<Manifest.Finding> findings) {
+      Declarations configuration, Set<String> produced, List<Manifest.Finding> findings) {
     for (QuerySpec<?, ?> query : configuration.queries()) {
       if (!produced.contains(query.inputType().name())) {
         findings.add(
@@ -246,7 +279,7 @@ final class Manifests {
   }
 
   /** Whether any sink reads this type, or a type reachable from it by deriving. */
-  private static boolean reaches(String type, Configuration configuration) {
+  private static boolean reaches(String type, Declarations configuration) {
     Set<String> seen = new LinkedHashSet<>();
     Deque<String> pending = new ArrayDeque<>(List.of(type));
     Set<String> doorsRead = new LinkedHashSet<>();
@@ -284,9 +317,9 @@ final class Manifests {
    * ceiling that reads a tenant will refuse to answer that, and saying so is more honest than
    * printing what it would allow nobody.
    */
-  private static String accepts(SinkSpec sink, AccessContext as) {
+  private static String accepts(Function<AccessContext, Ceiling> door, AccessContext as) {
     try {
-      Ceiling ceiling = sink.ceiling(as);
+      Ceiling ceiling = door.apply(as);
       return ceiling == null ? "(said nothing for this access)" : ceiling.toString();
     } catch (RuntimeException _) {
       return "(could not decide for this access)";

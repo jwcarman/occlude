@@ -17,7 +17,6 @@ package org.jwcarman.occlude;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.util.List;
 import java.util.Map;
@@ -58,19 +57,19 @@ class ErasingAcrossTenantsTest {
   void is_refused_even_for_a_compliance_officer() {
     AtomicReference<AccessContext> edge = new AtomicReference<>(AccessContext.empty());
 
-    DefaultCharter config =
-        new DefaultCharter(TENANT, LEVEL)
-            .currentAccess(edge::get)
-            .mayErase(
-                (label, ctx) ->
-                    ctx.has("role", "compliance")
-                        && ctx.get("tenant")
-                            .map(
-                                tenant ->
-                                    Ceiling.of(TENANT, Constraint.atMost(tenant))
-                                        .with(LEVEL, Constraint.any())
-                                        .permits(label))
-                            .orElse(false));
+    DefaultCharter config = new DefaultCharter(TENANT, LEVEL);
+    Erasure compliance =
+        config.erasure(
+            "compliance",
+            (label, ctx) ->
+                ctx.has("role", "compliance")
+                    && ctx.get("tenant")
+                        .map(
+                            tenant ->
+                                Ceiling.of(TENANT, Constraint.atMost(tenant))
+                                    .with(LEVEL, Constraint.any())
+                                    .permits(label))
+                        .orElse(false));
 
     Occlude<Record> globexRecords =
         config.source(
@@ -79,14 +78,16 @@ class ErasingAcrossTenantsTest {
             ctx -> Label.of(TENANT, "globex").with(LEVEL, Level.HIGH));
 
     MemoryStorage storage = new MemoryStorage();
-    config.seal(storage);
+    config.bind(storage, edge::get);
 
     Occluded<Record> globexRecord = globexRecords.occlude(new Record("globex's records"));
 
     edge.set(AccessContext.of(Map.of("tenant", "acme", "role", "compliance")));
 
-    assertThat(catchThrowable(() -> config.erase(globexRecord)))
-        .isInstanceOf(AccessDeniedException.class);
+    assertThat(compliance.erase(globexRecord))
+        .isInstanceOfSatisfying(
+            Erased.Refused.class,
+            refused -> assertThat(refused.reason()).isEqualTo(Erased.Reason.NOT_PERMITTED));
     assertThat(storage.contains(globexRecord.id())).isTrue();
   }
 
@@ -101,10 +102,14 @@ class ErasingAcrossTenantsTest {
   @DisplayName("records an attempt to erase a value that is not here")
   void records_an_attempt_to_erase_what_is_not_here() {
     MemoryStorage storage = new MemoryStorage();
-    DefaultCharter config = new DefaultCharter(TENANT, LEVEL).mayErase((label, ctx) -> true);
-    config.seal(storage);
+    DefaultCharter config = new DefaultCharter(TENANT, LEVEL);
+    Erasure erasure = config.erasure("anything", (label, ctx) -> true);
+    config.bind(storage, AccessContextProvider.none());
 
-    assertThat(config.erase(Occluded.of("occ_never-existed"))).isZero();
+    assertThat(erasure.erase(Occluded.of("occ_never-existed")))
+        .isInstanceOfSatisfying(
+            Erased.Refused.class,
+            refused -> assertThat(refused.reason()).isEqualTo(Erased.Reason.NO_SUCH_VALUE));
 
     assertThat(storage.audit(AuditRecord.Operation.ERASE))
         .isNotEmpty()
@@ -119,7 +124,8 @@ class ErasingAcrossTenantsTest {
   @DisplayName("removes a root and everything derived from it, one line per value")
   void removes_a_root_and_everything_derived_from_it() {
     MemoryStorage storage = new MemoryStorage();
-    DefaultCharter config = new DefaultCharter(TENANT, LEVEL).mayErase((label, ctx) -> true);
+    DefaultCharter config = new DefaultCharter(TENANT, LEVEL);
+    Erasure erasure = config.erasure("anything", (label, ctx) -> true);
     Occlude<Record> records =
         config.source(
             "records", RECORD_TYPE, ctx -> Label.of(TENANT, "acme").with(LEVEL, Level.LOW));
@@ -130,12 +136,12 @@ class ErasingAcrossTenantsTest {
             RECORD_TYPE,
             r -> new Record(r.text() + "-copy"),
             d -> d.accepting(Ceiling.of(TENANT, Constraint.any()).with(LEVEL, Constraint.any())));
-    config.seal(storage);
+    config.bind(storage, AccessContextProvider.none());
 
     Occluded<Record> root = records.occlude(new Record("root"));
     Occluded<Record> child = copy.derive(root).orThrow();
 
-    int removed = config.erase(root);
+    int removed = erasure.erase(root).orThrow();
 
     assertThat(removed).isEqualTo(2);
     assertThat(storage.contains(root.id())).isFalse();
@@ -158,7 +164,8 @@ class ErasingAcrossTenantsTest {
     OccludedType<Combined> combinedType = OccludedType.of(Combined.class);
 
     MemoryStorage storage = new MemoryStorage();
-    DefaultCharter config = new DefaultCharter(TENANT, LEVEL).mayErase((label, ctx) -> true);
+    DefaultCharter config = new DefaultCharter(TENANT, LEVEL);
+    Erasure erasure = config.erasure("anything", (label, ctx) -> true);
     Occlude<Record> records =
         config.source(
             "records", RECORD_TYPE, ctx -> Label.of(TENANT, "acme").with(LEVEL, Level.LOW));
@@ -176,14 +183,14 @@ class ErasingAcrossTenantsTest {
             combinedType,
             branches -> new Combined(branches.size() + " branches"),
             d -> d.accepting(anything));
-    config.seal(storage);
+    config.bind(storage, AccessContextProvider.none());
 
     Occluded<Record> root = records.occlude(new Record("root"));
     Occluded<Branch> leftChild = left.derive(root).orThrow();
     Occluded<Branch> rightChild = right.derive(root).orThrow();
     Occluded<Combined> combined = combine.fold(List.of(leftChild, rightChild)).orThrow();
 
-    int removed = config.erase(root);
+    int removed = erasure.erase(root).orThrow();
 
     assertThat(removed).isEqualTo(4);
     assertThat(storage.contains(combined.id())).isFalse();
@@ -195,20 +202,72 @@ class ErasingAcrossTenantsTest {
   @DisplayName("refuses when the erasure policy itself throws, rather than propagating the crash")
   void refuses_when_the_erasure_policy_throws() {
     MemoryStorage storage = new MemoryStorage();
-    DefaultCharter config =
-        new DefaultCharter(TENANT, LEVEL)
-            .mayErase(
-                (label, ctx) -> {
-                  throw new IllegalStateException("cannot decide");
-                });
+    DefaultCharter config = new DefaultCharter(TENANT, LEVEL);
+    Erasure erasure =
+        config.erasure(
+            "undecided",
+            (label, ctx) -> {
+              throw new IllegalStateException("cannot decide");
+            });
     Occlude<Record> records =
         config.source(
             "records", RECORD_TYPE, ctx -> Label.of(TENANT, "acme").with(LEVEL, Level.LOW));
-    config.seal(storage);
+    config.bind(storage, AccessContextProvider.none());
 
     Occluded<Record> root = records.occlude(new Record("root"));
 
-    assertThatThrownBy(() -> config.erase(root)).isInstanceOf(AccessDeniedException.class);
+    assertThat(erasure.erase(root).succeeded()).isFalse();
     assertThat(storage.contains(root.id())).isTrue();
+  }
+
+  /** Several may be declared, and the record says whose policy said no. */
+  @Test
+  @DisplayName("names the erasure that refused, when several are declared")
+  void names_the_erasure_that_refused() {
+    MemoryStorage storage = new MemoryStorage();
+    DefaultCharter config = new DefaultCharter(TENANT, LEVEL);
+    Occlude<Record> records =
+        config.source(
+            "records", RECORD_TYPE, ctx -> Label.of(TENANT, "acme").with(LEVEL, Level.HIGH));
+    Erasure retention = config.erasure("retention", (label, ctx) -> label.says(LEVEL, Level.LOW));
+    Erasure compliance = config.erasure("compliance", (label, ctx) -> true);
+    config.bind(storage, AccessContextProvider.none());
+
+    Occluded<Record> root = records.occlude(new Record("kept for now"));
+
+    assertThat(retention.erase(root).succeeded()).isFalse();
+    assertThat(storage.audit(AuditRecord.Operation.ERASE))
+        .singleElement()
+        .satisfies(line -> assertThat(line.target()).contains("retention"));
+
+    assertThat(compliance.erase(root).orThrow()).isEqualTo(1);
+    assertThat(storage.contains(root.id())).isFalse();
+  }
+
+  @Test
+  @DisplayName("refuses two erasures under one name")
+  void refuses_two_erasures_under_one_name() {
+    DefaultCharter config = new DefaultCharter(TENANT, LEVEL);
+    config.erasure("compliance", (label, ctx) -> true);
+
+    assertThatThrownBy(() -> config.erasure("compliance", (label, ctx) -> false))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("two erasures are registered as 'compliance'");
+  }
+
+  /** The orThrow form, for a caller that cannot continue without the erasure having happened. */
+  @Test
+  @DisplayName("throws from orThrow when refused")
+  void throws_from_or_throw_when_refused() {
+    DefaultCharter config = new DefaultCharter(TENANT, LEVEL);
+    Erasure nobody = config.erasure("nobody", (label, ctx) -> false);
+    config.bind(new MemoryStorage(), AccessContextProvider.none());
+
+    Erased erased = nobody.erase(Occluded.of("occ_never-existed"));
+
+    assertThat(erased.removed()).isEmpty();
+    assertThatThrownBy(erased::orThrow)
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("NO_SUCH_VALUE");
   }
 }

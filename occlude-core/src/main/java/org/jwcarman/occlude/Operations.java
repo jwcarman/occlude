@@ -15,16 +15,100 @@
  */
 package org.jwcarman.occlude;
 
+import java.util.concurrent.atomic.AtomicReference;
+import org.jwcarman.occlude.lattice.Axes;
+
 /**
- * What a sealed charter can do: the five operations, and the gate they share.
+ * What a charter's portals can do, which is nothing until the charter is bound.
  *
- * <p>Built once, when a charter is sealed, against the storage it was sealed to. A portal reaches
- * the one operation it performs through here, and nothing reaches any of them before sealing.
+ * <p>Created empty with the charter and handed to every portal as it is minted, so binding does not
+ * walk the portals and install anything: it fills this in, once, and every portal is in force from
+ * that instant. Everything the operations need comes from the environment -- where values live and
+ * who is asking -- and nothing from the declarations, because each portal carries its own.
+ *
+ * <p>Not a record, as it once was, because it now has a moment at which it changes. That moment is
+ * one compare-and-set, and it is the only place anything here crosses to the threads that use a
+ * portal.
  */
-record Operations(
-    Gate gate,
-    Occluding occluding,
-    Revealing revealing,
-    Querying querying,
-    Deriving deriving,
-    Erasing erasing) {}
+final class Operations {
+
+  private record Bound(
+      Occluding occluding,
+      Revealing revealing,
+      Querying querying,
+      Deriving deriving,
+      Erasing erasing,
+      Inspecting inspecting) {}
+
+  private final AtomicReference<Bound> bound = new AtomicReference<>();
+
+  /**
+   * Brings every portal holding this into force, against this storage and this source of identity.
+   *
+   * <p>Irreversible: there is no unbinding, no rebinding, and no replacing the storage.
+   */
+  void bind(Axes axes, Storage storage, AccessContextProvider currentAccess) {
+    if (bound.get() != null) {
+      throw new IllegalStateException("this charter is already bound");
+    }
+    Gate gate = new Gate(axes, currentAccess);
+    Trail trail = new Trail(storage);
+    Bound operations =
+        new Bound(
+            new Occluding(gate, trail, storage),
+            new Revealing(gate, trail, storage),
+            new Querying(gate, trail, storage),
+            new Deriving(gate, trail, storage),
+            new Erasing(gate, trail, storage),
+            new Inspecting(gate, trail, storage));
+    if (!bound.compareAndSet(null, operations)) {
+      throw new IllegalStateException("this charter was bound while it was being bound");
+    }
+  }
+
+  /** Whether this has been brought into force. */
+  boolean bound() {
+    return bound.get() != null;
+  }
+
+  Occluding occluding() {
+    return current().occluding();
+  }
+
+  Revealing revealing() {
+    return current().revealing();
+  }
+
+  Querying querying() {
+    return current().querying();
+  }
+
+  Deriving deriving() {
+    return current().deriving();
+  }
+
+  Erasing erasing() {
+    return current().erasing();
+  }
+
+  Inspecting inspecting() {
+    return current().inspecting();
+  }
+
+  /**
+   * The operations, or a refusal saying why a portal cannot act yet.
+   *
+   * <p>The refusal does not name the portal. Only a miswired application reaches it, and the stack
+   * trace already points at the call that came too early.
+   */
+  private Bound current() {
+    Bound current = bound.get();
+    if (current == null) {
+      throw new IllegalStateException(
+          "a portal cannot be exercised before its charter is bound. Authority is constituted"
+              + " while a charter is being written and comes into force when it is bound to"
+              + " storage; this one was asked to act before that happened.");
+    }
+    return current;
+  }
+}

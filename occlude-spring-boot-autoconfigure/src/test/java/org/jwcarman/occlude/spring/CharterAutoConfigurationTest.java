@@ -28,6 +28,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.jwcarman.occlude.AccessContext;
+import org.jwcarman.occlude.AccessContextProvider;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.DefaultCharter;
 import org.jwcarman.occlude.Derivation;
@@ -209,20 +211,20 @@ class CharterAutoConfigurationTest {
   @DisplayName("logging the manifest at startup")
   class LoggingTheManifest {
 
-    private Logger sealerLog;
+    private Logger binderLog;
     private ListAppender<ILoggingEvent> appender;
 
     @BeforeEach
     void attachAppender() {
-      sealerLog = (Logger) LoggerFactory.getLogger(CharterAutoConfiguration.class);
+      binderLog = (Logger) LoggerFactory.getLogger(CharterAutoConfiguration.class);
       appender = new ListAppender<>();
       appender.start();
-      sealerLog.addAppender(appender);
+      binderLog.addAppender(appender);
     }
 
     @AfterEach
     void detachAppender() {
-      sealerLog.detachAppender(appender);
+      binderLog.detachAppender(appender);
     }
 
     @Test
@@ -250,19 +252,18 @@ class CharterAutoConfigurationTest {
   /**
    * The failure that started this file.
    *
-   * <p>Sealing happens in a {@code SmartInitializingSingleton}, so a portal that works is the only
-   * evidence it ran at all. When the sealer silently never matched, every portal refused at request
-   * time -- and nothing in the wiring complained.
+   * <p>Binding happens in a {@code SmartInitializingSingleton}, so a portal that works is the only
+   * evidence it ran at all. When the sealer that preceded it silently never matched, every portal
+   * refused at request time -- and nothing in the wiring complained.
    */
   @Test
-  @DisplayName("seals it, so a portal declared against it actually works")
-  void seals_it_so_portals_work() {
+  @DisplayName("binds it, so a portal declared against it actually works")
+  void binds_it_so_portals_work() {
     runner
         .withUserConfiguration(AnApplication.class)
         .run(
             context -> {
               assertThat(context).hasNotFailed();
-              assertThat(context.getBean(Charter.class).sealed()).isTrue();
 
               Occlude<String> notes =
                   context
@@ -278,7 +279,7 @@ class CharterAutoConfigurationTest {
               Occluded<String> held = notes.occlude("a note");
 
               // The value coming back out is the evidence. A portal that refuses at request time
-              // is exactly what a charter that was never sealed produces, and it is what this
+              // is exactly what a charter that was never bound produces, and it is what this
               // test exists to catch.
               assertThat(reporting.reveal(held).granted()).contains("a note");
             });
@@ -302,7 +303,6 @@ class CharterAutoConfigurationTest {
               CharterEndpoint endpoint = context.getBean(CharterEndpoint.class);
 
               Map<String, Object> all = endpoint.charter();
-              assertThat(all).containsEntry("sealed", true);
               assertThat(all).containsEntry("axes", List.of("tenant", "clearance"));
               assertThat(entries(all, "sources")).contains("notes");
               assertThat(entries(all, "sinks")).contains("reporting");
@@ -459,11 +459,11 @@ class CharterAutoConfigurationTest {
    *
    * <p>A direct dependency here was evaluated before the bean existed, so the sealer never matched.
    * This is the regression test for that, and it passes only because resolution is deferred to the
-   * moment of sealing.
+   * moment of binding.
    */
   @Test
-  @DisplayName("seals against storage contributed by a later auto-configuration")
-  void seals_against_storage_contributed_later() {
+  @DisplayName("binds against storage contributed by a later auto-configuration")
+  void binds_against_storage_contributed_later() {
     new ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(CharterAutoConfiguration.class, LateStorage.class))
         .withUserConfiguration(NoStorage.class)
@@ -471,14 +471,14 @@ class CharterAutoConfigurationTest {
             context -> {
               assertThat(context).hasNotFailed();
               assertThat(context).hasSingleBean(Storage.class);
-              assertThat(context.getBean(Charter.class).sealed()).isTrue();
+              assertBound(context.getBean(Charter.class));
             });
   }
 
   /**
    * Storage the way a storage module really supplies it: from an auto-configuration ordered after
    * the one that constitutes the charter, which is precisely when a direct dependency is evaluated
-   * too early and the sealer silently never matches.
+   * too early and the binder silently never matches.
    */
   @AutoConfiguration(after = CharterAutoConfiguration.class)
   static class LateStorage {
@@ -516,16 +516,60 @@ class CharterAutoConfigurationTest {
   /**
    * The published bean cannot bring a charter into force, and cannot destroy through one.
    *
-   * <p>Not a check that refuses: {@link Charter} has no {@code seal} and no {@code erase} to call.
-   * What the container hands out is narrower than what the starter kept.
+   * <p>Not a check that refuses: {@link Charter} has no {@code bind} and no {@code erase} to call.
+   * Erasing takes an {@link org.jwcarman.occlude.Erasure}, which somebody has to have declared and
+   * handed over. What the container hands out is narrower than what the starter kept.
    */
   @Test
-  @DisplayName("publishes a charter that can neither seal nor erase")
-  void publishes_a_charter_that_cannot_seal() {
+  @DisplayName("publishes a charter that can neither bind nor erase")
+  void publishes_a_charter_that_cannot_bind() {
     assertThat(Charter.class.getMethods())
         .isNotEmpty()
-        .noneSatisfy(method -> assertThat(method.getName()).isEqualTo("seal"))
+        .noneSatisfy(method -> assertThat(method.getName()).isEqualTo("bind"))
         .noneSatisfy(method -> assertThat(method.getName()).isEqualTo("erase"));
+  }
+
+  /** Identity is the wiring's, so an application that says where it lives is taken at its word. */
+  @Test
+  @DisplayName("binds with the access source the application contributed")
+  void binds_with_the_applications_access_source() {
+    runner
+        .withUserConfiguration(AnApplication.class, AnIdentity.class)
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              AnIdentity identity = context.getBean(AnIdentity.class);
+              Occlude<String> notes =
+                  context
+                      .<Occlude<String>>getBeanProvider(
+                          ResolvableType.forClassWithGenerics(Occlude.class, String.class))
+                      .getObject();
+
+              notes.occlude("a note");
+
+              assertThat(identity.asked).isTrue();
+            });
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class AnIdentity {
+
+    private boolean asked;
+
+    @Bean
+    AccessContextProvider currentAccess() {
+      return () -> {
+        asked = true;
+        return AccessContext.of("tenant", "acme");
+      };
+    }
+  }
+
+  /** A bound charter says so the only way it can: by refusing to grow. */
+  private static void assertBound(Charter charter) {
+    assertThatThrownBy(() -> charter.erasure("probe", (label, ctx) -> true))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("has been bound");
   }
 
   /** And an application that brought its own charter keeps it. */
@@ -577,7 +621,7 @@ class CharterAutoConfigurationTest {
                               NOTE,
                               ctx -> Label.of(TENANT, "globex").with(CLEARANCE, Clearance.OPEN)))
                   .isInstanceOf(IllegalStateException.class)
-                  .hasMessageContaining("has been sealed");
+                  .hasMessageContaining("has been bound");
             });
   }
 }
