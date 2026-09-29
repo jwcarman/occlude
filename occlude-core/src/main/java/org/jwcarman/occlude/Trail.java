@@ -18,6 +18,10 @@ package org.jwcarman.occlude;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.storage.AuditRecord;
+import org.jwcarman.occlude.storage.Storage;
+import org.jwcarman.occlude.storage.StorageIntegrityException;
+import org.jwcarman.occlude.storage.StorageUnreadableException;
 
 /**
  * The record every operation writes, and the one way it gets written.

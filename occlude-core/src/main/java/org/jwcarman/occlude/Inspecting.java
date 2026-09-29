@@ -16,6 +16,9 @@
 package org.jwcarman.occlude;
 
 import org.jwcarman.occlude.lattice.Ceiling;
+import org.jwcarman.occlude.storage.AuditRecord;
+import org.jwcarman.occlude.storage.Storage;
+import org.jwcarman.occlude.storage.StoredMetadata;
 
 /**
  * Reading what a value is labelled and where it came from, without the value.

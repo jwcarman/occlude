@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.occlude;
+package org.jwcarman.occlude.storage;
 
 /**
  * What a {@link Storage} holds is not what it signed.

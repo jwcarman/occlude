@@ -22,6 +22,8 @@ import org.junit.jupiter.api.Test;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
+import org.jwcarman.occlude.storage.AuditRecord;
+import org.jwcarman.occlude.storage.MemoryStorage;
 
 /**
  * Asking about a value nobody minted -- not refused by a policy, because there is nothing to

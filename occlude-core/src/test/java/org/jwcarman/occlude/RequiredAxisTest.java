@@ -27,6 +27,10 @@ import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.storage.AuditRecord;
+import org.jwcarman.occlude.storage.Lineage;
+import org.jwcarman.occlude.storage.MemoryStorage;
+import org.jwcarman.occlude.storage.StoredValue;
 
 /**
  * An axis that has to be said.

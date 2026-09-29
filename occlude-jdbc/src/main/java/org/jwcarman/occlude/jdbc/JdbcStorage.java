@@ -42,12 +42,12 @@ import javax.sql.DataSource;
 import org.jwcarman.codec.Codec;
 import org.jwcarman.codec.CodecFactory;
 import org.jwcarman.codec.TypeRef;
-import org.jwcarman.occlude.AuditRecord;
-import org.jwcarman.occlude.Lineage;
-import org.jwcarman.occlude.Storage;
-import org.jwcarman.occlude.StoredMetadata;
-import org.jwcarman.occlude.StoredValue;
 import org.jwcarman.occlude.lattice.Axes;
+import org.jwcarman.occlude.storage.AuditRecord;
+import org.jwcarman.occlude.storage.Lineage;
+import org.jwcarman.occlude.storage.Storage;
+import org.jwcarman.occlude.storage.StoredMetadata;
+import org.jwcarman.occlude.storage.StoredValue;
 
 /**
  * Storage in a database, with every payload encrypted.

@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.manifest.Manifest;
 
 /**
  * Rendering a {@link Manifest} from what a charter has been told, and nothing else.

@@ -23,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.storage.MemoryStorage;
 
 /**
  * A source labels what arrives, and sometimes only the thing itself can say how.

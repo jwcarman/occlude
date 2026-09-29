@@ -16,6 +16,9 @@
 package org.jwcarman.occlude;
 
 import java.util.List;
+import org.jwcarman.occlude.storage.AuditRecord;
+import org.jwcarman.occlude.storage.Storage;
+import org.jwcarman.occlude.storage.StoredMetadata;
 
 /**
  * Forgetting a value and everything derived from it.

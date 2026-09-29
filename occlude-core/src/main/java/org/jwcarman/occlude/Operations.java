@@ -17,6 +17,7 @@ package org.jwcarman.occlude;
 
 import java.util.concurrent.atomic.AtomicReference;
 import org.jwcarman.occlude.lattice.Axes;
+import org.jwcarman.occlude.storage.Storage;
 
 /**
  * What a charter's portals can do, which is nothing until the charter is bound.

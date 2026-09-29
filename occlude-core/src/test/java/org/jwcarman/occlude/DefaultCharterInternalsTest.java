@@ -32,6 +32,8 @@ import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.manifest.Manifest;
+import org.jwcarman.occlude.storage.MemoryStorage;
 
 /**
  * What a charter refuses while it is being written, what it hands back about itself, and what its

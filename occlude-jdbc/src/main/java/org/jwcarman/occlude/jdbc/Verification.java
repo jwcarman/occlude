@@ -33,8 +33,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import javax.sql.DataSource;
-import org.jwcarman.occlude.StorageIntegrityException;
-import org.jwcarman.occlude.StorageUnreadableException;
+import org.jwcarman.occlude.storage.StorageIntegrityException;
+import org.jwcarman.occlude.storage.StorageUnreadableException;
 
 /**
  * Whether what a store holds still agrees with what it signed: the trail, the value graph, and the

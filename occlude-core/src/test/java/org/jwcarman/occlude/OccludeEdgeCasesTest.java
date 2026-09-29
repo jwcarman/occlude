@@ -21,6 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.storage.MemoryStorage;
 
 /**
  * A source is a door, and a door can misbehave two ways: handed nothing to label, or unable to say

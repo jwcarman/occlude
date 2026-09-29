@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.occlude;
+package org.jwcarman.occlude.manifest;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.jwcarman.occlude.AccessContext;
 
 /**
  * What a charter permits, in a form a person can read.

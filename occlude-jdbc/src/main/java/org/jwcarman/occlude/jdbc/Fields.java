@@ -36,12 +36,12 @@ import org.jwcarman.codec.CodecException;
 import org.jwcarman.codec.CodecFactory;
 import org.jwcarman.codec.TypeRef;
 import org.jwcarman.codec.versioned.VersionedFormatException;
-import org.jwcarman.occlude.Lineage;
-import org.jwcarman.occlude.StorageIntegrityException;
-import org.jwcarman.occlude.StorageUnreadableException;
-import org.jwcarman.occlude.StoredMetadata;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.storage.Lineage;
+import org.jwcarman.occlude.storage.StorageIntegrityException;
+import org.jwcarman.occlude.storage.StorageUnreadableException;
+import org.jwcarman.occlude.storage.StoredMetadata;
 
 /**
  * What a stored field becomes on its way to disk and back: serialised, encrypted, and on the way

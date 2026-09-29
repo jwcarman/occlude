@@ -16,6 +16,8 @@
 package org.jwcarman.occlude;
 
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.storage.Lineage;
+import org.jwcarman.occlude.storage.Storage;
 
 /**
  * What a storage holds about a value, read directly, for tests that assert state.

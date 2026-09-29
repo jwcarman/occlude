@@ -25,6 +25,7 @@ import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.manifest.Manifest;
 
 /**
  * What a charter permits is answerable without a database.

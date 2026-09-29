@@ -31,6 +31,8 @@ import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.manifest.Manifest;
+import org.jwcarman.occlude.storage.Storage;
 
 /**
  * Where an application declares its authority, and nothing more.

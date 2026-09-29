@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.occlude;
+package org.jwcarman.occlude.storage;
 
+import org.jwcarman.occlude.OccludedType;
 import org.jwcarman.occlude.lattice.Label;
 
 /**

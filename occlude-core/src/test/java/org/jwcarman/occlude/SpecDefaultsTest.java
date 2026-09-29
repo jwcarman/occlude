@@ -25,6 +25,7 @@ import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.storage.MemoryStorage;
 
 /**
  * What a query or a derivation says it may read, when nobody said anything at all.

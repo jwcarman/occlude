@@ -24,6 +24,7 @@ import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.storage.MemoryStorage;
 
 /**
  * Nothing can be declared after a charter is bound.

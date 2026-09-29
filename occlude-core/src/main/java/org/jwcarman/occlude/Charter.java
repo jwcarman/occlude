@@ -24,6 +24,7 @@ import java.util.function.Function;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.manifest.Manifest;
 
 /**
  * What an application declares its authority with.

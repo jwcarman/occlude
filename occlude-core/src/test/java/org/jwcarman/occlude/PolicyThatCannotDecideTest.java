@@ -23,6 +23,8 @@ import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.storage.AuditRecord;
+import org.jwcarman.occlude.storage.MemoryStorage;
 
 /**
  * Every gate in this library is application code, and application code throws.

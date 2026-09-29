@@ -17,6 +17,10 @@ package org.jwcarman.occlude;
 
 import java.util.function.BiFunction;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.storage.AuditRecord;
+import org.jwcarman.occlude.storage.Lineage;
+import org.jwcarman.occlude.storage.Storage;
+import org.jwcarman.occlude.storage.StoredValue;
 
 /**
  * Taking a value in through a source.

@@ -24,6 +24,7 @@ import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.storage.MemoryStorage;
 
 /**
  * A sink settles both its restrictions when it is declared.

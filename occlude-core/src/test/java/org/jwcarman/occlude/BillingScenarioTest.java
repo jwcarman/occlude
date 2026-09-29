@@ -31,6 +31,12 @@ import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.lattice.Ceiling;
 import org.jwcarman.occlude.lattice.Constraint;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.manifest.Manifest;
+import org.jwcarman.occlude.storage.AuditRecord;
+import org.jwcarman.occlude.storage.MemoryStorage;
+import org.jwcarman.occlude.storage.Storage;
+import org.jwcarman.occlude.storage.StoredMetadata;
+import org.jwcarman.occlude.storage.StoredValue;
 
 /**
  * A multi-tenant SaaS billing system, written the way an application would write it.

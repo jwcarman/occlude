@@ -28,7 +28,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.jwcarman.occlude.AuditRecord;
+import org.jwcarman.occlude.storage.AuditRecord;
 
 /**
  * Every MAC a store computes: the commitments to what things say, and the digests over them.

@@ -17,6 +17,7 @@ package org.jwcarman.occlude;
 
 import java.util.Optional;
 import org.jwcarman.occlude.lattice.Label;
+import org.jwcarman.occlude.storage.Lineage;
 
 /** What came of asking what a value is labelled and where it came from. */
 public sealed interface Inspected {

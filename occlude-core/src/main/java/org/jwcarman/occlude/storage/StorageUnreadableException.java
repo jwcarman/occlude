@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jwcarman.occlude;
+package org.jwcarman.occlude.storage;
 
 /**
  * A {@link Storage} could not read back what it holds.
