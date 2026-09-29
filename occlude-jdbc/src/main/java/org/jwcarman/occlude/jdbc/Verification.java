@@ -59,18 +59,47 @@ final class Verification {
   }
 
   /**
-   * A statement over a whole table, streamed rather than held.
+   * A whole table, streamed rather than held.
    *
    * <p>PostgreSQL's driver reads a result set into memory entire unless it has a fetch size and
-   * runs inside a transaction, so every scan here is both: prepared through this, on a connection
-   * from {@link Transactions#inTransactionReturning}. Unstreamed, the check that exists to notice
+   * runs inside a transaction, so every scan here is both: read through this, on a connection from
+   * {@link Transactions#inTransactionReturning}. Unstreamed, the check that exists to notice
    * tampering was the thing that ran a large store's application out of heap -- the sweep reads
    * every ciphertext the store holds.
    */
-  private static PreparedStatement streamed(Connection connection, String sql) throws SQLException {
-    PreparedStatement statement = connection.prepareStatement(sql);
-    statement.setFetchSize(SCAN_FETCH);
-    return statement;
+  private static <T> T scanned(Connection connection, String sql, Scan<T> scan)
+      throws SQLException {
+    try (PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setFetchSize(SCAN_FETCH);
+      try (ResultSet rows = statement.executeQuery()) {
+        return scan.read(rows);
+      }
+    }
+  }
+
+  /** The same, for a scan that looks at each row on its own. */
+  private static void eachRow(Connection connection, String sql, RowVisit visit)
+      throws SQLException {
+    try (PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setFetchSize(SCAN_FETCH);
+      try (ResultSet rows = statement.executeQuery()) {
+        while (rows.next()) {
+          visit.visit(rows);
+        }
+      }
+    }
+  }
+
+  /** What a scan makes of the rows it reads. */
+  @FunctionalInterface
+  private interface Scan<T> {
+    T read(ResultSet rows) throws SQLException;
+  }
+
+  /** What a scan does with one row. */
+  @FunctionalInterface
+  private interface RowVisit {
+    void visit(ResultSet row) throws SQLException;
   }
 
   /**
@@ -89,40 +118,34 @@ final class Verification {
     List<String> unreadableValues = new ArrayList<>();
     List<Long> alteredLines = new ArrayList<>();
     List<Long> unreadableLines = new ArrayList<>();
-    try (PreparedStatement statement =
-            streamed(
-                connection,
-                """
+    eachRow(
+        connection,
+        """
                   SELECT value_id, value_type, derivation, payload, label, payload_commitment,
                          label_commitment, root_id, mac,
                          (SELECT array_agg(parent_id ORDER BY position) FROM occlude_lineage l
                            WHERE l.child_id = v.value_id) AS parents
                     FROM occlude_value v ORDER BY value_id
-                  """);
-        ResultSet rows = statement.executeQuery()) {
-      while (rows.next()) {
-        // Each field on its own: an unreadable payload must not hide an altered label beside it.
-        Finding payload = check(() -> fields.payloadOf(rows));
-        Finding label = check(() -> fields.labelPlaintextOf(rows, Fields.parentsIn(rows)));
-        payload
-            .worst(label)
-            .file(rows.getString(Columns.VALUE_ID), alteredValues, unreadableValues);
-      }
-    }
-    try (PreparedStatement statement =
-            streamed(
-                connection,
-                """
+                  """,
+        rows -> {
+          // Each field on its own: an unreadable payload must not hide an altered label beside it.
+          Finding payload = check(() -> fields.payloadOf(rows));
+          Finding label = check(() -> fields.labelPlaintextOf(rows, Fields.parentsIn(rows)));
+          payload
+              .worst(label)
+              .file(rows.getString(Columns.VALUE_ID), alteredValues, unreadableValues);
+        });
+    eachRow(
+        connection,
+        """
                 SELECT entry_id, recorded_at, previous, detail, label, context, commitment,
                        root_id, mac
                   FROM occlude_audit ORDER BY entry_id
-                """);
-        ResultSet rows = statement.executeQuery()) {
-      while (rows.next()) {
-        check(() -> fields.lineOf(rows))
-            .file(rows.getLong(Columns.ENTRY_ID), alteredLines, unreadableLines);
-      }
-    }
+                """,
+        rows -> {
+          check(() -> fields.lineOf(rows))
+              .file(rows.getLong(Columns.ENTRY_ID), alteredLines, unreadableLines);
+        });
     return new Sweep(alteredValues, unreadableValues, alteredLines, unreadableLines);
   }
 
@@ -227,19 +250,15 @@ final class Verification {
   Optional<Long> firstBrokenEntry() {
     return transactions.inTransactionReturning(
         "could not read the trail back",
-        connection -> {
-          try (PreparedStatement statement =
-                  streamed(
-                      connection,
-                      """
-                      SELECT entry_id, recorded_at, operation, value_id, target, outcome, reason,
-                             previous, digest, root_id, commitment, mac
-                      FROM occlude_audit ORDER BY entry_id
-                      """);
-              ResultSet rows = statement.executeQuery()) {
-            return firstBrokenIn(rows);
-          }
-        });
+        connection ->
+            scanned(
+                connection,
+                """
+                SELECT entry_id, recorded_at, operation, value_id, target, outcome, reason,
+                       previous, digest, root_id, commitment, mac
+                FROM occlude_audit ORDER BY entry_id
+                """,
+                this::firstBrokenIn));
   }
 
   /** The chain walk itself, over rows already selected in order. */
@@ -381,18 +400,17 @@ final class Verification {
     return transactions.inTransactionReturning(
         "could not read the values back",
         connection -> {
-          try (PreparedStatement statement =
-                  streamed(
+          List<String> broken =
+              verifyToFixpoint(
+                  scanned(
                       connection,
                       "SELECT v.value_id, v.value_type, v.payload_commitment, v.label_commitment,"
                           + " v.digest, v.root_id, v.mac, v.derivation, "
                           + Fields.PARENTS_OF_V
-                          + " FROM occlude_value v ORDER BY v.value_id");
-              ResultSet rows = statement.executeQuery()) {
-            List<String> broken = verifyToFixpoint(loadValueRows(rows));
-            broken.sort(Comparator.naturalOrder());
-            return broken;
-          }
+                          + " FROM occlude_value v ORDER BY v.value_id",
+                      this::loadValueRows));
+          broken.sort(Comparator.naturalOrder());
+          return broken;
         });
   }
 

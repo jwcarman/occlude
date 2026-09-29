@@ -16,6 +16,7 @@
 package org.jwcarman.occlude.jdbc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -174,11 +175,8 @@ class IntegrityAtScaleTest {
     // The trail walk, the value graph, and the sweep's two.
     assertThat(scans).hasSize(4);
     assertThat(scans)
-        .allSatisfy(
-            scan -> {
-              assertThat(scan.fetchSize()).isEqualTo(Verification.SCAN_FETCH);
-              assertThat(scan.autoCommit()).isFalse();
-            });
+        .extracting(Asked::fetchSize, Asked::autoCommit)
+        .containsOnly(tuple(Verification.SCAN_FETCH, false));
   }
 
   @Test
