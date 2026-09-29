@@ -152,8 +152,9 @@ class TenantKeysTest {
                 "acme".equals(tenant)
                     ? new JceDataKeyProvider("acme-2", Map.of("acme-2", TestKeys.aes256()))
                     : tenantKeys(tenant));
+    String acmeId = acmes.id();
 
-    assertThatThrownBy(() -> shredded.value(acmes.id(), TEXT))
+    assertThatThrownBy(() -> shredded.value(acmeId, TEXT))
         .isInstanceOf(StorageUnreadableException.class);
     assertThat(shredded.value(globexes.id(), TEXT)).contains("globex's");
     assertThat(shredded.metadata(acmes.id())).isPresent();
@@ -231,8 +232,9 @@ class TenantKeysTest {
   @DisplayName("treats a tenant nothing supplies keys for any more as unreadable, not as a failure")
   void treats_a_tenant_without_keys_as_unreadable() {
     JdbcStorage offboarded = store(tenant -> "acme".equals(tenant) ? null : tenantKeys(tenant));
+    String acmeId = acmes.id();
 
-    assertThatThrownBy(() -> offboarded.value(acmes.id(), TEXT))
+    assertThatThrownBy(() -> offboarded.value(acmeId, TEXT))
         .isInstanceOf(StorageUnreadableException.class)
         .hasMessageNotContaining("acme'");
     assertThat(offboarded.value(globexes.id(), TEXT)).contains("globex's");

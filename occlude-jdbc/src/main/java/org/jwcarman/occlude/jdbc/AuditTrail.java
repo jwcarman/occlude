@@ -67,7 +67,12 @@ public final class AuditTrail {
     this.fields = fields;
   }
 
-  /** Every line about one value, in the order they were recorded. */
+  /**
+   * Every line about one value, in the order they were recorded.
+   *
+   * <p>Found by the value id each line names -- a column in the clear, so a line whose id somebody
+   * rewrote is not found here. {@link StorageIntegrity#check()} reports that line broken.
+   */
   public List<RecordedLine> about(String valueId) {
     Objects.requireNonNull(valueId, "lines about some value");
     return lines(COLUMNS + " WHERE value_id = ? ORDER BY entry_id", valueId);

@@ -582,6 +582,68 @@ class TamperingTest {
     assertThatThrownBy(integrity::reencrypt).isInstanceOf(StorageIntegrityException.class);
   }
 
+  /**
+   * Rows copied aside before an erasure and put back after carry genuine digests; only the trail
+   * knows they should be gone.
+   */
+  @Test
+  @DisplayName("reports a value put back after the trail says it was erased")
+  void reports_a_value_restored_after_erasure() throws SQLException {
+    Occluded<Note> note = notes.occlude(new Note("forget me"));
+    execute("CREATE TABLE saved AS SELECT * FROM occlude_value WHERE value_id = ?", note.id());
+    erasure.erase(note).orThrow();
+
+    execute("INSERT INTO occlude_value SELECT * FROM saved");
+    execute("DROP TABLE saved");
+
+    IntegrityReport report = storage.integrity().check();
+    assertThat(report.unaccountedValues()).containsExactly(note.id());
+    assertThat(report.intact()).isFalse();
+  }
+
+  @Test
+  @DisplayName("reports a value no line ever announced")
+  void reports_an_unannounced_value() throws SQLException {
+    Occluded<Note> note = notes.occlude(new Note("hello"));
+
+    execute(
+        "INSERT INTO occlude_value SELECT 'occ_nobody_announced', value_type, payload, label,"
+            + " payload_commitment, label_commitment, derivation, digest, root_id, mac"
+            + " FROM occlude_value WHERE value_id = ?",
+        note.id());
+
+    assertThat(storage.integrity().unaccountedValues()).containsExactly("occ_nobody_announced");
+  }
+
+  @Test
+  @DisplayName("refuses a line of the trail that names no value")
+  void refuses_a_line_naming_no_value() {
+    notes.occlude(new Note("hello"));
+
+    assertThatThrownBy(() -> execute("UPDATE occlude_audit SET value_id = NULL"))
+        .isInstanceOf(SQLException.class);
+  }
+
+  /**
+   * A schema without the constraint -- older, or altered -- must still get findings, not a crashed
+   * verifier that concludes nothing, and a nulled line must not hide a value that is really gone.
+   */
+  @Test
+  @DisplayName("reports a nulled line as broken, and still finds what is missing")
+  void reports_a_nulled_line_and_still_finds_what_is_missing() throws SQLException {
+    Occluded<Note> erased = notes.occlude(new Note("erased"));
+    Occluded<Note> deleted = notes.occlude(new Note("deleted"));
+    erasure.erase(erased).orThrow();
+    execute("ALTER TABLE occlude_audit ALTER COLUMN value_id DROP NOT NULL");
+    execute("UPDATE occlude_audit SET value_id = NULL WHERE operation = 'ERASE'");
+    execute("DELETE FROM occlude_value WHERE value_id = ?", deleted.id());
+
+    IntegrityReport report = storage.integrity().check();
+
+    assertThat(report.firstBrokenEntry()).isPresent();
+    assertThat(report.missingValues()).contains(deleted.id());
+  }
+
   @Test
   @DisplayName("finds nothing altered in a store nobody touched")
   void finds_nothing_in_an_untouched_store() {

@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS occlude_audit (
   entry_id    BIGSERIAL PRIMARY KEY,
   recorded_at TIMESTAMPTZ NOT NULL,
   operation   TEXT        NOT NULL,
-  value_id    TEXT,
+  value_id    TEXT        NOT NULL,
   target      TEXT,
   outcome     TEXT        NOT NULL,
   reason      TEXT,

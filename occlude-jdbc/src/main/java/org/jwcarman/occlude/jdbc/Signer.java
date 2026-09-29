@@ -325,7 +325,9 @@ final class Signer {
     feed(hmac, previous);
     feed(hmac, recordedAt.toString().getBytes(UTF_8));
     feed(hmac, facts.operation().getBytes(UTF_8));
-    feed(hmac, facts.value().getBytes(UTF_8));
+    // Null-safe, though the library never writes a line without a value: a line somebody nulled
+    // must fail its digest, not crash every verifier that reads it.
+    feed(hmac, facts.value() == null ? null : facts.value().getBytes(UTF_8));
     feed(hmac, facts.target() == null ? null : facts.target().getBytes(UTF_8));
     feed(hmac, facts.outcome().getBytes(UTF_8));
     feed(hmac, facts.reason() == null ? null : facts.reason().getBytes(UTF_8));

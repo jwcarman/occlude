@@ -34,6 +34,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -79,10 +80,8 @@ public final class JdbcStorage implements Storage {
       Codec<byte[]> storageCodec,
       PayloadKeys payloadKeys,
       Axes axes,
-      String rootId,
-      Function<String, byte[]> roots,
-      MacAlgorithm mac) {
-    return new JdbcStorage(dataSource, codecs, storageCodec, payloadKeys, axes, rootId, roots, mac);
+      Signer signer) {
+    return new JdbcStorage(dataSource, codecs, storageCodec, payloadKeys, axes, signer);
   }
 
   private static final String INSERT_AUDIT =
@@ -181,11 +180,9 @@ public final class JdbcStorage implements Storage {
       Codec<byte[]> storageCodec,
       PayloadKeys payloadKeys,
       Axes axes,
-      String rootId,
-      Function<String, byte[]> roots,
-      MacAlgorithm mac) {
+      Signer signer) {
     this.dataSource = dataSource;
-    this.signer = new Signer(rootId, roots, mac);
+    this.signer = signer;
     this.transactions = new Transactions(dataSource);
     this.fields = new Fields(codecs, storageCodec, payloadKeys, axes, signer);
     this.verification = new Verification(dataSource, signer, fields);
@@ -579,6 +576,15 @@ public final class JdbcStorage implements Storage {
   }
 
   /**
+   * Every value present that the trail does not account for: one no line ever announced, or one the
+   * trail says was lawfully erased -- a value restored from a copy taken before its erasure, say.
+   * Its digest is genuine, so only the trail can tell it should be gone. Needs no key.
+   */
+  public List<String> unaccountedValues() {
+    return verification.unaccountedValues();
+  }
+
+  /**
    * Every value the trail says should be here and is not.
    *
    * <p>The gap the value graph cannot see. A value's digest binds it to its ancestry, so editing
@@ -659,11 +665,26 @@ public final class JdbcStorage implements Storage {
    * is re-signed. Afterwards none of them can -- the lines they name carry new digests -- so a
    * trail cut back before re-signing would otherwise come out of it looking whole.
    *
-   * @param anchors heads published earlier, which the trail must still hold
+   * @param anchor a head published earlier, which the trail must still hold
+   * @param more any others
    * @return what was re-signed, and the head before and after
    */
-  public Resigned resign(TrailHead... anchors) {
-    return resigning.resign(List.of(anchors));
+  public Resigned resign(TrailHead anchor, TrailHead... more) {
+    List<TrailHead> anchors = new ArrayList<>();
+    anchors.add(Objects.requireNonNull(anchor, "re-signing is checked against some anchor"));
+    anchors.addAll(List.of(more));
+    return resigning.resign(anchors);
+  }
+
+  /**
+   * The same, for a store that has never published an anchor.
+   *
+   * <p>Named, because it is a choice: with no anchor to check, a trail cut back before this runs
+   * comes out of it looking whole, and nothing afterwards can tell. Publish heads, and pass them to
+   * {@link #resign(TrailHead, TrailHead...)} instead.
+   */
+  public Resigned resignWithoutAnchors() {
+    return resigning.resign(List.of());
   }
 
   /**

@@ -190,19 +190,22 @@ class AuditTrailTest {
             throw new SQLException("the database is down");
           }
         };
-    AuditTrail blind =
+    JdbcStorage unreachable =
         new JdbcStorageConfig()
             .dataSource(down)
             .codecs(new JacksonCodecFactory(JsonMapper.builder().build()))
             .encryptedWith(new JceDataKeyProvider("k1", Map.of("k1", TestKeys.aes256())))
             .rootedIn(TestKeys.ROOT_ID, TestKeys.root())
             .withoutMigration()
-            .storage(AXES)
-            .trail();
+            .storage(AXES);
+    AuditTrail blind = unreachable.trail();
 
     assertThatThrownBy(() -> blind.about("occ_anything"))
         .isExactlyInstanceOf(IllegalStateException.class)
         .hasMessageContaining("could not read the trail back");
+    assertThatThrownBy(unreachable::unaccountedValues)
+        .isExactlyInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("could not check the values against the trail");
   }
 
   /** A line's place is not signed, so two swapped lines would each still verify on their own. */

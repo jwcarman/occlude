@@ -30,7 +30,7 @@ class IntegrityReportTest {
 
   private static IntegrityReport report(
       Optional<Long> brokenAt, List<String> broken, List<String> missing, Sweep sweep) {
-    return new IntegrityReport(brokenAt, broken, missing, sweep, Optional.empty());
+    return new IntegrityReport(brokenAt, broken, missing, List.of(), sweep, Optional.empty());
   }
 
   @Test
@@ -50,6 +50,16 @@ class IntegrityReportTest {
     assertThat(report(Optional.empty(), List.of(), List.of("occ_b"), CLEAN).intact()).isFalse();
     Sweep altered = new Sweep(List.of("occ_c"), List.of(), List.of(), List.of());
     assertThat(report(Optional.empty(), List.of(), List.of(), altered).intact()).isFalse();
+    assertThat(
+            new IntegrityReport(
+                    Optional.empty(),
+                    List.of(),
+                    List.of(),
+                    List.of("occ_e"),
+                    CLEAN,
+                    Optional.empty())
+                .intact())
+        .isFalse();
   }
 
   /** Unreadable is a fact about the keys at hand, so it is reported apart from intact. */

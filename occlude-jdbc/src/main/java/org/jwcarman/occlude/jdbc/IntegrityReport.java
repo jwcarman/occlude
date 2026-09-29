@@ -28,6 +28,7 @@ import java.util.Optional;
  * @param firstBrokenEntry where the trail stops agreeing with itself, if it does
  * @param brokenValues values whose digest no longer agrees with their bytes and ancestry
  * @param missingValues values the trail announced, never erased, and which are not there
+ * @param unaccountedValues values present that the trail never announced, or says were erased
  * @param sweep every ciphertext checked against its commitment
  * @param head the last line, when anything has been recorded
  */
@@ -35,12 +36,14 @@ public record IntegrityReport(
     Optional<Long> firstBrokenEntry,
     List<String> brokenValues,
     List<String> missingValues,
+    List<String> unaccountedValues,
     Sweep sweep,
     Optional<TrailHead> head) {
 
   public IntegrityReport {
     brokenValues = List.copyOf(brokenValues);
     missingValues = List.copyOf(missingValues);
+    unaccountedValues = List.copyOf(unaccountedValues);
   }
 
   /**
@@ -51,6 +54,7 @@ public record IntegrityReport(
     return firstBrokenEntry.isEmpty()
         && brokenValues.isEmpty()
         && missingValues.isEmpty()
+        && unaccountedValues.isEmpty()
         && sweep.intact();
   }
 

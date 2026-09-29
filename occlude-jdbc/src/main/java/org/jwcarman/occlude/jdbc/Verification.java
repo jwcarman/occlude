@@ -257,6 +257,45 @@ final class Verification {
   }
 
   /**
+   * Every value present that the trail does not account for: one no line ever announced, or one the
+   * trail says was lawfully erased.
+   *
+   * <p>The other direction of {@link #missingValues()}, and the one a restore defeats. A value's
+   * rows copied aside before an erasure and put back afterwards carry genuine digests, so nothing
+   * signed disagrees with them -- only the trail knows they should be gone. {@code NOT EXISTS}
+   * throughout, as there: a null in a {@code NOT IN} list matches nothing, and would hide every
+   * finding.
+   *
+   * @return the identifiers of values present that the trail says should not be
+   */
+  List<String> unaccountedValues() {
+    List<String> unaccounted = new ArrayList<>();
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                """
+                SELECT v.value_id FROM occlude_value v
+                 WHERE NOT EXISTS (
+                   SELECT 1 FROM occlude_audit announced
+                    WHERE announced.value_id = v.value_id AND announced.outcome = 'ALLOWED'
+                      AND announced.operation IN ('CONCEAL', 'DERIVE'))
+                    OR EXISTS (
+                   SELECT 1 FROM occlude_audit erased
+                    WHERE erased.value_id = v.value_id AND erased.outcome = 'ALLOWED'
+                      AND erased.operation = 'ERASE')
+                 ORDER BY v.value_id
+                """);
+        ResultSet rows = statement.executeQuery()) {
+      while (rows.next()) {
+        unaccounted.add(rows.getString(Columns.VALUE_ID));
+      }
+      return unaccounted;
+    } catch (SQLException e) {
+      throw new IllegalStateException("could not check the values against the trail", e);
+    }
+  }
+
+  /**
    * Every value the trail says should be here and is not.
    *
    * <p>The gap the value graph cannot see. A value's digest binds it to its ancestry, so editing
@@ -289,10 +328,12 @@ final class Verification {
                   SELECT DISTINCT value_id FROM occlude_audit
                    WHERE outcome = 'ALLOWED' AND operation IN ('CONCEAL', 'DERIVE')
                 ) AS announced
-                 WHERE announced.value_id NOT IN (
-                   SELECT value_id FROM occlude_audit
-                    WHERE outcome = 'ALLOWED' AND operation = 'ERASE')
-                   AND announced.value_id NOT IN (SELECT value_id FROM occlude_value)
+                 WHERE NOT EXISTS (
+                   SELECT 1 FROM occlude_audit erased
+                    WHERE erased.value_id = announced.value_id
+                      AND erased.outcome = 'ALLOWED' AND erased.operation = 'ERASE')
+                   AND NOT EXISTS (
+                   SELECT 1 FROM occlude_value v WHERE v.value_id = announced.value_id)
                  ORDER BY announced.value_id
                 """);
         ResultSet rows = statement.executeQuery()) {

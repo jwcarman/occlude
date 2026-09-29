@@ -81,6 +81,8 @@ JdbcStorage storage = new JdbcStorageConfig()
 
 Resigned resigned = storage.resign(latestAnchor); // every anchor you published must still hold
 publish(resigned.after());                        // and afterwards none of them can
+
+storage.resignWithoutAnchors();                   // only for a store that never published one
 ```
 
 Once `resign()` returns nothing is signed under the old root, so drop it from the lookup and destroy
@@ -203,7 +205,8 @@ transaction and restored afterwards, because the chain's ordering depends on it.
 ```java
 storage.firstBrokenEntry();   // check the chain first
 storage.brokenValues();
-storage.missingValues();
+storage.missingValues();      // the trail says it exists, and it is gone
+storage.unaccountedValues();  // it exists, and the trail never announced it or says it was erased
 storage.sweep();              // and the ciphertext, which needs the keys
 ```
 

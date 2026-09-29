@@ -110,11 +110,12 @@ public class IntegrityMonitor implements SmartLifecycle {
     if (!report.intact() && log.isErrorEnabled()) {
       log.error(
           "occlude found its store altered: trail broken at line {}, {} value(s) not as signed, {}"
-              + " missing, {} altered value(s), {} altered line(s). StorageIntegrity.check() names"
-              + " them.",
+              + " missing, {} present the trail does not account for, {} altered value(s), {}"
+              + " altered line(s). StorageIntegrity.check() names them.",
           report.firstBrokenEntry().map(String::valueOf).orElse("(none)"),
           report.brokenValues().size(),
           report.missingValues().size(),
+          report.unaccountedValues().size(),
           report.sweep().alteredValues().size(),
           report.sweep().alteredLines().size());
     }

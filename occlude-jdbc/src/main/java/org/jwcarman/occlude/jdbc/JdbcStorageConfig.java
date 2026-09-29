@@ -192,12 +192,13 @@ public final class JdbcStorageConfig {
             shared,
             payloadKeys(shared, axes),
             axes,
-            require(
-                rootId,
-                "a durable store signs its record and its values under a secret it does not hold:"
-                    + " call rootedIn(...)"),
-            roots,
-            mac);
+            new Signer(
+                require(
+                    rootId,
+                    "a durable store signs its record and its values under a secret it does not"
+                        + " hold: call rootedIn(...)"),
+                roots,
+                mac));
     // Checked here as well as when set, so a lookup that cannot supply the current root, or
     // supplies
     // a short one, stops the store from being built rather than every write failing afterwards.

@@ -75,6 +75,15 @@ public final class StorageIntegrity {
   }
 
   /**
+   * Every value present that the trail says should not be: never announced, or lawfully erased.
+   *
+   * @see JdbcStorage#unaccountedValues()
+   */
+  public List<String> unaccountedValues() {
+    return storage.unaccountedValues();
+  }
+
+  /**
    * Every value whose digest no longer agrees with its own bytes and its ancestry.
    *
    * @see JdbcStorage#brokenValues()
@@ -106,6 +115,7 @@ public final class StorageIntegrity {
         storage.firstBrokenEntry(),
         storage.brokenValues(),
         storage.missingValues(),
+        storage.unaccountedValues(),
         storage.sweep(),
         head);
   }
@@ -113,12 +123,23 @@ public final class StorageIntegrity {
   /**
    * Re-signs everything under the current root and MAC, which is what makes an old root retirable.
    *
-   * @param anchors heads published earlier, which the trail must still hold
+   * @param anchor a head published earlier, which the trail must still hold
+   * @param more any others
    * @return what was re-signed, and the trail's head before and after
-   * @see JdbcStorage#resign(TrailHead...)
+   * @see JdbcStorage#resign(TrailHead, TrailHead...)
    */
-  public Resigned resign(TrailHead... anchors) {
-    return storage.resign(anchors);
+  public Resigned resign(TrailHead anchor, TrailHead... more) {
+    return storage.resign(anchor, more);
+  }
+
+  /**
+   * The same, for a store that has never published an anchor -- a choice, for the reason given
+   * there.
+   *
+   * @see JdbcStorage#resignWithoutAnchors()
+   */
+  public Resigned resignWithoutAnchors() {
+    return storage.resignWithoutAnchors();
   }
 
   /**

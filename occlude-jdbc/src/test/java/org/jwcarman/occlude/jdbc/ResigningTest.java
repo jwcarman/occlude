@@ -165,7 +165,8 @@ class ResigningTest {
   void resigns_everything_so_the_old_root_can_go() throws SQLException {
     long before = rowsUnder("old");
 
-    Resigned resigned = store("new", BOTH, MacAlgorithm.HMAC_SHA256).integrity().resign();
+    Resigned resigned =
+        store("new", BOTH, MacAlgorithm.HMAC_SHA256).integrity().resignWithoutAnchors();
 
     assertThat(resigned.values()).isEqualTo(3);
     assertThat(resigned.values() + resigned.lines()).isEqualTo(before);
@@ -182,7 +183,7 @@ class ResigningTest {
     JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
     TrailHead published = storage.head().orElseThrow();
 
-    Resigned resigned = storage.resign();
+    Resigned resigned = storage.resignWithoutAnchors();
 
     assertThat(resigned.before()).contains(published);
     assertThat(storage.stillHolds(published)).isFalse();
@@ -196,7 +197,7 @@ class ResigningTest {
     JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
     Occluded<String> newer = portals(storage).shout.derive(joined).orThrow();
 
-    storage.resign();
+    storage.resignWithoutAnchors();
 
     assertThat(rowsUnder("old")).isZero();
     assertThat(store("new", ONLY_NEW, MacAlgorithm.HMAC_SHA256).integrity().check().intact())
@@ -209,7 +210,7 @@ class ResigningTest {
   void resigns_when_only_the_algorithm_changes() {
     JdbcStorage storage = store("old", BOTH, MacAlgorithm.HMAC_SHA512);
 
-    Resigned resigned = storage.resign();
+    Resigned resigned = storage.resignWithoutAnchors();
 
     assertThat(resigned.values()).isEqualTo(3);
     assertThat(storage.integrity().check().intact()).isTrue();
@@ -222,7 +223,7 @@ class ResigningTest {
     execute("DELETE FROM occlude_value");
     execute("DELETE FROM occlude_audit");
 
-    Resigned resigned = store("new", BOTH, MacAlgorithm.HMAC_SHA256).resign();
+    Resigned resigned = store("new", BOTH, MacAlgorithm.HMAC_SHA256).resignWithoutAnchors();
 
     assertThat(resigned.values()).isZero();
     assertThat(resigned.before()).isEmpty();
@@ -240,7 +241,7 @@ class ResigningTest {
     }
     JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
 
-    Resigned resigned = storage.resign();
+    Resigned resigned = storage.resignWithoutAnchors();
 
     assertThat(resigned.lines()).isGreaterThan(520);
     assertThat(store("new", ONLY_NEW, MacAlgorithm.HMAC_SHA256).integrity().check().intact())
@@ -260,7 +261,7 @@ class ResigningTest {
     long untouched = rowsUnder("new");
     portals(store("old", BOTH, MacAlgorithm.HMAC_SHA256)).notes().occlude("then under the old one");
 
-    Resigned resigned = store("new", BOTH, MacAlgorithm.HMAC_SHA256).resign();
+    Resigned resigned = store("new", BOTH, MacAlgorithm.HMAC_SHA256).resignWithoutAnchors();
 
     assertThat(resigned.lines()).isEqualTo(1);
     assertThat(rowsUnder("new")).isEqualTo(untouched + 2);
@@ -283,7 +284,7 @@ class ResigningTest {
       old.join().fold(List.of(twice, twice, waiting)).orThrow();
     }
 
-    store("new", BOTH, MacAlgorithm.HMAC_SHA256).resign();
+    store("new", BOTH, MacAlgorithm.HMAC_SHA256).resignWithoutAnchors();
 
     assertThat(store("new", ONLY_NEW, MacAlgorithm.HMAC_SHA256).integrity().check().intact())
         .isTrue();
@@ -320,7 +321,7 @@ class ResigningTest {
         }
       }
 
-      store("new", BOTH, MacAlgorithm.HMAC_SHA256).resign();
+      store("new", BOTH, MacAlgorithm.HMAC_SHA256).resignWithoutAnchors();
 
       assertThat(store("new", ONLY_NEW, MacAlgorithm.HMAC_SHA256).integrity().check().intact())
           .as("seed %d", seed)
@@ -361,7 +362,7 @@ class ResigningTest {
     JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
     TrailHead published = storage.head().orElseThrow();
 
-    assertThat(storage.resign(published).values()).isEqualTo(3);
+    assertThat(storage.integrity().resign(published).values()).isEqualTo(3);
   }
 
   /** Claiming the current root is no way past the check: every row is checked, stale or not. */
@@ -371,7 +372,7 @@ class ResigningTest {
     execute("UPDATE occlude_value SET root_id = 'new' WHERE value_id = ?", note.id());
     JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
 
-    assertThatThrownBy(storage::resign).isInstanceOf(StorageIntegrityException.class);
+    assertThatThrownBy(storage::resignWithoutAnchors).isInstanceOf(StorageIntegrityException.class);
   }
 
   @Test
@@ -382,16 +383,16 @@ class ResigningTest {
             + " WHERE entry_id = (SELECT min(entry_id) FROM occlude_audit)");
     JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
 
-    assertThatThrownBy(storage::resign).isInstanceOf(StorageIntegrityException.class);
+    assertThatThrownBy(storage::resignWithoutAnchors).isInstanceOf(StorageIntegrityException.class);
   }
 
   @Test
   @DisplayName("does nothing the second time")
   void does_nothing_the_second_time() {
     JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
-    storage.resign();
+    storage.resignWithoutAnchors();
 
-    Resigned again = storage.resign();
+    Resigned again = storage.resignWithoutAnchors();
 
     assertThat(again.values()).isZero();
     assertThat(again.lines()).isZero();
@@ -405,7 +406,7 @@ class ResigningTest {
 
     JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
 
-    assertThatThrownBy(storage::resign)
+    assertThatThrownBy(storage::resignWithoutAnchors)
         .isInstanceOf(StorageIntegrityException.class)
         .hasMessageContaining(shouted.id());
     assertThat(rowsUnder("old")).isEqualTo(before);
@@ -419,7 +420,7 @@ class ResigningTest {
 
     JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
 
-    assertThatThrownBy(storage::resign)
+    assertThatThrownBy(storage::resignWithoutAnchors)
         .isInstanceOf(StorageIntegrityException.class)
         .hasMessageContaining("of the trail");
     assertThat(rowsUnder("old")).isEqualTo(before);
@@ -434,7 +435,7 @@ class ResigningTest {
 
     JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
 
-    assertThatThrownBy(storage::resign).isInstanceOf(StorageIntegrityException.class);
+    assertThatThrownBy(storage::resignWithoutAnchors).isInstanceOf(StorageIntegrityException.class);
   }
 
   @Test
@@ -446,7 +447,7 @@ class ResigningTest {
 
     JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
 
-    assertThatThrownBy(storage::resign).isInstanceOf(StorageIntegrityException.class);
+    assertThatThrownBy(storage::resignWithoutAnchors).isInstanceOf(StorageIntegrityException.class);
   }
 
   @Test
@@ -459,7 +460,7 @@ class ResigningTest {
 
     JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
 
-    assertThatThrownBy(storage::resign)
+    assertThatThrownBy(storage::resignWithoutAnchors)
         .isInstanceOf(StorageIntegrityException.class)
         .hasMessageContaining("cycle");
   }
@@ -477,7 +478,8 @@ class ResigningTest {
             .rootedIn("new", BOTH)
             .storage(AXES);
 
-    assertThatThrownBy(withoutTheKey::resign).isInstanceOf(StorageUnreadableException.class);
+    assertThatThrownBy(withoutTheKey::resignWithoutAnchors)
+        .isInstanceOf(StorageUnreadableException.class);
     assertThat(rowsUnder("old")).isEqualTo(before);
   }
 }
