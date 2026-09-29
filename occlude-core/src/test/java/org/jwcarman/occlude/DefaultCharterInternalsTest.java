@@ -56,6 +56,16 @@ class DefaultCharterInternalsTest {
   class Binding {
 
     @Test
+    @DisplayName("says whether it has been bound")
+    void says_whether_it_has_been_bound() {
+      DefaultCharter charter = new DefaultCharter(TENANT);
+
+      assertThat(charter.isBound()).isFalse();
+      charter.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
+      assertThat(charter.isBound()).isTrue();
+    }
+
+    @Test
     @DisplayName("refuses to be bound twice")
     void refuses_to_be_bound_twice() {
       DefaultCharter charter = new DefaultCharter(TENANT);

@@ -25,6 +25,7 @@ import ch.qos.logback.core.read.ListAppender;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
 import io.micrometer.observation.ObservationRegistry;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.jwcarman.occlude.AccessContext;
 import org.jwcarman.occlude.AccessContextProvider;
+import org.jwcarman.occlude.Bindings;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.DefaultCharter;
 import org.jwcarman.occlude.Derivation;
@@ -54,6 +56,8 @@ import org.jwcarman.occlude.storage.MemoryStorage;
 import org.jwcarman.occlude.storage.Storage;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.actuate.autoconfigure.endpoint.EndpointAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -734,12 +738,66 @@ class CharterAutoConfigurationTest {
   @DisplayName("leaves a charter the application declared itself alone")
   void leaves_an_application_charter_alone() {
     runner
-        .withUserConfiguration(OwnCharter.class)
+        .withUserConfiguration(OwnCharter.class, BindsItsOwnCharter.class)
         .run(
             context -> {
+              assertThat(context).hasNotFailed();
               assertThat(context).hasSingleBean(Charter.class);
               assertThat(context.getBean(Charter.class).axes()).isEqualTo(Axes.of(TENANT));
+              assertBound(context.getBean(Charter.class));
             });
+  }
+
+  /** Left unbound, every portal would refuse at first use; startup says so instead. */
+  @Test
+  @DisplayName("refuses to start when the application's own charter is never bound")
+  void refuses_an_unbound_application_charter() {
+    runner
+        .withUserConfiguration(OwnCharter.class)
+        .run(context -> assertThat(context).getFailure().hasMessageContaining("never bound it"));
+  }
+
+  /** A charter of some other making says nothing about binding, so nothing is assumed. */
+  @Test
+  @DisplayName("leaves a charter that is not a DefaultCharter to whoever made it")
+  void leaves_a_charter_of_another_making_alone() {
+    runner
+        .withUserConfiguration(ACharterOfAnotherMaking.class)
+        .run(context -> assertThat(context).hasNotFailed());
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class ACharterOfAnotherMaking {
+
+    @Bean
+    Axes axes() {
+      return Axes.of(TENANT);
+    }
+
+    @Bean
+    Charter charter() {
+      return (Charter)
+          Proxy.newProxyInstance(
+              getClass().getClassLoader(),
+              new Class<?>[] {Charter.class},
+              (proxy, method, args) -> method.getName().equals("axes") ? Axes.of(TENANT) : null);
+    }
+
+    @Bean(name = CharterAutoConfiguration.STORAGE, defaultCandidate = false)
+    Storage storage() {
+      return new MemoryStorage();
+    }
+  }
+
+  /** An application that constructs its own charter binds it itself, as the starter does. */
+  @Configuration(proxyBeanMethods = false)
+  static class BindsItsOwnCharter {
+
+    @Bean
+    SmartInitializingSingleton bindsItself(
+        Charter charter, @Qualifier(CharterAutoConfiguration.STORAGE) Storage storage) {
+      return () -> ((DefaultCharter) charter).bind(Bindings.of(storage).withoutIdentity());
+    }
   }
 
   @Configuration(proxyBeanMethods = false)

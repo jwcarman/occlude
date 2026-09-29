@@ -31,7 +31,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.micrometer.observation.autoconfigure.ObservationAutoConfiguration;
+import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.event.ContextRefreshedEvent;
 
 /**
  * What every backing store needs, whatever it is backed by.
@@ -119,6 +121,28 @@ public class CharterAutoConfiguration {
       constituted.bind(Bindings.of(storage).withIdentity(access).observedBy(observations));
       if (properties.isLogManifest()) {
         log.info("\n{}", constituted.manifest());
+      }
+    };
+  }
+
+  /**
+   * Refuses to start when the application supplied its own charter and never bound it.
+   *
+   * <p>A charter the application constructs is the application's to bind -- that is the rule this
+   * starter follows for its own -- so it is left alone. But left unbound, every portal refused at
+   * its first use, long after startup said all was well. Once the context has refreshed, every
+   * singleton has had its chance to bind it; one still unbound is a mistake, and said so now.
+   */
+  @Bean
+  @ConditionalOnBean(Charter.class)
+  public ApplicationListener<ContextRefreshedEvent> unboundCharterCheck(Charter charter) {
+    return event -> {
+      if (charter != constituted && charter instanceof DefaultCharter own && !own.isBound()) {
+        throw new IllegalStateException(
+            "this application supplies its own Charter bean and never bound it, so none of its"
+                + " portals would ever work. Bind it once everything is declared --"
+                + " charter.bind(Bindings.of(storage).withIdentity(...)) -- or remove the bean and"
+                + " declare an Axes bean, and the starter will construct the charter and bind it.");
       }
     };
   }

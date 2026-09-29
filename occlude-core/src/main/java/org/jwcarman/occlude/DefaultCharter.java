@@ -106,6 +106,17 @@ public final class DefaultCharter implements Charter {
   }
 
   /**
+   * Whether this charter has been bound, and its portals are in force.
+   *
+   * <p>A question anyone may ask: the answer grants nothing. It is how wiring that did not
+   * construct a charter can tell that whoever did forgot to bind it, at startup rather than at a
+   * portal's first use.
+   */
+  public boolean isBound() {
+    return operations.bound();
+  }
+
+  /**
    * Records a declaration, unless this charter is already in force.
    *
    * <p>A security invariant rather than an ergonomic one: an authority graph that can still grow is

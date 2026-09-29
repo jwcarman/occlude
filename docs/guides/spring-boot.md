@@ -29,6 +29,11 @@ application receives a `Charter` to declare on — never one it could bring into
 value takes an `Erasure` and reading its label takes an `Inspection`, declared like any other
 portal and handed to whatever needs them.
 
+An application can construct its own `DefaultCharter` bean instead, and the starter leaves it alone:
+whoever constructs a charter binds it. Bind it once everything is declared — a
+`SmartInitializingSingleton` is the natural place — because a charter still unbound when the context
+has finished refreshing stops startup, rather than leaving every portal to refuse at first use.
+
 !!! note "It is a statement of intent, not a sandbox"
     The implementation's privileged methods are public, so a cast on the injected bean defeats
     this. What the interface buys is that a class asking for the ability to bring authority into
