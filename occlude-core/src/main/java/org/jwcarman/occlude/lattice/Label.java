@@ -18,6 +18,7 @@ package org.jwcarman.occlude.lattice;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -163,6 +164,19 @@ public final class Label {
           said.put(axis, axis.decode(value));
         });
     return new Label(said);
+  }
+
+  /**
+   * The one value this label says on an axis, as it is written down: a tenant's name, a rung's
+   * name. Empty when it says nothing there, or a mixture of several.
+   *
+   * <p>For choosing <i>where</i> a value is kept -- which key encrypts it -- and never for deciding
+   * who may read it. That is what a ceiling is for, and asking a label one axis at a time and
+   * acting on the answer is how an application rebuilds the gate badly, outside the record.
+   */
+  public Optional<String> sole(Axis<?> axis) {
+    Objects.requireNonNull(axis, "a label is asked about some axis");
+    return axis.sole(at(axis));
   }
 
   /** What this label says on one axis, in whatever form the axis keeps. */

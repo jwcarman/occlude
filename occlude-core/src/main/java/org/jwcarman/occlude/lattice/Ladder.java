@@ -19,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Ranked constants: the rungs of a ladder, least constrained first.
@@ -93,6 +94,12 @@ final class Ladder implements Order {
   @Override
   public String encode(Object value) {
     return ((Enum<?>) value).name();
+  }
+
+  /** Every rung is a value somebody could have written, the bottom one included. */
+  @Override
+  public Optional<String> sole(Object value) {
+    return Optional.of(((Enum<?>) value).name());
   }
 
   @Override

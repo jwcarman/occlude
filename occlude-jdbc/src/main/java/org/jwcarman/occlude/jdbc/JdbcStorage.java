@@ -77,11 +77,12 @@ public final class JdbcStorage implements Storage {
       DataSource dataSource,
       CodecFactory codecs,
       Codec<byte[]> storageCodec,
+      PayloadKeys payloadKeys,
       Axes axes,
       String rootId,
       Function<String, byte[]> roots,
       MacAlgorithm mac) {
-    return new JdbcStorage(dataSource, codecs, storageCodec, axes, rootId, roots, mac);
+    return new JdbcStorage(dataSource, codecs, storageCodec, payloadKeys, axes, rootId, roots, mac);
   }
 
   private static final String INSERT_AUDIT =
@@ -105,9 +106,13 @@ public final class JdbcStorage implements Storage {
           + Fields.PARENTS_OF_V
           + " FROM occlude_value v WHERE value_id = ?";
 
+  // With the label beside the payload: a store keyed by tenant reads the label to learn whose keys
+  // open the payload.
   private static final String SELECT_PAYLOAD =
-      "SELECT value_id, value_type, payload, payload_commitment, root_id, mac"
-          + " FROM occlude_value WHERE value_id = ?";
+      "SELECT value_id, value_type, payload, payload_commitment, label, label_commitment,"
+          + " derivation, root_id, mac, "
+          + Fields.PARENTS_OF_V
+          + " FROM occlude_value v WHERE value_id = ?";
 
   private static final String SELECT_METADATA_MANY =
       "SELECT value_id, value_type, label, label_commitment, derivation, root_id, mac, "
@@ -115,8 +120,10 @@ public final class JdbcStorage implements Storage {
           + " FROM occlude_value v WHERE value_id = ANY (?)";
 
   private static final String SELECT_PAYLOAD_MANY =
-      "SELECT value_id, value_type, payload, payload_commitment, root_id, mac"
-          + " FROM occlude_value WHERE value_id = ANY (?)";
+      "SELECT value_id, value_type, payload, payload_commitment, label, label_commitment,"
+          + " derivation, root_id, mac, "
+          + Fields.PARENTS_OF_V
+          + " FROM occlude_value v WHERE value_id = ANY (?)";
 
   private static final String INSERT_PARENT =
       """
@@ -172,6 +179,7 @@ public final class JdbcStorage implements Storage {
       DataSource dataSource,
       CodecFactory codecs,
       Codec<byte[]> storageCodec,
+      PayloadKeys payloadKeys,
       Axes axes,
       String rootId,
       Function<String, byte[]> roots,
@@ -179,7 +187,7 @@ public final class JdbcStorage implements Storage {
     this.dataSource = dataSource;
     this.signer = new Signer(rootId, roots, mac);
     this.transactions = new Transactions(dataSource);
-    this.fields = new Fields(codecs, storageCodec, axes, signer);
+    this.fields = new Fields(codecs, storageCodec, payloadKeys, axes, signer);
     this.verification = new Verification(dataSource, signer, fields);
     this.reencryption = new Reencryption(transactions, fields);
     this.resigning = new Resigning(transactions, signer, fields);
@@ -320,7 +328,7 @@ public final class JdbcStorage implements Storage {
     try (PreparedStatement statement = connection.prepareStatement(INSERT_VALUE)) {
       statement.setString(1, id);
       statement.setString(2, value.type().name());
-      statement.setBytes(3, fields.encrypt(payload));
+      statement.setBytes(3, fields.encryptPayload(payload, value.label()));
       statement.setBytes(4, fields.encrypt(label));
       statement.setString(5, value.lineage().derivation().orElse(null));
       statement.setBytes(6, digest);

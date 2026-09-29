@@ -15,6 +15,8 @@
  */
 package org.jwcarman.occlude.lattice;
 
+import java.util.Optional;
+
 /**
  * A value that has to match exactly, and what happens when two of them do not.
  *
@@ -96,6 +98,11 @@ final class Matching implements Order {
       return MIXED_ENCODING;
     }
     return matched.value() == null ? "" : VALUE_PREFIX + matched.value();
+  }
+
+  @Override
+  public Optional<String> sole(Object value) {
+    return Optional.ofNullable(((Matched) value).value());
   }
 
   @Override

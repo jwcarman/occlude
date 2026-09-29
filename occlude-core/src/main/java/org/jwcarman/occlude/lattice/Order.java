@@ -15,6 +15,8 @@
  */
 package org.jwcarman.occlude.lattice;
 
+import java.util.Optional;
+
 /**
  * What one kind of axis knows about its own values.
  *
@@ -53,4 +55,11 @@ interface Order {
   String encode(Object value);
 
   Object decode(String encoded);
+
+  /**
+   * The one value an application wrote that this holds, as it is written down -- or empty when it
+   * holds none: unsaid, or a mixture of several. Text rather than the application's type, for the
+   * reason above.
+   */
+  Optional<String> sole(Object value);
 }

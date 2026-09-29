@@ -33,6 +33,34 @@ is on both.
 on what its plaintext says — the side channel CRIME and BREACH exploit — and a security library has
 no size to save that is worth it.
 
+## Keys per tenant
+
+`keyedBy(axis, keysFor)` encrypts each value's payload under the keys of whatever its label says on
+that axis — typically a tenant's own, so a customer's data can sit under a key the customer controls:
+
+```java
+JdbcStorage storage = new JdbcStorageConfig()
+    // ...
+    .encryptedWith(sharedKeys)                          // everything else
+    .keyedBy(TENANT, tenant -> kms.providerFor(tenant)) // a payload labelled tenant=acme: acme's keys
+    .storage(axes);
+```
+
+The key follows the label, not whoever is asking: the label is the value's own statement of whose it
+is, fixed when it was stored, and the same thing isolation is defined on. `keysFor` is asked once per
+tenant, the first time one is needed, and every key id it hands out must be unique across tenants,
+because a payload is read back by the id recorded in its envelope.
+
+**Only payloads.** A value's label is read to learn whose keys open the payload beside it, so it could
+never be read if it were under those same keys; labels stay under the shared keys, and so does every
+line of the trail, so revoking a tenant's key never costs you the record. A value whose label says
+nothing on the axis, or mixes several tenants, uses the shared keys too.
+
+**Offboarding is erasing, then destroying.** Destroy a tenant's key and exactly their payloads become
+unreadable — nobody else's — and a sweep reports them as such. Erase their values first: a value
+whose key is gone can no longer be re-encrypted or re-signed. Keying by a ladder works the same way,
+by rung — cardholder data under its own key hierarchy, say.
+
 ## Roots
 
 `rootedIn(name, secret)` names the secret the digests are computed under. It must be at least 32

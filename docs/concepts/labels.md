@@ -149,3 +149,6 @@ right. Something that genuinely acts for every tenant is declared as its own doo
 
 **Let the lattice do the rest.** A value derived from two tenants' data carries a mixture, and no
 ceiling admits a mixture. Isolation across derivations is not a rule to remember.
+
+**Give each tenant their own keys, if you need to.** The same axis can choose which keys encrypt a
+value's payload — see [keys per tenant](../guides/storage.md#keys-per-tenant).

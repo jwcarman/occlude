@@ -111,6 +111,16 @@ occlude:
     mac: HMAC_SHA256         # or HMAC_SHA384, HMAC_SHA512
 ```
 
+What properties do not cover is reached with a `JdbcStorageConfigCustomizer` bean, applied before
+the store is built — keys per tenant, most often:
+
+```java
+@Bean
+JdbcStorageConfigCustomizer tenantKeys(TenantKms kms) {
+  return config -> config.keyedBy(TENANT, kms::providerFor);
+}
+```
+
 Keys and roots come from the environment or a secret store, never a committed file. A
 `DataKeyProvider` bean — a KMS, Vault — replaces the configured keys entirely. Without keys, or
 without a root, startup fails naming what is missing.

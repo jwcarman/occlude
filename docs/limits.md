@@ -134,11 +134,12 @@ customer's values by who they belong to: labels are encrypted, and that is the p
 application that must erase everything about someone keeps its own list of the references it
 occluded for them.
 
-## One key for everything
+## Keys per tenant cover payloads, not labels or the record
 
-Every tenant's values are wrapped under the same current key-encryption key. Separate keys per
-tenant — so destroying one tenant's key erases exactly them — would need a `DataKeyProvider` that
-chose a key by label, and nothing passes it one yet.
+`keyedBy` puts each tenant's payloads under that tenant's keys, so destroying one tenant's key makes
+exactly their values unreadable. Their labels and every line of the trail stay under the shared keys
+— a label is what says whose keys open the payload, and the record must outlive any tenant — so a
+tenant's labels outlive their key. Erase a tenant's values to remove those too.
 
 ## One backend, and no migrations yet
 

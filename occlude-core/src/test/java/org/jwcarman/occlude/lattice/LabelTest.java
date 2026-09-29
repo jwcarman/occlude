@@ -272,4 +272,18 @@ class LabelTest {
   void is_not_equal_to_something_that_is_not_a_label() {
     assertThat(Label.of(TENANT, "acme")).isNotEqualTo("acme");
   }
+
+  /** For choosing which key encrypts a value: the one value written, or nothing. */
+  @Test
+  @DisplayName("says the one value it holds on an axis, and nothing for unsaid or mixed")
+  void says_its_sole_value() {
+    Label acme = Label.of(TENANT, "acme").with(SENSITIVITY, Sensitivity.PERSONAL);
+
+    assertThat(acme.sole(TENANT)).contains("acme");
+    assertThat(acme.sole(SENSITIVITY)).contains("PERSONAL");
+    assertThat(acme.sole(INTEGRITY)).contains("ENDORSED");
+    assertThat(Label.nothing().sole(TENANT)).isEmpty();
+    assertThat(acme.join(Label.of(TENANT, "globex")).sole(TENANT)).isEmpty();
+    assertThatThrownBy(() -> acme.sole(null)).isInstanceOf(NullPointerException.class);
+  }
 }

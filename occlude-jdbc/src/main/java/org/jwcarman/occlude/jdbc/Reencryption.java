@@ -20,6 +20,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 
 /** Encrypting everything a store holds again, under its current keys, so an old key can go. */
 final class Reencryption {
@@ -103,8 +104,10 @@ final class Reencryption {
       try (ResultSet rows = select.executeQuery()) {
         while (rows.next()) {
           last = rows.getString(Columns.VALUE_ID);
-          update.setBytes(1, fields.encrypt(fields.payloadOf(rows)));
-          update.setBytes(2, fields.encrypt(fields.labelPlaintextOf(rows, Fields.parentsIn(rows))));
+          List<String> parents = Fields.parentsIn(rows);
+          update.setBytes(
+              1, fields.encryptPayload(fields.payloadOf(rows), fields.labelOf(rows, parents)));
+          update.setBytes(2, fields.encrypt(fields.labelPlaintextOf(rows, parents)));
           update.setString(3, last);
           update.addBatch();
           rewritten++;

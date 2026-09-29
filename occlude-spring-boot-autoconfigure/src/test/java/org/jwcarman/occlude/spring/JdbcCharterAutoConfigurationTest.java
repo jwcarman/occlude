@@ -21,7 +21,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import javax.crypto.spec.SecretKeySpec;
 import javax.sql.DataSource;
@@ -32,6 +34,7 @@ import org.jwcarman.codec.crypto.JceDataKeyProvider;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.jdbc.AuditTrail;
 import org.jwcarman.occlude.jdbc.JdbcStorage;
+import org.jwcarman.occlude.jdbc.MacAlgorithm;
 import org.jwcarman.occlude.jdbc.StorageIntegrity;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Axis;
@@ -185,6 +188,27 @@ class JdbcCharterAutoConfigurationTest {
     Object snoop(AuditTrail trail) {
       return trail;
     }
+  }
+
+  /** What properties do not cover -- keys per tenant -- is reached with a customizer bean. */
+  @Test
+  @DisplayName("applies the application's customizers before building the store")
+  void applies_customizers() {
+    List<String> applied = new ArrayList<>();
+    runner
+        .withUserConfiguration(AnApplication.class)
+        .withBean("first", JdbcStorageConfigCustomizer.class, () -> config -> applied.add("first"))
+        .withBean(
+            "second",
+            JdbcStorageConfigCustomizer.class,
+            () ->
+                config ->
+                    config.keyedBy(TENANT, tenant -> null).signedWith(MacAlgorithm.HMAC_SHA512))
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              assertThat(applied).containsExactly("first");
+            });
   }
 
   /** What operating the store needs is an ordinary bean, because it reads no value. */

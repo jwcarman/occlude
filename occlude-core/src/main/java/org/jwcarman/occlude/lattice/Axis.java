@@ -17,6 +17,7 @@ package org.jwcarman.occlude.lattice;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.IntStream;
 
 /**
@@ -160,6 +161,11 @@ public final class Axis<T> {
 
   Object decode(String encoded) {
     return order.decode(encoded);
+  }
+
+  /** The one value written on this axis, as text, when there is exactly one. */
+  Optional<String> sole(Object value) {
+    return order.sole(value);
   }
 
   @Override

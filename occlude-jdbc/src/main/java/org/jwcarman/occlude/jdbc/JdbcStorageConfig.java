@@ -25,6 +25,7 @@ import org.jwcarman.codec.crypto.EnvelopeCodec;
 import org.jwcarman.codec.versioned.VersionedCodec;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.lattice.Axes;
+import org.jwcarman.occlude.lattice.Axis;
 
 /**
  * What a database-backed store needs that has nothing to do with policy.
@@ -56,6 +57,8 @@ public final class JdbcStorageConfig {
   private Function<String, byte[]> roots;
   private MacAlgorithm mac = MacAlgorithm.HMAC_SHA256;
   private boolean migrate = true;
+  private Axis<?> keyAxis;
+  private Function<String, DataKeyProvider> keysFor;
 
   /** Where the tables are. */
   public JdbcStorageConfig dataSource(DataSource dataSource) {
@@ -95,6 +98,30 @@ public final class JdbcStorageConfig {
    */
   public JdbcStorageConfig signedWith(MacAlgorithm mac) {
     this.mac = Objects.requireNonNull(mac, "a store signs with some algorithm");
+    return this;
+  }
+
+  /**
+   * Encrypts each value's payload under the keys of whatever its label says on this axis -- a
+   * tenant's own, typically, so that a customer's data can be under a key the customer controls,
+   * and destroying that key makes their values unreadable.
+   *
+   * <p>{@code keysFor} is asked once per value of the axis, the first time one is needed: a
+   * tenant's name, or a rung's, as it is written down. It is the application's -- a KMS key per
+   * tenant, say -- and every key id it hands out must be unique across all of them, because reading
+   * back finds a payload's key by the id recorded in its envelope. The keys given to {@link
+   * #encryptedWith} still encrypt everything else: a value whose label says nothing on this axis,
+   * or mixes several, every label, and every line of the trail. So revoking a tenant's key never
+   * costs the record, and a label -- which is read to learn whose keys open the payload beside it
+   * -- can always be read.
+   *
+   * <p>Offboarding a tenant is erasing their values first, and destroying their key after: a value
+   * whose key is gone can no longer be re-encrypted or re-signed, and a sweep reports it
+   * unreadable.
+   */
+  public JdbcStorageConfig keyedBy(Axis<?> axis, Function<String, DataKeyProvider> keysFor) {
+    this.keyAxis = Objects.requireNonNull(axis, "keyed by some axis");
+    this.keysFor = Objects.requireNonNull(keysFor, "keyed by some source of keys");
     return this;
   }
 
@@ -150,18 +177,20 @@ public final class JdbcStorageConfig {
    */
   public JdbcStorage storage(Axes axes) {
     Objects.requireNonNull(axes, "a durable store needs the charter's axes");
+    Codec<byte[]> shared =
+        pipeline(
+            require(
+                dataKeys,
+                "a durable store encrypts everything it keeps: call encryptedWith(...) with a"
+                    + " DataKeyProvider -- a JceDataKeyProvider over keys you hold, or your KMS"));
     JdbcStorage storage =
         JdbcStorage.of(
             require(dataSource, "a durable store needs a data source: call dataSource(...)"),
             require(
                 codecs,
                 "a durable store needs codecs: give it a CodecFactory that can serialise values"),
-            pipeline(
-                require(
-                    dataKeys,
-                    "a durable store encrypts everything it keeps: call encryptedWith(...) with a"
-                        + " DataKeyProvider -- a JceDataKeyProvider over keys you hold, or your"
-                        + " KMS")),
+            shared,
+            payloadKeys(shared, axes),
             axes,
             require(
                 rootId,
@@ -177,6 +206,23 @@ public final class JdbcStorageConfig {
       storage.migrate();
     }
     return storage;
+  }
+
+  /**
+   * Whose keys encrypt each payload. The axis must be one the charter declares: keyed by an axis no
+   * label can speak to, every payload would quietly go under the shared keys.
+   */
+  private PayloadKeys payloadKeys(Codec<byte[]> shared, Axes axes) {
+    if (keyAxis == null) {
+      return PayloadKeys.shared(shared);
+    }
+    if (!axes.named(keyAxis.name()).map(keyAxis::equals).orElse(false)) {
+      throw new IllegalStateException(
+          "keyedBy names the axis '"
+              + keyAxis.name()
+              + "', which this charter does not declare, so no label could choose a key by it");
+    }
+    return PayloadKeys.keyedBy(shared, keyAxis, keysFor);
   }
 
   /**

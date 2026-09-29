@@ -33,6 +33,7 @@ import org.jwcarman.occlude.jdbc.JdbcStorage;
 import org.jwcarman.occlude.jdbc.JdbcStorageConfig;
 import org.jwcarman.occlude.jdbc.MacAlgorithm;
 import org.jwcarman.occlude.jdbc.StorageIntegrity;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -130,7 +131,8 @@ public class JdbcCharterAutoConfiguration {
         DataSource dataSource,
         CodecFactory codecs,
         DataKeyProvider keys,
-        CharterProperties properties) {
+        CharterProperties properties,
+        ObjectProvider<JdbcStorageConfigCustomizer> customizers) {
       CharterProperties.Roots roots = properties.getRoots();
       if (roots.getCurrent() == null) {
         throw new IllegalStateException(
@@ -155,6 +157,7 @@ public class JdbcCharterAutoConfiguration {
       if (!properties.isMigrate()) {
         jdbc.withoutMigration();
       }
+      customizers.orderedStream().forEach(customizer -> customizer.customize(jdbc));
       return jdbc.storage(charter.axes());
     }
 

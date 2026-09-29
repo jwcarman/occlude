@@ -54,6 +54,7 @@ final class Fields {
   private final CodecFactory codecs;
 
   private final Codec<byte[]> storageCodec;
+  private final PayloadKeys payloadKeys;
 
   /**
    * Serialisation alone, for the two things stored as a map of strings: a label, and whatever the
@@ -68,9 +69,15 @@ final class Fields {
 
   private final Signer signer;
 
-  Fields(CodecFactory codecs, Codec<byte[]> storageCodec, Axes axes, Signer signer) {
+  Fields(
+      CodecFactory codecs,
+      Codec<byte[]> storageCodec,
+      PayloadKeys payloadKeys,
+      Axes axes,
+      Signer signer) {
     this.codecs = codecs;
     this.storageCodec = storageCodec;
+    this.payloadKeys = payloadKeys;
     this.axes = axes;
     this.signer = signer;
     // One axis at a time, keyed by name. A record would have gone to disk positionally, and then
@@ -142,6 +149,7 @@ final class Fields {
   byte[] payloadOf(ResultSet rows) throws SQLException {
     byte[] plaintext =
         opened(
+            payloadCodec(rows),
             rows.getBytes(Columns.PAYLOAD),
             "the payload stored for " + rows.getString(Columns.VALUE_ID));
     List<byte[]> facts = Signer.payloadFacts(rows.getString(Columns.VALUE_TYPE));
@@ -179,8 +187,13 @@ final class Fields {
    * is down, and never recorded against the value or filed as unreadable by a sweep.
    */
   byte[] opened(byte[] ciphertext, String what) {
+    return opened(storageCodec, ciphertext, what);
+  }
+
+  /** The same, through a codec other than the shared one -- a tenant's, for a payload. */
+  private static byte[] opened(Codec<byte[]> codec, byte[] ciphertext, String what) {
     try {
-      return storageCodec.decode(ciphertext);
+      return codec.decode(ciphertext);
     } catch (TransientCodecException e) {
       throw new IllegalStateException(what + " could not be opened: its key was out of reach", e);
     } catch (VersionedFormatException _) {
@@ -188,6 +201,24 @@ final class Fields {
     } catch (CodecException e) {
       throw new StorageUnreadableException(what + " would not decrypt with the keys at hand", e);
     }
+  }
+
+  /**
+   * A payload, encrypted under the keys its label chooses: its tenant's when the store is keyed by
+   * one, the shared ones otherwise.
+   */
+  byte[] encryptPayload(byte[] plaintext, Label label) {
+    return payloadKeys.forLabel(label).encode(plaintext);
+  }
+
+  /**
+   * The codec a row's payload was written through. For a keyed store that is chosen by the row's
+   * label, so the label is opened and checked first -- which is why it lives under the shared keys.
+   */
+  private Codec<byte[]> payloadCodec(ResultSet rows) throws SQLException {
+    return payloadKeys.keyed()
+        ? payloadKeys.forLabel(labelOf(rows, parentsIn(rows)))
+        : storageCodec;
   }
 
   /** The same, keeping an absent field absent. */
