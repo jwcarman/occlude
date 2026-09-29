@@ -34,8 +34,8 @@ package org.jwcarman.occlude.lattice;
 // else, and Constraint.<Tenant>any() is still a tenant constraint although it holds no tenant.
 // Erasing T would make every constraint assignable to every axis and move that mismatch to a
 // ClassCastException inside a ceiling check at request time, which is the one place a policy
-// decision must not fail.
-@SuppressWarnings("java:S2326")
+// decision must not fail. Resolved in SonarCloud as won't-fix, for this reason, rather than
+// suppressed here.
 public sealed interface Constraint<T> {
 
   /**

@@ -44,7 +44,7 @@ import java.util.Objects;
 // S2326 says T is unused. It is used by the compiler and by nothing else, which is the point:
 // handing an Occluded<Card> to a door declared over Invoice is a compile error rather than a
 // refusal at request time. Erasing T would delete the one guarantee this type exists to give.
-@SuppressWarnings("java:S2326")
+// Resolved in SonarCloud as won't-fix, for this reason, rather than suppressed here.
 public record Occluded<T>(String id) {
 
   /**
