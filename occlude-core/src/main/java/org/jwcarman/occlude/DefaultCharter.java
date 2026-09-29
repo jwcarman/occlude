@@ -201,6 +201,19 @@ public final class DefaultCharter implements Charter {
     return sink(name, context -> ceiling, reads);
   }
 
+  @Override
+  public <T> Reveal<T> reveal(
+      String name, Function<AccessContext, Ceiling> ceiling, OccludedType<T> type) {
+    Objects.requireNonNull(type, "a sink reads some type");
+    return sink(name, ceiling, type).reading(type);
+  }
+
+  @Override
+  public <T> Reveal<T> reveal(String name, Ceiling ceiling, OccludedType<T> type) {
+    Objects.requireNonNull(ceiling, "a sink needs a ceiling");
+    return reveal(name, context -> ceiling, type);
+  }
+
   /**
    * Mints the authority to make one value from one other. Configuration time only.
    *

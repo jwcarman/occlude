@@ -98,8 +98,7 @@ Occlude<Mail> customerMail =
     charter.source("customer-mail", MAIL, ctx -> label(ctx, UNENDORSED, PERSONAL));
 
 Reveal<Invoice> paymentProcessor =
-    charter.sink("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE)
-           .reading(INVOICE);
+    charter.reveal("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE);
 
 Derivation<Invoice, Last4> cardLast4 =
     charter.derivation("invoice.card.last4", INVOICE, LAST4,

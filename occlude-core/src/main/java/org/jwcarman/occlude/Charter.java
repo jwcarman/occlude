@@ -77,6 +77,17 @@ public interface Charter {
   Sink sink(String name, Ceiling ceiling, OccludedType<?>... reads);
 
   /**
+   * A door that reads one type, and the portal that reads it through that door, in one step.
+   *
+   * <p>The common case. {@code reveal(name, ceiling, MAIL)} is {@code sink(name, ceiling,
+   * MAIL).reading(MAIL)}; a door that reads several types is still declared with {@link #sink}.
+   */
+  <T> Reveal<T> reveal(String name, Function<AccessContext, Ceiling> ceiling, OccludedType<T> type);
+
+  /** The same, for a ceiling that does not depend on who is asking. */
+  <T> Reveal<T> reveal(String name, Ceiling ceiling, OccludedType<T> type);
+
+  /**
    * The authority to make one value from another.
    *
    * <p>The customizer says what the derivation may read, and whether it weakens a label. Both are

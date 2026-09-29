@@ -61,8 +61,11 @@ context. So it is not quite a constant, but nothing a caller passes influences i
 
 ```java
 Reveal<Invoice> paymentProcessor =
-    charter.sink("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE)
-           .reading(INVOICE);
+    charter.reveal("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE);
+
+// a door that reads several types is declared once, and read through per type:
+Sink vendor = charter.sink("vendor", ctx -> ceiling(ctx, ENDORSED, ORDINARY), MAIL, NOTE);
+Reveal<Mail> vendorMail = vendor.reading(MAIL);
 
 Revealed<Invoice> out = paymentProcessor.reveal(held);
 ```

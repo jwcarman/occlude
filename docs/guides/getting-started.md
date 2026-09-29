@@ -72,17 +72,17 @@ Occlude<Mail> customerMail = charter.source("customer-mail", MAIL,
                 .with(INTEGRITY, UNENDORSED)
                 .with(SENSITIVITY, PERSONAL));
 
-Reveal<Mail> quarantinedLlm = charter.sink("quarantined-llm",
+Reveal<Mail> quarantinedLlm = charter.reveal("quarantined-llm",
     ctx -> Ceiling.of(TENANT, Constraint.any())
                   .with(INTEGRITY, Constraint.any())
                   .with(SENSITIVITY, Constraint.atMost(PERSONAL)),
-    MAIL).reading(MAIL);
+    MAIL);
 
-Reveal<Mail> vendorLlm = charter.sink("vendor-llm",
+Reveal<Mail> vendorLlm = charter.reveal("vendor-llm",
     ctx -> Ceiling.of(TENANT, Constraint.any())
                   .with(INTEGRITY, Constraint.atMost(ENDORSED))
                   .with(SENSITIVITY, Constraint.atMost(ORDINARY)),
-    MAIL).reading(MAIL);
+    MAIL);
 ```
 
 **The type's name is permanent.** `"mail"` is written beside every value and checked when one is

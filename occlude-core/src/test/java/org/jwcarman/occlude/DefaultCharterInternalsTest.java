@@ -210,6 +210,39 @@ class DefaultCharterInternalsTest {
   @DisplayName("declaring")
   class Declaring {
 
+    /** One step for the common case, and exactly what the two-step form declares. */
+    @Test
+    @DisplayName("declares a one-type door and its portal in one step")
+    void declares_a_one_type_door_in_one_step() {
+      DefaultCharter charter = new DefaultCharter(TENANT);
+      Occlude<String> notes = charter.source("notes", STRING_TYPE, Label.of(TENANT, "acme"));
+      Reveal<String> desk =
+          charter.reveal("desk", Ceiling.of(TENANT, Constraint.any()), STRING_TYPE);
+      Reveal<String> mine =
+          charter.reveal("mine", ctx -> Ceiling.of(TENANT, Constraint.atMost("acme")), STRING_TYPE);
+      charter.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
+
+      Occluded<String> held = notes.occlude("hello");
+
+      assertThat(desk.reveal(held).value()).contains("hello");
+      assertThat(mine.reveal(held).succeeded()).isTrue();
+      assertThat(charter.manifest().sinks())
+          .extracting(Manifest.Entry::name)
+          .containsExactly("desk", "mine");
+    }
+
+    @Test
+    @DisplayName("refuses a one-step door with no type or no ceiling")
+    void refuses_a_one_step_door_without_a_type_or_ceiling() {
+      DefaultCharter charter = new DefaultCharter(TENANT);
+      Ceiling anything = Ceiling.of(TENANT, Constraint.any());
+
+      assertThatThrownBy(() -> charter.reveal("desk", anything, null))
+          .isInstanceOf(NullPointerException.class);
+      assertThatThrownBy(() -> charter.reveal("desk", (Ceiling) null, STRING_TYPE))
+          .isInstanceOf(NullPointerException.class);
+    }
+
     @Test
     @DisplayName("refuses two sources registered as the same name")
     void refuses_two_sources_with_the_same_name() {

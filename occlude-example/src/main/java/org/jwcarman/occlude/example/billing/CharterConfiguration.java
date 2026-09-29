@@ -84,20 +84,15 @@ public class CharterConfiguration {
 
     // ---- how values get out ----------------------------------------------------
     Reveal<Domain.Invoice> supportUi =
-        charter
-            .sink("support-ui", ctx -> ceiling(ctx, ENDORSED, ORDINARY), Domain.INVOICE)
-            .reading(Domain.INVOICE);
+        charter.reveal("support-ui", ctx -> ceiling(ctx, ENDORSED, ORDINARY), Domain.INVOICE);
     Reveal<Domain.Last4> approvalDesk =
-        charter
-            .sink(
-                "approval-desk",
-                ctx -> ceiling(ctx, ENDORSED, ctx.has("role", "approver") ? PERSONAL : ORDINARY),
-                Domain.LAST4)
-            .reading(Domain.LAST4);
+        charter.reveal(
+            "approval-desk",
+            ctx -> ceiling(ctx, ENDORSED, ctx.has("role", "approver") ? PERSONAL : ORDINARY),
+            Domain.LAST4);
     Reveal<Domain.Invoice> paymentProcessor =
-        charter
-            .sink("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), Domain.INVOICE)
-            .reading(Domain.INVOICE);
+        charter.reveal(
+            "payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), Domain.INVOICE);
 
     // ---- one value from another ------------------------------------------------
     // The only operation that can raise trust, and it earns it by tying what the customer

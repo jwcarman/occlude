@@ -44,9 +44,8 @@ DisputeService disputeService(Charter charter, Invoices invoices) {
   Occlude<Mail> customerMail = charter.source("customer-mail", MAIL,
       ctx -> label(ctx, UNENDORSED, PERSONAL));
 
-  Reveal<Invoice> paymentProcessor = charter
-      .sink("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE)
-      .reading(INVOICE);
+  Reveal<Invoice> paymentProcessor =
+      charter.reveal("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE);
 
   return new DisputeService(customerMail, paymentProcessor);
 }
