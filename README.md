@@ -1,6 +1,9 @@
 # Occlude
 
 [![CI](https://github.com/jwcarman/occlude/actions/workflows/maven.yml/badge.svg)](https://github.com/jwcarman/occlude/actions/workflows/maven.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/org.jwcarman.occlude/occlude-core)](https://central.sonatype.com/namespace/org.jwcarman.occlude)
+[![Javadoc](https://javadoc.io/badge2/org.jwcarman.occlude/occlude-api/javadoc.svg)](https://javadoc.io/doc/org.jwcarman.occlude/occlude-api)
+[![Docs](https://img.shields.io/badge/docs-jwcarman.github.io%2Focclude-blue)](https://jwcarman.github.io/occlude/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Java](https://img.shields.io/badge/dynamic/xml?url=https://raw.githubusercontent.com/jwcarman/occlude/main/pom.xml&query=//*[local-name()='maven.compiler.release']/text()&label=Java&color=orange)](https://openjdk.org/)
 
