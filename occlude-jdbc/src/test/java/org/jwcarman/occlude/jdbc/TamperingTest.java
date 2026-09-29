@@ -557,6 +557,26 @@ class TamperingTest {
     assertThat(linesFor(note.id())).doesNotContain("REVEAL ALLOWED");
   }
 
+  /** Operations code gets the store's verification without its reads, and the same answers. */
+  @Test
+  @DisplayName("reports the same through its integrity view as the store does")
+  void reports_the_same_through_its_integrity_view() throws SQLException {
+    Occluded<Note> note = notes.occlude(new Note("hello"));
+    Occluded<Note> shouted = shout.derive(note).orThrow();
+    StorageIntegrity integrity = storage.integrity();
+    TrailHead anchored = integrity.head().orElseThrow();
+    assertThat(integrity.reencrypt()).isPositive();
+
+    execute("UPDATE occlude_value SET derivation = 'forged' WHERE value_id = ?", shouted.id());
+
+    assertThat(integrity.stillHolds(anchored)).isTrue();
+    assertThat(integrity.firstBrokenEntry()).isEmpty();
+    assertThat(integrity.missingValues()).isEmpty();
+    assertThat(integrity.brokenValues()).containsExactly(shouted.id());
+    assertThat(integrity.sweep().alteredValues()).containsExactly(shouted.id());
+    assertThatThrownBy(integrity::reencrypt).isInstanceOf(StorageIntegrityException.class);
+  }
+
   @Test
   @DisplayName("finds nothing altered in a store nobody touched")
   void finds_nothing_in_an_untouched_store() {

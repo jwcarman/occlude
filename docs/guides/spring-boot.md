@@ -72,8 +72,23 @@ access is nobody in particular.
 
 ## Storage
 
-Contribute a `Storage` bean, or put `occlude-jdbc` on the classpath and give it a `DataSource`, keys
-and a root. See [Storage](storage.md).
+Put `occlude-jdbc` on the classpath and give it a `DataSource`, keys and a root, or contribute a
+store of your own. See [Storage](storage.md).
+
+The store can hand over any value decrypted, with no ceiling asked and no line written, so no
+application bean can have it. It is registered under the name `occludeStorage` and hidden from
+injection by type: a bean that asks for a `Storage` in its constructor fails to start. A store of
+your own is registered the same way:
+
+```java
+@Bean(name = CharterAutoConfiguration.STORAGE, defaultCandidate = false)
+Storage storage() {
+  return new MemoryStorage();
+}
+```
+
+What operating the JDBC store needs -- `sweep()`, `reencrypt()`, the trail's `head()` for anchoring
+-- is published as a `StorageIntegrity` bean, which reads no value. Operations code takes that.
 
 ```yaml
 occlude:

@@ -23,6 +23,7 @@ import org.jwcarman.occlude.storage.Storage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -32,17 +33,25 @@ import org.springframework.context.annotation.Bean;
 /**
  * What every backing store needs, whatever it is backed by.
  *
- * <p>Which turns out to be nothing but settings. The store itself is never published: an
- * application needs the charter, to declare what it allows, and the portals, to do the work. It has
- * no use for the thing holding the values -- reading a label or a lineage is an authority in its
- * own right, which is why it is an {@link org.jwcarman.occlude.Inspection} an application declares
- * rather than something every bean could reach.
+ * <p>Which turns out to be nothing but settings, and one rule about the store. An application needs
+ * the charter, to declare what it allows, and the portals, to do the work. It has no use for the
+ * thing holding the values, which can hand over any of them decrypted with no ceiling asked and no
+ * line written. So the store is found by the name {@value #STORAGE}, and a store module registers
+ * it as no candidate for injection by type: a bean that asks for a {@link Storage} in its
+ * constructor gets none, where otherwise it would quietly have had every value there is.
+ *
+ * <p>An application supplying its own store names its bean {@value #STORAGE}, and should register
+ * it the same way: {@code @Bean(name = CharterAutoConfiguration.STORAGE, defaultCandidate =
+ * false)}.
  */
 @AutoConfiguration
 @EnableConfigurationProperties(CharterProperties.class)
 public class CharterAutoConfiguration {
 
   private static final Logger log = LoggerFactory.getLogger(CharterAutoConfiguration.class);
+
+  /** The name a charter's store is registered, and found, under. */
+  public static final String STORAGE = "occludeStorage";
 
   /**
    * The one reference able to bind, kept by the thing that made it.
@@ -86,12 +95,14 @@ public class CharterAutoConfiguration {
    *
    * <p>Storage is required, not looked for: an application that declared a charter and supplies
    * none fails to start, with Spring's own report of the missing bean, rather than serving requests
-   * that all refuse.
+   * that all refuse. It is asked for by name, which is what finds a store no other bean can.
    */
   @Bean
   @ConditionalOnBean(Axes.class)
   public SmartInitializingSingleton charterBinder(
-      Storage storage, AccessContextProvider access, CharterProperties properties) {
+      @Qualifier(STORAGE) Storage storage,
+      AccessContextProvider access,
+      CharterProperties properties) {
     return () -> {
       if (constituted == null) {
         return;

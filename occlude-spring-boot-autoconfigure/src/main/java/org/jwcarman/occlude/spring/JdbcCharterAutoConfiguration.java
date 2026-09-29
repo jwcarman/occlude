@@ -30,13 +30,15 @@ import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.jdbc.JdbcStorage;
 import org.jwcarman.occlude.jdbc.JdbcStorageConfig;
 import org.jwcarman.occlude.jdbc.MacAlgorithm;
-import org.jwcarman.occlude.storage.Storage;
+import org.jwcarman.occlude.jdbc.StorageIntegrity;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -47,9 +49,12 @@ import tools.jackson.databind.json.JsonMapper;
  * nothing. So the build must come last, after every bean that declares a portal has been
  * constructed -- which by hand means one class orchestrating the whole startup.
  *
- * <p>Here it is Spring's job. Declare a {@link JdbcStorageConfig} bean saying what your application
- * allows, take it as a parameter wherever you declare portals, and this supplies the plumbing and
- * builds the store once the context has finished making singletons.
+ * <p>Here it is Spring's job. Declare an {@code Axes} bean, take the {@code Charter} as a parameter
+ * wherever you declare portals, and this supplies the plumbing and builds the store.
+ *
+ * <p>The store is registered as no candidate for injection by type, so no application bean can take
+ * one and read around its portals. What operating it needs -- verifying, anchoring, re-encrypting
+ * -- is published instead as {@link StorageIntegrity}, which reads no value.
  *
  * <p>Everything it supplies is {@link ConditionalOnMissingBean}, so any of it can be replaced by
  * declaring your own: the serialisation, the keys, or the data source itself. What cannot be
@@ -91,50 +96,72 @@ public class JdbcCharterAutoConfiguration {
   }
 
   /**
-   * Durable storage for whatever charter this application declared.
+   * The store and its integrity, together or not at all.
    *
-   * <p>This module's whole job. It supplies somewhere to keep values and lines; it does not
-   * construct a charter and it does not bring one into force, so nothing here decides what an
-   * application is allowed to do.
-   *
-   * <p>Keys are required, not looked for: without a {@link DataKeyProvider} -- the application's,
-   * or the one built from {@code occlude.keys.*} -- the application fails to start with Spring's
-   * own report of the missing bean. A root is required the same way.
+   * <p>Decided once, by name, for both. Spring Boot's bean conditions pass over a bean that is no
+   * candidate for injection by type, which is exactly how a store is registered -- so "is there a
+   * store yet" can only be asked by name, and asked before either bean exists.
    */
-  @Bean
+  @Configuration(proxyBeanMethods = false)
   @ConditionalOnBean(Charter.class)
-  @ConditionalOnMissingBean(Storage.class)
-  public JdbcStorage jdbcStorage(
-      Charter charter,
-      DataSource dataSource,
-      CodecFactory codecs,
-      DataKeyProvider keys,
-      CharterProperties properties) {
-    CharterProperties.Roots roots = properties.getRoots();
-    if (roots.getCurrent() == null) {
-      throw new IllegalStateException(
-          "occlude-jdbc signs its record and its values under a secret root and has none: set"
-              + " occlude.roots.current and occlude.roots.secrets.<id>");
+  @ConditionalOnMissingBean(name = CharterAutoConfiguration.STORAGE)
+  static class Store {
+
+    /**
+     * Durable storage for whatever charter this application declared.
+     *
+     * <p>This module's whole job. It supplies somewhere to keep values and lines; it does not
+     * construct a charter and it does not bring one into force, so nothing here decides what an
+     * application is allowed to do.
+     *
+     * <p>Keys are required, not looked for: without a {@link DataKeyProvider} -- the application's,
+     * or the one built from {@code occlude.keys.*} -- the application fails to start with Spring's
+     * own report of the missing bean. A root is required the same way.
+     */
+    @Bean(name = CharterAutoConfiguration.STORAGE, defaultCandidate = false)
+    public JdbcStorage jdbcStorage(
+        Charter charter,
+        DataSource dataSource,
+        CodecFactory codecs,
+        DataKeyProvider keys,
+        CharterProperties properties) {
+      CharterProperties.Roots roots = properties.getRoots();
+      if (roots.getCurrent() == null) {
+        throw new IllegalStateException(
+            "occlude-jdbc signs its record and its values under a secret root and has none: set"
+                + " occlude.roots.current and occlude.roots.secrets.<id>");
+      }
+      Map<String, byte[]> secrets = new LinkedHashMap<>();
+      roots.getSecrets().forEach((id, encoded) -> secrets.put(id, decoded(encoded, "root", id)));
+      if (!secrets.containsKey(roots.getCurrent())) {
+        throw new IllegalStateException(
+            "occlude.roots.current is '"
+                + roots.getCurrent()
+                + "', but occlude.roots.secrets has no secret by that name");
+      }
+      JdbcStorageConfig jdbc =
+          new JdbcStorageConfig()
+              .dataSource(dataSource)
+              .codecs(codecs)
+              .encryptedWith(keys)
+              .rootedIn(roots.getCurrent(), secrets::get)
+              .signedWith(macNamed(roots.getMac()));
+      if (!properties.isMigrate()) {
+        jdbc.withoutMigration();
+      }
+      return jdbc.storage(charter.axes());
     }
-    Map<String, byte[]> secrets = new LinkedHashMap<>();
-    roots.getSecrets().forEach((id, encoded) -> secrets.put(id, decoded(encoded, "root", id)));
-    if (!secrets.containsKey(roots.getCurrent())) {
-      throw new IllegalStateException(
-          "occlude.roots.current is '"
-              + roots.getCurrent()
-              + "', but occlude.roots.secrets has no secret by that name");
+
+    /**
+     * Verification, anchoring and re-encryption of the store above, for operations code: a
+     * scheduled sweep, an endpoint that publishes the trail's head. It reads no value, so unlike
+     * the store it is an ordinary bean.
+     */
+    @Bean
+    public StorageIntegrity storageIntegrity(
+        @Qualifier(CharterAutoConfiguration.STORAGE) JdbcStorage storage) {
+      return storage.integrity();
     }
-    JdbcStorageConfig jdbc =
-        new JdbcStorageConfig()
-            .dataSource(dataSource)
-            .codecs(codecs)
-            .encryptedWith(keys)
-            .rootedIn(roots.getCurrent(), secrets::get)
-            .signedWith(macNamed(roots.getMac()));
-    if (!properties.isMigrate()) {
-      jdbc.withoutMigration();
-    }
-    return jdbc.storage(charter.axes());
   }
 
   /**

@@ -509,6 +509,15 @@ public final class JdbcStorage implements Storage {
   }
 
   /**
+   * This store's verification, anchoring and re-encryption, without its reads.
+   *
+   * <p>What to hand an operations job instead of the store itself, which can decrypt anything.
+   */
+  public StorageIntegrity integrity() {
+    return new StorageIntegrity(this);
+  }
+
+  /**
    * The digest of the last line written, for publishing somewhere this database cannot reach.
    *
    * <p>The one thing verification cannot do on its own is notice lines cut from the end: what

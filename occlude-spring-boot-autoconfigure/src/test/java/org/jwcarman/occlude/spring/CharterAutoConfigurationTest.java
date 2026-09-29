@@ -96,7 +96,7 @@ class CharterAutoConfigurationTest {
       return Axes.of(TENANT, CLEARANCE);
     }
 
-    @Bean
+    @Bean(name = CharterAutoConfiguration.STORAGE, defaultCandidate = false)
     Storage storage() {
       return new MemoryStorage();
     }
@@ -132,7 +132,7 @@ class CharterAutoConfigurationTest {
       return Axes.of(TENANT, CLEARANCE);
     }
 
-    @Bean
+    @Bean(name = CharterAutoConfiguration.STORAGE, defaultCandidate = false)
     Storage storage() {
       return new MemoryStorage();
     }
@@ -531,7 +531,7 @@ class CharterAutoConfigurationTest {
   @AutoConfiguration(after = CharterAutoConfiguration.class)
   static class LateStorage {
 
-    @Bean
+    @Bean(name = CharterAutoConfiguration.STORAGE, defaultCandidate = false)
     Storage storage() {
       return new MemoryStorage();
     }
@@ -649,7 +649,7 @@ class CharterAutoConfigurationTest {
       return new DefaultCharter(TENANT);
     }
 
-    @Bean
+    @Bean(name = CharterAutoConfiguration.STORAGE, defaultCandidate = false)
     Storage storage() {
       return new MemoryStorage();
     }

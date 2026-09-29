@@ -30,6 +30,12 @@ import org.jwcarman.codec.TypeRef;
  * are decided once in {@code Gate} and shared by every implementation. A second copy of a security
  * decision is a second chance to get it wrong, and the two would drift.
  *
+ * <p><b>The engine's, not the application's.</b> Nothing here asks a ceiling or writes a line on
+ * its own behalf: {@link #value} hands over whatever it holds to whoever calls it, because the
+ * portal calling it already decided and recorded. Code holding a store has every value in it and
+ * leaves no trace, so a store is bound to a charter and handed to nothing else. What operating one
+ * needs belongs on a view that reads no value, as {@code JdbcStorage.integrity()} is.
+ *
  * <p>An implementation must be safe to use from several threads.
  */
 public interface Storage {

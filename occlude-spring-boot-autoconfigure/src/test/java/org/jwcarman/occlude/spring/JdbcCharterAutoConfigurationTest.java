@@ -31,6 +31,7 @@ import org.jwcarman.codec.crypto.DataKeyProvider;
 import org.jwcarman.codec.crypto.JceDataKeyProvider;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.jdbc.JdbcStorage;
+import org.jwcarman.occlude.jdbc.StorageIntegrity;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Axis;
 import org.jwcarman.occlude.storage.MemoryStorage;
@@ -121,6 +122,45 @@ class JdbcCharterAutoConfigurationTest {
               assertThatThrownBy(() -> charter.erasure("probe", (label, ctx) -> true))
                   .isInstanceOf(IllegalStateException.class)
                   .hasMessageContaining("has been bound");
+            });
+  }
+
+  /**
+   * The store can decrypt anything without asking a ceiling or writing a line, so a bean that names
+   * it in its constructor must get nothing -- the same rule that keeps portals from being beans.
+   */
+  @Test
+  @DisplayName("keeps the store from any bean that asks for it by type")
+  void keeps_the_store_from_injection_by_type() {
+    runner
+        .withUserConfiguration(AnApplication.class, ASnoop.class)
+        .run(
+            context ->
+                assertThat(context)
+                    .getFailure()
+                    .hasRootCauseInstanceOf(NoSuchBeanDefinitionException.class)
+                    .hasStackTraceContaining(Storage.class.getName()));
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class ASnoop {
+
+    @Bean
+    Object snoop(Storage storage) {
+      return storage;
+    }
+  }
+
+  /** What operating the store needs is an ordinary bean, because it reads no value. */
+  @Test
+  @DisplayName("publishes the store's integrity for operations code")
+  void publishes_the_stores_integrity() {
+    runner
+        .withUserConfiguration(AnApplication.class)
+        .run(
+            context -> {
+              assertThat(context).hasNotFailed();
+              assertThat(context).hasSingleBean(StorageIntegrity.class);
             });
   }
 
@@ -258,13 +298,24 @@ class JdbcCharterAutoConfigurationTest {
   @DisplayName("leaves storage the application supplied alone")
   void leaves_application_storage_alone() {
     runner
-        .withUserConfiguration(AnApplication.class)
-        .withBean(Storage.class, MemoryStorage::new)
+        .withUserConfiguration(AnApplication.class, OwnStorage.class)
         .run(
             context -> {
+              assertThat(context).hasNotFailed();
               assertThat(context).hasSingleBean(Storage.class);
               assertThat(context).doesNotHaveBean(JdbcStorage.class);
+              assertThat(context).doesNotHaveBean(StorageIntegrity.class);
             });
+  }
+
+  /** Registered the way the auto-configuration recommends: by name, and hidden from type. */
+  @Configuration(proxyBeanMethods = false)
+  static class OwnStorage {
+
+    @Bean(name = CharterAutoConfiguration.STORAGE, defaultCandidate = false)
+    Storage storage() {
+      return new MemoryStorage();
+    }
   }
 
   /**

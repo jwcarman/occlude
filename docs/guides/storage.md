@@ -22,6 +22,13 @@ stored.
 Rotating is adding a key and making it current; what the older one wrapped still decrypts under the
 id recorded in its envelope.
 
+**The store is for the charter, not for your code.** `value()` and `metadata()` hand over what it
+holds with no ceiling asked and no line written, because the portals that call them already did
+both. Bind the charter to it and keep it there. What running it needs — verifying, anchoring,
+re-encrypting, sweeping — is `storage.integrity()`, a `StorageIntegrity` that reads no value: give
+operations code that instead. The examples below call the store directly for brevity; each method
+is on both.
+
 **No compression**, deliberately. Compressing before encrypting makes a ciphertext's length depend
 on what its plaintext says — the side channel CRIME and BREACH exploit — and a security library has
 no size to save that is worth it.
