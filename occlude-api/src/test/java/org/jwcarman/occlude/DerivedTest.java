@@ -41,7 +41,7 @@ class DerivedTest {
     @Test
     @DisplayName("hands back the new handle")
     void hands_back_the_new_handle() {
-      assertThat(derived.made()).contains(value);
+      assertThat(derived.value()).contains(value);
     }
 
     @Test
@@ -67,7 +67,7 @@ class DerivedTest {
     @Test
     @DisplayName("has no handle to hand back")
     void has_no_handle_to_hand_back() {
-      assertThat(derived.made()).isEmpty();
+      assertThat(derived.value()).isEmpty();
     }
 
     @Test

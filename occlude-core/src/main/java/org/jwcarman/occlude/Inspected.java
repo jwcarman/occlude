@@ -37,7 +37,7 @@ public sealed interface Inspected {
   }
 
   /** What was seen, or empty when the inspection was refused. */
-  default Optional<Seen> seen() {
+  default Optional<Seen> value() {
     return this instanceof Seen seen ? Optional.of(seen) : Optional.empty();
   }
 

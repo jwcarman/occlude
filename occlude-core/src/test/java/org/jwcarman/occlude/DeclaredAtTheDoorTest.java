@@ -85,7 +85,7 @@ class DeclaredAtTheDoorTest {
   void reads_the_types_it_was_declared_to_read() {
     Occluded<Card> card = cards.occlude(new Card("4111111111114821"));
 
-    assertThat(processor.reading(cardType).reveal(card).granted())
+    assertThat(processor.reading(cardType).reveal(card).value())
         .contains(new Card("4111111111114821"));
   }
 
@@ -133,7 +133,7 @@ class DeclaredAtTheDoorTest {
   void constitutes_readers_on_demand() {
     Occluded<Card> card = cards.occlude(new Card("4111111111114821"));
 
-    assertThat(processor.reading(cardType).reveal(card).allowed()).isTrue();
-    assertThat(processor.reading(cardType).reveal(card).allowed()).isTrue();
+    assertThat(processor.reading(cardType).reveal(card).succeeded()).isTrue();
+    assertThat(processor.reading(cardType).reveal(card).succeeded()).isTrue();
   }
 }

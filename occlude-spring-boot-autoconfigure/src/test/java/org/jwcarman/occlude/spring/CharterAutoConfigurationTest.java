@@ -326,7 +326,7 @@ class CharterAutoConfigurationTest {
               // The value coming back out is the evidence. A portal that refuses at request time
               // is exactly what a charter that was never bound produces, and it is what this
               // test exists to catch.
-              assertThat(reporting.reveal(held).granted()).contains("a note");
+              assertThat(reporting.reveal(held).value()).contains("a note");
             });
   }
 

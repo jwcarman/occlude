@@ -165,7 +165,7 @@ class PolicyThatCannotDecideTest {
   @Test
   @DisplayName("is not a sink that accepts the value")
   void is_not_a_sink_that_accepts_the_value() {
-    assertThat(sinkWhoseCeilingThrows.reveal(held).allowed()).isFalse();
+    assertThat(sinkWhoseCeilingThrows.reveal(held).succeeded()).isFalse();
   }
 
   @Test
@@ -191,7 +191,7 @@ class PolicyThatCannotDecideTest {
   void is_not_a_derivation_that_may_read_the_value() {
     Derived<String> result = derivationWhoseCeilingThrows.derive(held);
 
-    assertThat(result.made()).isEmpty();
+    assertThat(result.value()).isEmpty();
     assertThat(((Derived.Refused<String>) result).reason()).isEqualTo(Derived.Reason.ABOVE_CEILING);
   }
 
@@ -200,7 +200,7 @@ class PolicyThatCannotDecideTest {
   void is_not_a_lowering_that_lowered_anything() {
     Derived<String> result = loweringThrows.derive(held);
 
-    assertThat(result.made()).isEmpty();
+    assertThat(result.value()).isEmpty();
     assertThat(((Derived.Refused<String>) result).reason())
         .isEqualTo(Derived.Reason.NOT_A_LOWERING);
   }
@@ -219,7 +219,7 @@ class PolicyThatCannotDecideTest {
 
     Derived<String> result = functionThrows.derive(held);
 
-    assertThat(result.made()).isEmpty();
+    assertThat(result.value()).isEmpty();
     assertThat(((Derived.Refused<String>) result).reason()).isEqualTo(Derived.Reason.DECLINED);
     assertThat(storage.audit()).isNotEmpty();
     assertThat(storage.audit())
@@ -248,7 +248,7 @@ class PolicyThatCannotDecideTest {
   void is_not_a_derivation_whose_ceiling_answered_with_nothing() {
     Derived<String> result = derivationWhoseCeilingIsNull.derive(held);
 
-    assertThat(result.made()).isEmpty();
+    assertThat(result.value()).isEmpty();
     assertThat(((Derived.Refused<String>) result).reason()).isEqualTo(Derived.Reason.ABOVE_CEILING);
   }
 
@@ -267,7 +267,7 @@ class PolicyThatCannotDecideTest {
 
     Derived<String> result = loweringReturnsNothing.derive(held);
 
-    assertThat(result.made()).isEmpty();
+    assertThat(result.value()).isEmpty();
     assertThat(((Derived.Refused<String>) result).reason())
         .isEqualTo(Derived.Reason.NOT_A_LOWERING);
     assertThat(storage.audit()).isNotEmpty();
@@ -280,7 +280,7 @@ class PolicyThatCannotDecideTest {
 
     Derived<String> result = checkReturnsNothing.derive(held);
 
-    assertThat(result.made()).isEmpty();
+    assertThat(result.value()).isEmpty();
     assertThat(((Derived.Refused<String>) result).reason()).isEqualTo(Derived.Reason.DECLINED);
     assertThat(storage.audit()).isNotEmpty();
   }

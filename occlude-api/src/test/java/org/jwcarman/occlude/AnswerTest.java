@@ -46,7 +46,7 @@ class AnswerTest {
     @Test
     @DisplayName("ran")
     void ran() {
-      assertThat(answer.ran()).isTrue();
+      assertThat(answer.succeeded()).isTrue();
     }
 
     @Test
@@ -77,7 +77,7 @@ class AnswerTest {
     @Test
     @DisplayName("ran")
     void ran() {
-      assertThat(answer.ran()).isTrue();
+      assertThat(answer.succeeded()).isTrue();
     }
   }
 
@@ -107,7 +107,7 @@ class AnswerTest {
     @Test
     @DisplayName("did not run")
     void did_not_run() {
-      assertThat(answer.ran()).isFalse();
+      assertThat(answer.succeeded()).isFalse();
     }
 
     @Test

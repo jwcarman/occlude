@@ -28,7 +28,7 @@ import java.util.Optional;
 public sealed interface Revealed<T> {
 
   /** The value, because the gate allowed it. */
-  record Allowed<T>(T value) implements Revealed<T> {
+  record Allowed<T>(T plaintext) implements Revealed<T> {
 
     /**
      * Says nothing about the value.
@@ -39,7 +39,7 @@ public sealed interface Revealed<T> {
      */
     @Override
     public String toString() {
-      return "Allowed[value=<held>]";
+      return "Allowed[plaintext=<held>]";
     }
   }
 
@@ -57,11 +57,12 @@ public sealed interface Revealed<T> {
   }
 
   /** The value when the gate allowed it, empty when it did not. */
-  default Optional<T> granted() {
-    return this instanceof Allowed<T>(T value) ? Optional.of(value) : Optional.empty();
+  default Optional<T> value() {
+    return this instanceof Allowed<T>(T plaintext) ? Optional.of(plaintext) : Optional.empty();
   }
 
-  default boolean allowed() {
+  /** Whether the gate allowed it. */
+  default boolean succeeded() {
     return this instanceof Allowed<T>;
   }
 
@@ -71,8 +72,8 @@ public sealed interface Revealed<T> {
    * <p>For code that genuinely cannot continue without it, and whose caller is not a prompt.
    */
   default T orThrow() {
-    if (this instanceof Allowed<T>(T value)) {
-      return value;
+    if (this instanceof Allowed<T>(T plaintext)) {
+      return plaintext;
     }
     Denied<T> denied = (Denied<T>) this;
     throw new RefusedException(denied.reason(), denied.detail());

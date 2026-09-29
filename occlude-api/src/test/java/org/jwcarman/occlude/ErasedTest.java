@@ -40,7 +40,7 @@ class ErasedTest {
     @Test
     @DisplayName("says how many values went, the root included")
     void says_how_many_went() {
-      assertThat(erased.removed()).hasValue(3);
+      assertThat(erased.value()).hasValue(3);
     }
 
     @Test
@@ -66,7 +66,7 @@ class ErasedTest {
     @Test
     @DisplayName("says nothing was removed rather than zero")
     void says_nothing_was_removed() {
-      assertThat(erased.removed()).isEmpty();
+      assertThat(erased.value()).isEmpty();
     }
 
     @Test

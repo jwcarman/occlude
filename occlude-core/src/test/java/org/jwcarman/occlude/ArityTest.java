@@ -91,7 +91,7 @@ class ArityTest {
   @Test
   @DisplayName("of none is a refusal, not a bug: an empty list is data, not a mistake")
   void none_is_a_refusal() {
-    assertThat(joined.fold(List.of()).made()).isEmpty();
+    assertThat(joined.fold(List.of()).value()).isEmpty();
   }
 
   @Test
@@ -132,7 +132,7 @@ class ArityTest {
     }
     reads.set(0);
 
-    assertThat(joinAll.fold(parents).made()).isPresent();
+    assertThat(joinAll.fold(parents).value()).isPresent();
     assertThat(reads.get()).isEqualTo(2);
   }
 

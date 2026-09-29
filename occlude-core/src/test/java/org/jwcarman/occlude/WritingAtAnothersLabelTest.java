@@ -105,7 +105,7 @@ class WritingAtAnothersLabelTest {
 
     // And globex does not read it as its own.
     edge.set(AccessContext.of(Map.of("tenant", "globex")));
-    assertThat(reporting.reveal(written).allowed()).isFalse();
+    assertThat(reporting.reveal(written).succeeded()).isFalse();
   }
 
   @Test
@@ -116,6 +116,6 @@ class WritingAtAnothersLabelTest {
     Occluded<Note> mine = notes.occlude(new Note("our own note"));
 
     assertThat(storage.contains(mine.id())).isTrue();
-    assertThat(reporting.reveal(mine).granted()).contains(new Note("our own note"));
+    assertThat(reporting.reveal(mine).value()).contains(new Note("our own note"));
   }
 }

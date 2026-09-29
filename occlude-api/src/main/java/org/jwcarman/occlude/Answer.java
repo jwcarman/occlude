@@ -37,7 +37,7 @@ public sealed interface Answer {
     }
 
     @Override
-    public boolean ran() {
+    public boolean succeeded() {
       return true;
     }
 
@@ -61,7 +61,7 @@ public sealed interface Answer {
     }
 
     @Override
-    public boolean ran() {
+    public boolean succeeded() {
       return false;
     }
 
@@ -85,7 +85,7 @@ public sealed interface Answer {
   boolean isFalse();
 
   /** Whether the check ran at all. */
-  boolean ran();
+  boolean succeeded();
 
   /**
    * The answer, or an exception naming the refusal.

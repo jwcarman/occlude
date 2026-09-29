@@ -82,7 +82,7 @@ class InspectionTest {
 
     Inspected inspected = desk.inspect(shouted);
     assertThat(inspected.succeeded()).isTrue();
-    assertThat(inspected.seen()).isPresent();
+    assertThat(inspected.value()).isPresent();
     Inspected.Seen seen = inspected.orThrow();
 
     assertThat(seen.label()).isEqualTo(Label.of(TENANT, "acme"));
@@ -113,7 +113,7 @@ class InspectionTest {
               assertThat(refused.reason()).isEqualTo(Inspected.Reason.ABOVE_CEILING);
               assertThat(refused.detail()).doesNotContain("globex");
             });
-    assertThat(inspected.seen()).isEmpty();
+    assertThat(inspected.value()).isEmpty();
     assertThat(storage.audit(AuditRecord.Operation.INSPECT))
         .singleElement()
         .satisfies(line -> assertThat(line.outcome()).isEqualTo(AuditRecord.Outcome.REFUSED));

@@ -273,10 +273,10 @@ class JdbcCharterTest {
     Occluded<Card> card = card();
 
     acme();
-    assertThat(paymentProcessor.reveal(card).granted())
+    assertThat(paymentProcessor.reveal(card).value())
         .contains(new Card("4111111111114821", "J CARMAN"));
     acme();
-    assertThat(vendorLlm.reveal(card).allowed()).isFalse();
+    assertThat(vendorLlm.reveal(card).succeeded()).isFalse();
   }
 
   /** The point of the whole module: what is on disk is not the value. */
@@ -315,7 +315,7 @@ class JdbcCharterTest {
     Occluded<Card> card = card();
     edge.set(AccessContext.of("tenant", "acme"));
 
-    assertThat(vendorLlm.reveal(card).allowed()).isFalse();
+    assertThat(vendorLlm.reveal(card).succeeded()).isFalse();
 
     try (Connection connection = dataSource.getConnection();
         PreparedStatement statement =
@@ -905,7 +905,7 @@ class JdbcCharterTest {
   /** A different tenant, established at the edge rather than claimed by the caller. */
   private boolean revealAs(String tenant, Occluded<Card> card) {
     edge.set(AccessContext.of("tenant", tenant));
-    return paymentProcessor.reveal(card).allowed();
+    return paymentProcessor.reveal(card).succeeded();
   }
 
   /** The trail goes to the database, in the same transaction as the thing it describes. */
@@ -1055,14 +1055,14 @@ class JdbcCharterTest {
     Occluded<List<Card>> held = cardLists.occlude(cardBatch);
 
     acme();
-    assertThat(cardListProcessor.reveal(held).granted())
+    assertThat(cardListProcessor.reveal(held).value())
         .hasValueSatisfying(
             back -> {
               assertThat(back).hasSize(2);
               assertThat(back.getFirst().number()).isEqualTo("4111111111114821");
             });
     acme();
-    assertThat(cardListVendor.reveal(held).allowed()).isFalse();
+    assertThat(cardListVendor.reveal(held).succeeded()).isFalse();
   }
 
   @Test
@@ -1073,7 +1073,7 @@ class JdbcCharterTest {
     Occluded<List<Last4>> lying = Occluded.of(occluded.id());
 
     acme();
-    assertThat(last4ListProcessor.reveal(lying).allowed()).isFalse();
+    assertThat(last4ListProcessor.reveal(lying).succeeded()).isFalse();
   }
 
   /** Reading a label should not decrypt a payload. */

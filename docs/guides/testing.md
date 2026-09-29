@@ -28,7 +28,7 @@ class InvoiceChecksTest {
 
     asking.put("tenant", "globex");
 
-    assertThat(billingUi.reveal(held).allowed()).isFalse();
+    assertThat(billingUi.reveal(held).succeeded()).isFalse();
   }
 }
 ```
@@ -36,7 +36,7 @@ class InvoiceChecksTest {
 Declare your portals the same way production does — a static method or a configuration class that
 takes the `Charter` — so the test exercises the real ceilings rather than copies of them.
 
-**Refusals are results, so assert on them directly.** `reveal(...).allowed()`, `derive(...).made()`,
+**Refusals are results, so assert on them directly.** `reveal(...).succeeded()`, `derive(...).value()`,
 `ask(...)` returning `Answer.Refused` with a reason. Nothing needs to be caught, and the reason tells
 you which rule said no.
 

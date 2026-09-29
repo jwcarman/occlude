@@ -29,7 +29,7 @@ public sealed interface Erased {
   record Removed(int count) implements Erased {
 
     @Override
-    public OptionalInt removed() {
+    public OptionalInt value() {
       return OptionalInt.of(count);
     }
 
@@ -48,7 +48,7 @@ public sealed interface Erased {
   record Refused(Reason reason, String detail) implements Erased {
 
     @Override
-    public OptionalInt removed() {
+    public OptionalInt value() {
       return OptionalInt.empty();
     }
 
@@ -72,7 +72,7 @@ public sealed interface Erased {
   }
 
   /** How many values were removed, the root included, or empty when nothing was. */
-  OptionalInt removed();
+  OptionalInt value();
 
   /** Whether anything was removed. */
   boolean succeeded();

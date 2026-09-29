@@ -432,7 +432,7 @@ class TamperingTest {
 
     Occluded<Note> twice = join.fold(List.of(note, note)).orThrow();
 
-    assertThat(noteDesk.reveal(twice).granted()).contains(new Note("abab"));
+    assertThat(noteDesk.reveal(twice).value()).contains(new Note("abab"));
     assertThat(storage.metadata(twice.id()).orElseThrow().lineage().parents())
         .containsExactly(note.id(), note.id());
     assertThat(storage.brokenValues()).isEmpty();

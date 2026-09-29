@@ -320,7 +320,7 @@ class ErasingAcrossTenantsTest {
 
     Erased erased = nobody.erase(Occluded.of("occ_never-existed"));
 
-    assertThat(erased.removed()).isEmpty();
+    assertThat(erased.value()).isEmpty();
     assertThatThrownBy(erased::orThrow)
         .isInstanceOf(RefusedException.class)
         .hasMessageContaining("NO_SUCH_VALUE");

@@ -456,7 +456,7 @@ class BillingScenarioTest {
       acme();
       Revealed<String> attempt = vendorLlmText.reveal(email);
 
-      assertThat(attempt.allowed()).isFalse();
+      assertThat(attempt.succeeded()).isFalse();
       assertThat(attempt)
           .isInstanceOfSatisfying(
               Revealed.Denied.class,
@@ -469,7 +469,7 @@ class BillingScenarioTest {
       Occluded<String> email = customerEmail();
 
       acme();
-      assertThat(quarantinedLlmText.reveal(email).granted())
+      assertThat(quarantinedLlmText.reveal(email).value())
           .hasValueSatisfying(text -> assertThat(text).contains("INV-4471"));
     }
 
@@ -495,7 +495,7 @@ class BillingScenarioTest {
     @DisplayName("reaches the payment processor")
     void reaches_the_payment_processor() {
       acme();
-      assertThat(paymentProcessorText.reveal(token()).granted()).contains("tok_1P9xyz");
+      assertThat(paymentProcessorText.reveal(token()).value()).contains("tok_1P9xyz");
     }
 
     /** Not by policy anyone wrote. By arithmetic: every model sits below CARDHOLDER. */
@@ -505,11 +505,11 @@ class BillingScenarioTest {
       Occluded<String> token = token();
 
       acme();
-      assertThat(vendorLlmText.reveal(token).allowed()).isFalse();
+      assertThat(vendorLlmText.reveal(token).succeeded()).isFalse();
       acme();
-      assertThat(quarantinedLlmText.reveal(token).allowed()).isFalse();
+      assertThat(quarantinedLlmText.reveal(token).succeeded()).isFalse();
       acme("clearance", "finance");
-      assertThat(approvalCardText.reveal(token).allowed()).isFalse();
+      assertThat(approvalCardText.reveal(token).succeeded()).isFalse();
     }
   }
 
@@ -525,21 +525,21 @@ class BillingScenarioTest {
     @DisplayName("shows a finance approver the last four")
     void shows_a_finance_approver_the_last_four() {
       acme("clearance", "finance");
-      assertThat(approvalCardText.reveal(last4()).granted()).contains("4821");
+      assertThat(approvalCardText.reveal(last4()).value()).contains("4821");
     }
 
     @Test
     @DisplayName("shows anyone else a handle")
     void shows_anyone_else_a_handle() {
       acme("clearance", "support");
-      assertThat(approvalCardText.reveal(last4()).allowed()).isFalse();
+      assertThat(approvalCardText.reveal(last4()).succeeded()).isFalse();
     }
 
     @Test
     @DisplayName("and with nobody named at all, shows nothing")
     void with_nobody_named_shows_nothing() {
       acme();
-      assertThat(approvalCardText.reveal(last4()).allowed()).isFalse();
+      assertThat(approvalCardText.reveal(last4()).succeeded()).isFalse();
     }
   }
 
@@ -579,13 +579,13 @@ class BillingScenarioTest {
 
       assertThat(Stored.label(storage, report).says(TENANT, "acme")).isFalse();
       acme();
-      assertThat(vendorLlmReports.reveal(report).allowed()).isFalse();
+      assertThat(vendorLlmReports.reveal(report).succeeded()).isFalse();
       acme();
-      assertThat(paymentProcessorReports.reveal(report).allowed()).isFalse();
+      assertThat(paymentProcessorReports.reveal(report).succeeded()).isFalse();
       acme();
-      assertThat(quarantinedLlmReports.reveal(report).allowed()).isFalse();
+      assertThat(quarantinedLlmReports.reveal(report).succeeded()).isFalse();
       AccessContext.of("tenant", "globex");
-      assertThat(vendorLlmReports.reveal(report).allowed()).isFalse();
+      assertThat(vendorLlmReports.reveal(report).succeeded()).isFalse();
       // It exists, and it remembers where it came from.
       assertThat(Stored.lineage(storage, report).parents())
           .containsExactly(acmeNote.id(), globexNote.id());
@@ -603,7 +603,7 @@ class BillingScenarioTest {
       Occluded<Report> report = summarise.fold(List.of(first, second)).orThrow();
 
       acme();
-      assertThat(vendorLlmReports.reveal(report).granted())
+      assertThat(vendorLlmReports.reveal(report).value())
           .contains(new Report("first note / second note"));
     }
 
@@ -627,9 +627,9 @@ class BillingScenarioTest {
 
       assertThat(Stored.label(storage, report).says(DATA_CLASS, DataClass.PII)).isTrue();
       acme();
-      assertThat(vendorLlmReports.reveal(report).allowed()).isFalse();
+      assertThat(vendorLlmReports.reveal(report).succeeded()).isFalse();
       acme();
-      assertThat(quarantinedLlmReports.reveal(report).allowed()).isTrue();
+      assertThat(quarantinedLlmReports.reveal(report).succeeded()).isTrue();
     }
 
     @Test
@@ -655,7 +655,7 @@ class BillingScenarioTest {
               "globex's entirely unremarkable note");
 
       acme();
-      assertThat(vendorLlmText.reveal(globexNote).allowed()).isFalse();
+      assertThat(vendorLlmText.reveal(globexNote).succeeded()).isFalse();
     }
 
     @Test
@@ -665,7 +665,7 @@ class BillingScenarioTest {
           holdAs("acme", Integrity.ENDORSED, Tlp.CLEAR, DataClass.NONE, notes, "nothing secret");
 
       acme();
-      assertThat(vendorLlmText.reveal(held).allowed()).isTrue();
+      assertThat(vendorLlmText.reveal(held).succeeded()).isTrue();
     }
   }
 
@@ -784,10 +784,10 @@ class BillingScenarioTest {
       assertThat(Stored.label(storage, number))
           .isEqualTo(label("acme", Integrity.UNENDORSED, Tlp.AMBER, DataClass.PII));
       acme();
-      assertThat(quarantinedLlmInvoice.reveal(number).granted())
+      assertThat(quarantinedLlmInvoice.reveal(number).value())
           .contains(new InvoiceNumber("INV-4471"));
       acme();
-      assertThat(vendorLlmInvoice.reveal(number).allowed()).isFalse();
+      assertThat(vendorLlmInvoice.reveal(number).succeeded()).isFalse();
     }
 
     /** An invoice number a customer typed is a question, not an answer. */
@@ -896,7 +896,7 @@ class BillingScenarioTest {
 
       assertThat(Stored.label(storage, last4).says(DATA_CLASS, DataClass.PII)).isTrue();
       acme("clearance", "finance");
-      assertThat(approvalCardLast4.reveal(last4).granted()).contains(new Last4("4821"));
+      assertThat(approvalCardLast4.reveal(last4).value()).contains(new Last4("4821"));
     }
 
     @Test
@@ -922,7 +922,7 @@ class BillingScenarioTest {
       assertThat(Stored.label(storage, partly).says(DATA_CLASS, DataClass.PII)).isTrue();
       assertThat(Stored.label(storage, partly).says(TLP, Tlp.RED)).isTrue();
       acme("clearance", "finance");
-      assertThat(approvalCardLast4.reveal(partly).allowed()).isFalse();
+      assertThat(approvalCardLast4.reveal(partly).succeeded()).isFalse();
     }
 
     @Test
@@ -1044,7 +1044,7 @@ class BillingScenarioTest {
 
       assertThat(answer.isTrue()).isFalse();
       assertThat(answer.isFalse()).isFalse();
-      assertThat(answer.ran()).isFalse();
+      assertThat(answer.succeeded()).isFalse();
     }
 
     @Test
@@ -1084,7 +1084,7 @@ class BillingScenarioTest {
       acme();
       Revealed<String> allowed = quarantinedLlmText.reveal(customerEmail());
 
-      assertThat(allowed.allowed()).isTrue();
+      assertThat(allowed.succeeded()).isTrue();
       assertThat(allowed.toString()).doesNotContain("123-45-6789");
     }
 
@@ -1151,7 +1151,7 @@ class BillingScenarioTest {
       acme();
       Revealed<String> result = broken.reveal(held);
 
-      assertThat(result.allowed()).isFalse();
+      assertThat(result.succeeded()).isFalse();
     }
   }
 

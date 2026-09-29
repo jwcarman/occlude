@@ -34,13 +34,13 @@ class RevealedTest {
     @Test
     @DisplayName("was allowed")
     void was_allowed() {
-      assertThat(revealed.allowed()).isTrue();
+      assertThat(revealed.succeeded()).isTrue();
     }
 
     @Test
     @DisplayName("hands back the value")
     void hands_back_the_value() {
-      assertThat(revealed.granted()).contains("4111-1111-1111-1111");
+      assertThat(revealed.value()).contains("4111-1111-1111-1111");
     }
 
     @Test
@@ -58,7 +58,7 @@ class RevealedTest {
     @DisplayName("does not print the value it is carrying")
     void does_not_print_the_value_it_is_carrying() {
       assertThat(revealed.toString())
-          .isEqualTo("Allowed[value=<held>]")
+          .isEqualTo("Allowed[plaintext=<held>]")
           .doesNotContain("4111-1111-1111-1111");
     }
   }
@@ -73,13 +73,13 @@ class RevealedTest {
     @Test
     @DisplayName("was not allowed")
     void was_not_allowed() {
-      assertThat(revealed.allowed()).isFalse();
+      assertThat(revealed.succeeded()).isFalse();
     }
 
     @Test
     @DisplayName("has no value to hand back")
     void has_no_value_to_hand_back() {
-      assertThat(revealed.granted()).isEmpty();
+      assertThat(revealed.value()).isEmpty();
     }
 
     @Test

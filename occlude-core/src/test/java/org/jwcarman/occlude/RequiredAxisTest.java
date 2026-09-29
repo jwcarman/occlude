@@ -184,7 +184,7 @@ class RequiredAxisTest {
 
     Derived<Note> result = redact.derive(door.occlude(new Note("ours")));
 
-    assertThat(result.made()).isEmpty();
+    assertThat(result.value()).isEmpty();
     assertThat(((Derived.Refused<Note>) result).reason()).isEqualTo(Derived.Reason.NOT_A_LOWERING);
     assertThat(storage.audit(AuditRecord.Operation.DERIVE))
         .isNotEmpty()
@@ -233,7 +233,7 @@ class RequiredAxisTest {
 
     edge.set(AccessContext.of(Map.of("tenant", "globex")));
 
-    assertThat(anyTenant.reveal(Occluded.<Note>of("occ_from-before")).allowed()).isFalse();
+    assertThat(anyTenant.reveal(Occluded.<Note>of("occ_from-before")).succeeded()).isFalse();
   }
 
   @Test

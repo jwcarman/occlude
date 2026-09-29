@@ -321,7 +321,7 @@ class ObservedOperationsTest {
 
     Occluded<String> held = notes.occlude("hello");
 
-    assertThat(desk.reveal(held).allowed()).isTrue();
+    assertThat(desk.reveal(held).succeeded()).isTrue();
   }
 
   @Test

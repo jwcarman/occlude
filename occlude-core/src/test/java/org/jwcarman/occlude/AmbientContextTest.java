@@ -90,10 +90,10 @@ class AmbientContextTest {
     Occluded<String> value = last4();
 
     currentUser.set("finance");
-    assertThat(wired.card().reveal(value).granted()).contains("4821");
+    assertThat(wired.card().reveal(value).value()).contains("4821");
 
     currentUser.set("support");
-    assertThat(wired.card().reveal(value).allowed()).isFalse();
+    assertThat(wired.card().reveal(value).succeeded()).isFalse();
   }
 
   @Test
