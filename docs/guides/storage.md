@@ -79,7 +79,9 @@ JdbcStorage storage = new JdbcStorageConfig()
     .rootedIn("prod-2027", id -> roots.get(id))   // the new root current, the old still supplied
     .storage(axes);
 
-Resigned resigned = storage.resign(latestAnchor); // every anchor you published must still hold
+TrailHead now = storage.head().orElseThrow();
+publish(now);                                     // first, so nothing after it is left to cut
+Resigned resigned = storage.resign(now);          // every anchor passed must still hold
 publish(resigned.after());                        // and afterwards none of them can
 
 storage.resignWithoutAnchors();                   // only for a store that never published one

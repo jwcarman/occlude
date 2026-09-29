@@ -78,6 +78,7 @@ public record AuditRecord(
 
   public AuditRecord {
     Objects.requireNonNull(operation, "an audit record needs an operation");
+    Objects.requireNonNull(value, "an audit record names the value it is about");
     // In the order given, as AccessContext keeps it: Map.copyOf would reorder who asked by run.
     Map<String, String> copy = new LinkedHashMap<>();
     context.forEach(

@@ -665,6 +665,11 @@ public final class JdbcStorage implements Storage {
    * is re-signed. Afterwards none of them can -- the lines they name carry new digests -- so a
    * trail cut back before re-signing would otherwise come out of it looking whole.
    *
+   * <p>An anchor protects the trail up to itself and no further: lines written after the newest
+   * anchor passed could have been cut, and re-signing would make that permanent. So publish {@link
+   * #head()} immediately before re-signing -- wherever anchors go, where this database cannot reach
+   * -- and pass that, so nothing is left after it to cut.
+   *
    * @param anchor a head published earlier, which the trail must still hold
    * @param more any others
    * @return what was re-signed, and the head before and after
@@ -672,7 +677,9 @@ public final class JdbcStorage implements Storage {
   public Resigned resign(TrailHead anchor, TrailHead... more) {
     List<TrailHead> anchors = new ArrayList<>();
     anchors.add(Objects.requireNonNull(anchor, "re-signing is checked against some anchor"));
-    anchors.addAll(List.of(more));
+    for (TrailHead each : more) {
+      anchors.add(Objects.requireNonNull(each, "re-signing is checked against no null anchor"));
+    }
     return resigning.resign(anchors);
   }
 

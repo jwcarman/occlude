@@ -145,6 +145,18 @@ class ResigningTest {
     }
   }
 
+  private byte[] digestOfLine(long entry) throws SQLException {
+    try (Connection connection = dataSource.getConnection();
+        var statement =
+            connection.prepareStatement("SELECT digest FROM occlude_audit WHERE entry_id = ?")) {
+      statement.setLong(1, entry);
+      try (ResultSet rows = statement.executeQuery()) {
+        rows.next();
+        return rows.getBytes(1);
+      }
+    }
+  }
+
   private long rowsUnder(String root) throws SQLException {
     try (Connection connection = dataSource.getConnection();
         var statement =
@@ -358,11 +370,12 @@ class ResigningTest {
 
   @Test
   @DisplayName("re-signs when every anchor given still holds")
-  void resigns_when_every_anchor_holds() {
+  void resigns_when_every_anchor_holds() throws SQLException {
     JdbcStorage storage = store("new", BOTH, MacAlgorithm.HMAC_SHA256);
+    TrailHead earlier = new TrailHead(1, digestOfLine(1));
     TrailHead published = storage.head().orElseThrow();
 
-    assertThat(storage.integrity().resign(published).values()).isEqualTo(3);
+    assertThat(storage.integrity().resign(earlier, published).values()).isEqualTo(3);
   }
 
   /** Claiming the current root is no way past the check: every row is checked, stale or not. */
