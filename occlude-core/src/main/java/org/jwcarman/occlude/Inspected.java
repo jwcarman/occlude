@@ -51,6 +51,6 @@ public sealed interface Inspected {
       return seen;
     }
     Refused refused = (Refused) this;
-    throw new AccessDeniedException(refused.reason().name(), refused.detail());
+    throw new RefusedException(refused.reason().name(), refused.detail());
   }
 }

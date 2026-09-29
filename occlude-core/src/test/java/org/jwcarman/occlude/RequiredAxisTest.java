@@ -103,7 +103,7 @@ class RequiredAxisTest {
     Note note = new Note("who does this belong to?");
 
     assertThatThrownBy(() -> notes.occlude(note))
-        .isInstanceOf(AccessDeniedException.class)
+        .isInstanceOf(RefusedException.class)
         .hasMessageContaining("readable by everyone");
   }
 
@@ -126,7 +126,7 @@ class RequiredAxisTest {
     edge.set(AccessContext.empty());
     Note orphan = new Note("orphan");
 
-    assertThatThrownBy(() -> watched.occlude(orphan)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> watched.occlude(orphan)).isInstanceOf(RefusedException.class);
 
     assertThat(storage.contains("nothing")).isFalse();
     assertThat(kept.everything()).isEmpty();
@@ -242,7 +242,7 @@ class RequiredAxisTest {
     edge.set(AccessContext.empty());
     Note orphan = new Note("orphan");
 
-    assertThatThrownBy(() -> notes.occlude(orphan)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> notes.occlude(orphan)).isInstanceOf(RefusedException.class);
 
     // Nothing was stored, so there is nothing for any tenant to read. Asserting against a
     // fabricated identifier proved nothing: it is refused whether or not the orphan was written.

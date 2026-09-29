@@ -114,7 +114,7 @@ class AnswerTest {
     @DisplayName("throws an exception naming the reason and detail rather than answering")
     void throws_naming_the_reason_and_detail() {
       assertThatThrownBy(answer::orThrow)
-          .isInstanceOf(AccessDeniedException.class)
+          .isInstanceOf(RefusedException.class)
           .hasMessageContaining("ABOVE_CEILING")
           .hasMessageContaining("clearance too low");
     }

@@ -75,7 +75,7 @@ class DerivedTest {
     void throws_naming_the_reason_and_detail() {
       assertThatThrownBy(derived::orThrow)
           .isInstanceOf(DerivationRefusedException.class)
-          .isInstanceOf(AccessDeniedException.class)
+          .isInstanceOf(RefusedException.class)
           .hasMessageContaining("NO_SUCH_VALUE")
           .hasMessageContaining("no such parent");
     }

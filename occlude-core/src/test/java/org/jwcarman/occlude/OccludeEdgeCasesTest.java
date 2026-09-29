@@ -59,7 +59,7 @@ class OccludeEdgeCasesTest {
     charter.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
 
     assertThatThrownBy(() -> source.occlude("hello"))
-        .isInstanceOf(AccessDeniedException.class)
+        .isInstanceOf(RefusedException.class)
         .hasMessageContaining("SOURCE_CANNOT_LABEL");
   }
 
@@ -70,7 +70,7 @@ class OccludeEdgeCasesTest {
     charter.bind(Bindings.of(new MemoryStorage()).withoutIdentity());
 
     assertThatThrownBy(() -> source.occlude("hello"))
-        .isInstanceOf(AccessDeniedException.class)
+        .isInstanceOf(RefusedException.class)
         .hasMessageContaining("SOURCE_CANNOT_LABEL");
   }
 }

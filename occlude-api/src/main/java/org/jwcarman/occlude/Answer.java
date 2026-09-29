@@ -67,7 +67,7 @@ public sealed interface Answer {
 
     @Override
     public boolean orThrow() {
-      throw new AccessDeniedException(reason.name(), detail);
+      throw new RefusedException(reason.name(), detail);
     }
   }
 

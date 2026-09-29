@@ -18,10 +18,10 @@ package org.jwcarman.occlude;
 /**
  * A derivation did not happen.
  *
- * <p>An {@link AccessDeniedException}, so that code turning refusals into a response handles both
- * with one catch.
+ * <p>An {@link RefusedException}, so that code turning refusals into a response handles both with
+ * one catch.
  */
-public class DerivationRefusedException extends AccessDeniedException {
+public class DerivationRefusedException extends RefusedException {
 
   private static final long serialVersionUID = 1L;
 

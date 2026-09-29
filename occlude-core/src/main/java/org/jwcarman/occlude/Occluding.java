@@ -66,7 +66,7 @@ final class Occluding {
           Why.of("the source could not say how to label this", detail),
           null,
           asking);
-      throw new AccessDeniedException("SOURCE_CANNOT_LABEL", detail);
+      throw new RefusedException("SOURCE_CANNOT_LABEL", detail);
     }
     // One of two places a label can be incomplete. Join only moves up, so an ordinary derivation
     // cannot lose what was said here -- but a privileged one may relabel, so deriving checks too.
@@ -79,7 +79,7 @@ final class Occluding {
           Why.of("the label leaves a required axis unsaid"),
           label,
           asking);
-      throw new AccessDeniedException(
+      throw new RefusedException(
           "INCOMPLETE_LABEL",
           ("'%s' produced a label that leaves a required axis unsaid. Unsaid is the bottom of its"
                   + " order, which is below every ceiling, so the value would have been readable"

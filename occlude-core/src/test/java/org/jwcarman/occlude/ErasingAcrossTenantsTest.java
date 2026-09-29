@@ -322,7 +322,7 @@ class ErasingAcrossTenantsTest {
 
     assertThat(erased.removed()).isEmpty();
     assertThatThrownBy(erased::orThrow)
-        .isInstanceOf(AccessDeniedException.class)
+        .isInstanceOf(RefusedException.class)
         .hasMessageContaining("NO_SUCH_VALUE");
   }
 }

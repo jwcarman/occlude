@@ -26,18 +26,18 @@ package org.jwcarman.occlude;
  * <p>The reason is a name rather than an enum because the gates refuse for different reasons and a
  * caller handling all of them wants a string to log, not a switch over a union.
  */
-public class AccessDeniedException extends RuntimeException {
+public class RefusedException extends RuntimeException {
 
   private static final long serialVersionUID = 1L;
 
   private final String reason;
 
-  public AccessDeniedException(String reason, String detail) {
+  public RefusedException(String reason, String detail) {
     super(reason + ": " + detail);
     this.reason = reason;
   }
 
-  public AccessDeniedException(Revealed.Reason reason, String detail) {
+  public RefusedException(Revealed.Reason reason, String detail) {
     this(reason.name(), detail);
   }
 

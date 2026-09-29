@@ -15,7 +15,7 @@
  */
 package org.jwcarman.occlude.example.billing;
 
-import org.jwcarman.occlude.AccessDeniedException;
+import org.jwcarman.occlude.RefusedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -80,8 +80,8 @@ public class DisputeController {
   }
 
   /** A refusal is a 403, and says which gate said no without saying what was behind it. */
-  @ExceptionHandler(AccessDeniedException.class)
-  public ResponseEntity<String> refused(AccessDeniedException e) {
+  @ExceptionHandler(RefusedException.class)
+  public ResponseEntity<String> refused(RefusedException e) {
     return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
   }
 }

@@ -75,6 +75,6 @@ public sealed interface Revealed<T> {
       return value;
     }
     Denied<T> denied = (Denied<T>) this;
-    throw new AccessDeniedException(denied.reason(), denied.detail());
+    throw new RefusedException(denied.reason(), denied.detail());
   }
 }

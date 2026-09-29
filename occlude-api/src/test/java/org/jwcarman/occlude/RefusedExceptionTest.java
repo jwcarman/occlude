@@ -20,14 +20,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("An access-denied exception")
-class AccessDeniedExceptionTest {
+@DisplayName("A refusal, thrown")
+class RefusedExceptionTest {
 
   @Test
   @DisplayName("reports the reason a caller can log, and a message combining reason and detail")
   void reports_the_reason_it_was_constructed_with() {
-    AccessDeniedException exception =
-        new AccessDeniedException("ABOVE_CEILING", "clearance too low");
+    RefusedException exception = new RefusedException("ABOVE_CEILING", "clearance too low");
 
     assertThat(exception.reason()).isEqualTo("ABOVE_CEILING");
     assertThat(exception.getMessage()).isEqualTo("ABOVE_CEILING: clearance too low");
@@ -36,8 +35,7 @@ class AccessDeniedExceptionTest {
   @Test
   @DisplayName("takes its reason from a gate's own Reason enum by name")
   void takes_its_reason_from_a_gates_reason_enum() {
-    AccessDeniedException exception =
-        new AccessDeniedException(Revealed.Reason.WRONG_TYPE, "not a card");
+    RefusedException exception = new RefusedException(Revealed.Reason.WRONG_TYPE, "not a card");
 
     assertThat(exception.reason()).isEqualTo("WRONG_TYPE");
     assertThat(exception.getMessage()).isEqualTo("WRONG_TYPE: not a card");

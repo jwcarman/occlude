@@ -113,9 +113,9 @@ violation of this design, not a judgement call available to the implementer.
 **Concealing**
 
 1. A null value is rejected outright, before anything is recorded.
-2. A null label is a *recorded* refusal, then `AccessDeniedException`.
+2. A null label is a *recorded* refusal, then `RefusedException`.
 3. A label leaving a required axis unsaid is a recorded refusal, then
-   `AccessDeniedException`. Unsaid is the bottom of its order and below every
+   `RefusedException`. Unsaid is the bottom of its order and below every
    ceiling, so this must fail closed.
 4. Only then is an id minted and the value stored.
 

@@ -59,7 +59,7 @@ public interface Occlude<T> {
    * and deserves a value; being unable to say how a value is labelled is a bug.
    *
    * @throws IllegalArgumentException if the value is null
-   * @throws AccessDeniedException if this door cannot say how to label what arrived
+   * @throws RefusedException if this door cannot say how to label what arrived
    * @throws IllegalStateException if this door was never brought into force
    */
   Occluded<T> occlude(T value);

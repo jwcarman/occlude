@@ -59,7 +59,7 @@ public sealed interface Erased {
 
     @Override
     public int orThrow() {
-      throw new AccessDeniedException(reason.name(), detail);
+      throw new RefusedException(reason.name(), detail);
     }
   }
 

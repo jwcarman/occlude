@@ -370,7 +370,7 @@ class PolicyThatCannotDecideTest {
     @DisplayName("when a source cannot label what it was given")
     void when_a_source_cannot_label() {
       assertThatThrownBy(() -> sourceThatCannotLabel.occlude("secret"))
-          .isInstanceOf(AccessDeniedException.class)
+          .isInstanceOf(RefusedException.class)
           .hasMessageContaining(THREW);
     }
 

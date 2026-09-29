@@ -129,7 +129,7 @@ class InspectionTest {
 
     assertThat(inspected.succeeded()).isFalse();
     assertThatThrownBy(inspected::orThrow)
-        .isInstanceOf(AccessDeniedException.class)
+        .isInstanceOf(RefusedException.class)
         .hasMessageContaining("ABOVE_CEILING");
   }
 

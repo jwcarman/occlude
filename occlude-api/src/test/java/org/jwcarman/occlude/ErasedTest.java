@@ -73,7 +73,7 @@ class ErasedTest {
     @DisplayName("throws the refusal, naming its reason, when the caller insists")
     void throws_the_refusal() {
       assertThatThrownBy(erased::orThrow)
-          .isInstanceOf(AccessDeniedException.class)
+          .isInstanceOf(RefusedException.class)
           .hasMessageContaining("NOT_PERMITTED")
           .hasMessageContaining("retention");
     }
