@@ -17,3 +17,17 @@ management:
     web:
       exposure:
         include: charter
+  # Where the LGTM container in compose.yaml listens. Grafana is at http://localhost:3000.
+  otlp:
+    metrics:
+      export:
+        url: ${OTLP_METRICS_URL:http://localhost:4318/v1/metrics}
+        step: 10s
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTLP_TRACES_URL:http://localhost:4318/v1/traces}
+  tracing:
+    sampling:
+      probability: 1.0

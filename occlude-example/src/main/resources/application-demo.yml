@@ -13,4 +13,7 @@ occlude:
     current: demo
     secrets:
       demo: ${OCCLUDE_DEMO_ROOT:ZGVtby1yb290LW5vdC1hLXNlY3JldC1hdC1hbGwtZG8tbm90LWRlcGxveQ==}
-
+  # Check the store every minute, so its result shows up in Grafana beside the operations. A real
+  # store would check far less often: every run reads and decrypts every row.
+  integrity:
+    interval: 1m

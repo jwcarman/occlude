@@ -23,3 +23,19 @@ services:
       POSTGRES_PASSWORD: occlude
     ports:
       - '5432'
+
+  # Grafana's own all-in-one: Grafana, Prometheus, Tempo and Loki behind one OTLP endpoint. Every
+  # Occlude operation arrives as a timer and a span, and the scheduled integrity check as a timer
+  # per result -- labelled by operation, portal, outcome and reason, and never by anything a value
+  # could appear in.
+  lgtm:
+    image: 'grafana/otel-lgtm'
+    ports:
+      - '3000:3000'   # Grafana, the thing you actually look at
+      - '4317:4317'   # OTLP/gRPC
+      - '4318:4318'   # OTLP/HTTP, where application.yml sends metrics and traces
+    volumes:
+      - billing-lgtm:/data
+
+volumes:
+  billing-lgtm:
