@@ -27,7 +27,12 @@ import java.util.Optional;
  */
 public sealed interface Revealed<T> {
 
-  /** The value, because the gate allowed it. */
+  /**
+   * The value, because the gate allowed it.
+   *
+   * @param plaintext the value itself
+   * @param <T> its type
+   */
   record Allowed<T>(T plaintext) implements Revealed<T> {
 
     /**
@@ -43,7 +48,13 @@ public sealed interface Revealed<T> {
     }
   }
 
-  /** No value, and why. */
+  /**
+   * No value, and why.
+   *
+   * @param reason why, as a code that names a rule and never a value
+   * @param detail what the code leaves out, for whoever handles the refusal
+   * @param <T> the type the value would have had
+   */
   record Denied<T>(Reason reason, String detail) implements Revealed<T> {}
 
   /** Why a value was not handed over. */

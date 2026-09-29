@@ -74,6 +74,11 @@ import tools.jackson.databind.json.JsonMapper;
 @ConditionalOnClass({JdbcStorage.class, DataSource.class})
 public class JdbcCharterAutoConfiguration {
 
+  /** Created by Spring Boot's auto-configuration. */
+  public JdbcCharterAutoConfiguration() {
+    // The store and what it needs are the beans below.
+  }
+
   /** The name the audit trail is registered, and found, under. */
   public static final String AUDIT_TRAIL = "occludeAuditTrail";
 

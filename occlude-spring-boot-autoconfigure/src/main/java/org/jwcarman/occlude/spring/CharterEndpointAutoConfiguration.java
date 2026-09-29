@@ -36,6 +36,17 @@ import org.springframework.context.annotation.Bean;
 @ConditionalOnClass(Endpoint.class)
 public class CharterEndpointAutoConfiguration {
 
+  /** Created by Spring Boot's auto-configuration. */
+  public CharterEndpointAutoConfiguration() {
+    // The endpoint is the bean below.
+  }
+
+  /**
+   * The charter endpoint, when Actuator exposes it.
+   *
+   * @param charter the application's charter
+   * @return the endpoint that renders it
+   */
   @Bean
   @ConditionalOnBean(Charter.class)
   @ConditionalOnAvailableEndpoint(endpoint = CharterEndpoint.class)

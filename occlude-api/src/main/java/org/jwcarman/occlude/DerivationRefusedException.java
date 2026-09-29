@@ -25,6 +25,12 @@ public class DerivationRefusedException extends RefusedException {
 
   private static final long serialVersionUID = 1L;
 
+  /**
+   * A derivation's refusal.
+   *
+   * @param reason why the derivation did not happen
+   * @param detail what the reason leaves out
+   */
   public DerivationRefusedException(Derived.Reason reason, String detail) {
     super(reason.name(), detail);
   }

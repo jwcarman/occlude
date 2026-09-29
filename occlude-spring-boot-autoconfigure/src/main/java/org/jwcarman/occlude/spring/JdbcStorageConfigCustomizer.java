@@ -36,5 +36,10 @@ import org.jwcarman.occlude.jdbc.JdbcStorageConfig;
 @FunctionalInterface
 public interface JdbcStorageConfigCustomizer {
 
+  /**
+   * Adjusts the configuration the store is about to be built from.
+   *
+   * @param config the configuration, with the starter's settings already applied
+   */
   void customize(JdbcStorageConfig config);
 }

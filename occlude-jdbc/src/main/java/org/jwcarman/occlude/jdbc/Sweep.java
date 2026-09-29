@@ -40,6 +40,7 @@ public record Sweep(
     List<Long> alteredLines,
     List<Long> unreadableLines) {
 
+  /** Copied, so a sweep's findings cannot change after it was made. */
   public Sweep {
     alteredValues = List.copyOf(alteredValues);
     unreadableValues = List.copyOf(unreadableValues);

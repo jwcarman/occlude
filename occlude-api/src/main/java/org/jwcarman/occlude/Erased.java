@@ -25,7 +25,11 @@ import java.util.OptionalInt;
  */
 public sealed interface Erased {
 
-  /** The value and everything derived from it are gone. */
+  /**
+   * The value and everything derived from it are gone.
+   *
+   * @param count how many values were removed: the one asked about and its descendants
+   */
   record Removed(int count) implements Erased {
 
     @Override
@@ -44,7 +48,12 @@ public sealed interface Erased {
     }
   }
 
-  /** Nothing was removed, and why. */
+  /**
+   * Nothing was removed, and why.
+   *
+   * @param reason why, as a code that names a rule and never a value
+   * @param detail what the code leaves out, for whoever handles the refusal
+   */
   record Refused(Reason reason, String detail) implements Erased {
 
     @Override

@@ -40,6 +40,7 @@ public record IntegrityReport(
     Sweep sweep,
     Optional<TrailHead> head) {
 
+  /** Copied, so a report cannot change after it was made. */
   public IntegrityReport {
     brokenValues = List.copyOf(brokenValues);
     missingValues = List.copyOf(missingValues);

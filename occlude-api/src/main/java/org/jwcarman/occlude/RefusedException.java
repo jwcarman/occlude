@@ -30,18 +30,35 @@ public class RefusedException extends RuntimeException {
 
   private static final long serialVersionUID = 1L;
 
+  /** Which gate said no: the refusal's code, naming a rule and never a value. */
   private final String reason;
 
+  /**
+   * A refusal, for a caller that cannot proceed without what was refused.
+   *
+   * @param reason which gate said no, as a code that names a rule and never a value
+   * @param detail what the code leaves out
+   */
   public RefusedException(String reason, String detail) {
     super(reason + ": " + detail);
     this.reason = reason;
   }
 
+  /**
+   * A reveal's refusal.
+   *
+   * @param reason why the value was not handed over
+   * @param detail what the reason leaves out
+   */
   public RefusedException(Revealed.Reason reason, String detail) {
     this(reason.name(), detail);
   }
 
-  /** Which gate said no, and why. */
+  /**
+   * Which gate said no, and why.
+   *
+   * @return the refusal's code
+   */
   public String reason() {
     return reason;
   }

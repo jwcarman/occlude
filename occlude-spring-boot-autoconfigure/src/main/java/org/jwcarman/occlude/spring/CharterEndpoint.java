@@ -77,6 +77,11 @@ public class CharterEndpoint {
 
   private final Charter charter;
 
+  /**
+   * The endpoint for one charter.
+   *
+   * @param charter the charter it renders
+   */
   public CharterEndpoint(Charter charter) {
     this.charter = charter;
   }

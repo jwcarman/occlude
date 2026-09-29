@@ -51,6 +51,14 @@ public interface Query<I, Q> {
   /** What a query actually does: looks at the value, and returns one bit. */
   @FunctionalInterface
   interface Asking<I, Q> {
+    /**
+     * The question itself.
+     *
+     * @param value the plaintext being asked about
+     * @param against what it is asked against: a plain value, part of what a review reads
+     * @param context who is asking
+     * @return the one bit
+     */
     boolean test(I value, Q against, AccessContext context);
   }
 }

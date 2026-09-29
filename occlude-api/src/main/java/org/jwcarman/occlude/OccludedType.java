@@ -33,10 +33,10 @@ import org.jwcarman.codec.TypeRef;
  * stored is still readable. Change the name and you have orphaned every row carrying the old one,
  * which is a migration and not a preference.
  *
- * <p>Declare one wherever it reads best: {@code type(...)} on the configuration applies the naming
- * strategy for you, and this constructor is fine when you would rather say it plainly. Either way
- * the configuration sees every type that reaches a portal and refuses two of them wanting one name,
- * so the check does not depend on which you chose.
+ * <p>Declare one wherever it reads best: {@link #of(Class)} derives the name from the class -- or
+ * its {@link OccludedName} -- and {@link #of(String, Class)} says it plainly. Either way the
+ * charter sees every type that reaches a portal and refuses two of them wanting one name, so the
+ * check does not depend on which you chose.
  *
  * <p>Holding one grants nothing -- it names a type, it does not open a door -- and a mismatched
  * pairing gains nothing either. A reader still only reaches names its sink declared and its store
@@ -48,6 +48,12 @@ import org.jwcarman.codec.TypeRef;
  */
 public record OccludedType<T>(String name, TypeRef<T> type) {
 
+  /**
+   * A type written down under this name.
+   *
+   * @param name what values of this type are written down as, never blank
+   * @param type how to decode one
+   */
   public OccludedType {
     Objects.requireNonNull(name, "a type needs a name");
     Objects.requireNonNull(type, "a type needs to say how to decode one");

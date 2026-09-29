@@ -22,10 +22,20 @@ import org.jwcarman.occlude.storage.Lineage;
 /** What came of asking what a value is labelled and where it came from. */
 public sealed interface Inspected {
 
-  /** What the record says about the value. */
+  /**
+   * What the record says about the value.
+   *
+   * @param label what the value is labelled
+   * @param lineage where it came from: its parents, and what made it from them
+   */
   record Seen(Label label, Lineage lineage) implements Inspected {}
 
-  /** Nothing was read, and why. */
+  /**
+   * Nothing was read, and why.
+   *
+   * @param reason why, as a code that names a rule and never a value
+   * @param detail what the code leaves out, for whoever handles the refusal
+   */
   record Refused(Reason reason, String detail) implements Inspected {}
 
   /** Why nothing was read. */

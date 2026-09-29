@@ -24,8 +24,11 @@ package org.jwcarman.occlude.jdbc;
  * row said could be talked down to something weaker by rewriting one column.
  */
 public enum MacAlgorithm {
+  /** HMAC with SHA-256: the default, and mandatory on every Java platform. */
   HMAC_SHA256("HmacSHA256"),
+  /** HMAC with SHA-384. */
   HMAC_SHA384("HmacSHA384"),
+  /** HMAC with SHA-512. */
   HMAC_SHA512("HmacSHA512");
 
   private final String jcaName;

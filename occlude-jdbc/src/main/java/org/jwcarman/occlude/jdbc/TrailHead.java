@@ -31,10 +31,16 @@ import java.util.HexFormat;
  */
 public record TrailHead(long entryId, byte[] digest) {
 
+  /** Copied, so an anchor written down cannot change afterwards. */
   public TrailHead {
     digest = digest.clone();
   }
 
+  /**
+   * The line's digest, as a copy.
+   *
+   * @return a copy of the digest, never the array this holds
+   */
   @Override
   public byte[] digest() {
     return digest.clone();

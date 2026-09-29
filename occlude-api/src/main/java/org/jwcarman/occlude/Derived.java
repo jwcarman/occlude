@@ -20,10 +20,21 @@ import java.util.Optional;
 /** What came of asking for a value to be derived from another. */
 public sealed interface Derived<O> {
 
-  /** A new handle, stored, labelled and with its lineage recorded. */
+  /**
+   * A new handle, stored, labelled and with its lineage recorded.
+   *
+   * @param occluded the new value's handle
+   * @param <O> the new value's type
+   */
   record Made<O>(Occluded<O> occluded) implements Derived<O> {}
 
-  /** No new value, and why. */
+  /**
+   * No new value, and why.
+   *
+   * @param reason why, as a code that names a rule and never a value
+   * @param detail what the code leaves out, for whoever handles the refusal
+   * @param <O> the type the value would have had
+   */
   record Refused<O>(Reason reason, String detail) implements Derived<O> {}
 
   /** Why a derivation did not happen. */

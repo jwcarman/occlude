@@ -27,5 +27,7 @@ import org.jwcarman.occlude.lattice.Label;
  * @param typeName what the value was stored as, compared against what a handle claims. A name
  *     rather than a reconstructed type, because comparing what was written to what is asked for
  *     needs no parser and cannot be fooled by one.
+ * @param label what the value is labelled
+ * @param lineage where it came from
  */
 public record StoredMetadata(String typeName, Label label, Lineage lineage) {}

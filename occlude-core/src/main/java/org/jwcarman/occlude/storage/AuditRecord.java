@@ -35,7 +35,10 @@ import java.util.Optional;
  * <p>Refusals are recorded as carefully as permissions. A thousand refused attempts against one
  * value is the interesting event, and a log that only records successes cannot show it.
  *
+ * @param operation what was attempted
+ * @param value the value it was attempted on
  * @param target what was on the other side: a sink, a derivation, a check
+ * @param outcome whether it was allowed
  * @param reason the coarse code, in the clear: it names a rule, not a value, so it stays queryable
  *     -- "how many refusals above a ceiling this hour" is a question a trail should answer without
  *     decrypting anything
@@ -43,6 +46,7 @@ import java.util.Optional;
  *     is protected exactly like {@code label} is. Splitting it from {@code reason} is what keeps
  *     the trail both queryable and closed -- putting the explanation in {@code reason} would have
  *     described every value in the system to anyone who could read the table
+ * @param label the value's label, as it was when this happened
  * @param context whatever the application contributed about who was asking
  */
 public record AuditRecord(
@@ -71,11 +75,15 @@ public record AuditRecord(
     INSPECT
   }
 
+  /** How it ended. */
   public enum Outcome {
+    /** It happened. */
     ALLOWED,
+    /** It did not, and the line's reason says why. */
     REFUSED
   }
 
+  /** Checked and copied: an operation and a value always, and who asked in the order given. */
   public AuditRecord {
     Objects.requireNonNull(operation, "an audit record needs an operation");
     Objects.requireNonNull(value, "an audit record names the value it is about");

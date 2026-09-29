@@ -53,6 +53,11 @@ import org.springframework.context.event.ContextRefreshedEvent;
 @EnableConfigurationProperties(CharterProperties.class)
 public class CharterAutoConfiguration {
 
+  /** Created by Spring Boot's auto-configuration. */
+  public CharterAutoConfiguration() {
+    // The charter and its binding are the beans below.
+  }
+
   private static final Logger log = LoggerFactory.getLogger(CharterAutoConfiguration.class);
 
   /** The name a charter's store is registered, and found, under. */

@@ -38,7 +38,12 @@ package org.jwcarman.occlude.lattice;
 @SuppressWarnings("java:S2326")
 public sealed interface Constraint<T> {
 
-  /** At or below one value: the ordinary case, and what every ceiling used to be. */
+  /**
+   * At or below one value: the ordinary case, and what every ceiling used to be.
+   *
+   * @param value the most constrained value admitted
+   * @param <T> the axis's type
+   */
   record AtMost<T>(T value) implements Constraint<T> {}
 
   /**
@@ -47,6 +52,8 @@ public sealed interface Constraint<T> {
    * <p>On a ladder that is every rung, because a ladder has nothing poisoned on it. On a matching
    * axis it is any one value and never a mixture -- a reporting job entitled to every tenant reads
    * each tenant's rows, and whatever it combines from them reaches nobody.
+   *
+   * @param <T> the axis's type
    */
   record Any<T>() implements Constraint<T> {}
 

@@ -38,6 +38,7 @@ import java.util.Objects;
  * reference is what separates your record from somebody else's. The identifier is unguessable for
  * that reason, and it is why leaking one into a log matters.
  *
+ * @param id the value's identifier: opaque, and nothing else
  * @param <T> the type of value this stands in for, as far as the compiler is concerned
  */
 // S2326 says T is unused. It is used by the compiler and by nothing else, which is the point:
@@ -46,6 +47,11 @@ import java.util.Objects;
 @SuppressWarnings("java:S2326")
 public record Occluded<T>(String id) {
 
+  /**
+   * A handle to the value stored under this id.
+   *
+   * @param id the value's identifier, never blank
+   */
   public Occluded {
     Objects.requireNonNull(id, "an occluded reference needs an id");
     if (id.isBlank()) {

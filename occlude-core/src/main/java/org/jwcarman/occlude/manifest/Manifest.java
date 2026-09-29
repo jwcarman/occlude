@@ -39,6 +39,16 @@ import org.jwcarman.occlude.AccessContext;
  * person who wrote it knows. What limits the exposure is the ceiling -- a value you may not ask
  * about gives you no questions at all -- and what makes it visible is the trail, which records
  * every question against the value it was asked about.
+ *
+ * @param bottom how a label that says nothing renders
+ * @param sources the doors values enter through
+ * @param sinks the doors values leave through
+ * @param derivations what makes one value from others
+ * @param questions what asks one bit of a value without the value leaving
+ * @param erasures what may forget a value and everything derived from it
+ * @param inspections what may read a value's label and lineage
+ * @param findings what can be proved wrong about the declarations without running anything
+ * @param renderedFor the access the ceilings in this report were evaluated for
  */
 public record Manifest(
     String bottom,
@@ -57,6 +67,8 @@ public record Manifest(
    * <p>The types are structured rather than left in {@code detail}, so a report can be filtered and
    * diffed rather than only read. {@code detail} stays because a person reads it.
    *
+   * @param name the declaration's name
+   * @param detail what it does, for a person to read
    * @param reads the occluded types this takes in; empty for a door values only enter through
    * @param writes the occluded type this produces, or null when it produces no value at all -- a
    *     sink hands a value out of the system, and a question answers a bit
@@ -89,6 +101,7 @@ public record Manifest(
    *
    * @param kind a stable code, so a build can fail on one kind and not another
    * @param about the declaration this is about
+   * @param detail what was found, for a person to read
    */
   public record Finding(String kind, String about, String detail) {}
 

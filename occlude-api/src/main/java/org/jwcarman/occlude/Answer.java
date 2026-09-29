@@ -23,7 +23,11 @@ package org.jwcarman.occlude;
  */
 public sealed interface Answer {
 
-  /** The check ran and this is what it said. */
+  /**
+   * The check ran and this is what it said.
+   *
+   * @param value what it said
+   */
   record Answered(boolean value) implements Answer {
 
     @Override
@@ -47,7 +51,12 @@ public sealed interface Answer {
     }
   }
 
-  /** The check did not run. */
+  /**
+   * The check did not run.
+   *
+   * @param reason why, as a code that names a rule and never a value
+   * @param detail what the code leaves out, for whoever handles the refusal
+   */
   record Refused(Reason reason, String detail) implements Answer {
 
     @Override
@@ -71,10 +80,15 @@ public sealed interface Answer {
     }
   }
 
+  /** Why a question was not answered. */
   enum Reason {
+    /** No such value. Also what a manufactured id gets. */
     NO_SUCH_VALUE,
+    /** The value is not the type this question asks about. */
     WRONG_TYPE,
+    /** The value's label is above what this question may look at. */
     ABOVE_CEILING,
+    /** This question is not offered in this context, or failed while reading the value. */
     NOT_AVAILABLE_HERE
   }
 

@@ -44,6 +44,13 @@ import org.jwcarman.occlude.lattice.Axis;
 public final class JdbcStorageConfig {
 
   /**
+   * An empty configuration: nothing builds until the data source, codecs, keys and root are set.
+   */
+  public JdbcStorageConfig() {
+    // Every setting is required or has its default where it is declared.
+  }
+
+  /**
    * The pipeline version every payload is written under. Fixed forever: version 1 is codec's
    * envelope over the configured keys and nothing else. A later pipeline -- padding, a new
    * algorithm -- is added as 2 beside it, so what is already stored still reads.

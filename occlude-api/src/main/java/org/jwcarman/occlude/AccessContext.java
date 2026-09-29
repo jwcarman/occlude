@@ -34,6 +34,8 @@ import java.util.Optional;
  * whoever asked.
  *
  * <p>It is also what an audit line records, which is the other reason it cannot be skipped.
+ *
+ * @param attributes what the application said about whoever is asking, in the order it said it
  */
 public record AccessContext(Map<String, String> attributes) {
 
@@ -59,14 +61,33 @@ public record AccessContext(Map<String, String> attributes) {
     return EMPTY;
   }
 
+  /**
+   * What the application says about whoever is asking.
+   *
+   * @param attributes the attributes, copied in the order given
+   * @return a context holding them
+   */
   public static AccessContext of(Map<String, String> attributes) {
     return new AccessContext(attributes);
   }
 
+  /**
+   * A context saying one thing.
+   *
+   * @param key the attribute's name
+   * @param value its value
+   * @return a context holding just that
+   */
   public static AccessContext of(String key, String value) {
     return new AccessContext(Map.of(key, value));
   }
 
+  /**
+   * What the application said for one attribute.
+   *
+   * @param key the attribute's name
+   * @return its value, or empty when nothing was said
+   */
   public Optional<String> get(String key) {
     return Optional.ofNullable(attributes.get(key));
   }

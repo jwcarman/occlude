@@ -53,6 +53,13 @@ public class IntegrityMonitor implements SmartLifecycle {
   private final ObservationRegistry observations;
   private ScheduledExecutorService scheduler;
 
+  /**
+   * A monitor that checks one store.
+   *
+   * @param integrity what the checks run on
+   * @param interval how long between checks
+   * @param observations what each run is observed through
+   */
   public IntegrityMonitor(
       StorageIntegrity integrity, Duration interval, ObservationRegistry observations) {
     this.integrity = integrity;
