@@ -33,12 +33,12 @@
   <parent>
     <groupId>org.jwcarman.occlude</groupId>
     <artifactId>occlude-parent</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.3.0-SNAPSHOT</version>
   </parent>
 
   <groupId>org.jwcarman.occlude</groupId>
   <artifactId>occlude-example</artifactId>
-  <version>0.2.0-SNAPSHOT</version>
+  <version>0.3.0-SNAPSHOT</version>
   <name>Occlude :: Example</name>
   <description>A billing support desk: an ordinary Spring Boot service that happens to handle
     cardholder data and untrusted mail.</description>
@@ -111,7 +111,7 @@
     <dependency>
       <groupId>org.jwcarman.occlude</groupId>
       <artifactId>occlude-spring-boot-starter</artifactId>
-      <version>0.2.0-SNAPSHOT</version>
+      <version>0.3.0-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.jwcarman.codec</groupId>
