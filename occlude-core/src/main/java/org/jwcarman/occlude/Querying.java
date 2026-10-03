@@ -47,12 +47,12 @@ final class Querying {
     AtomicReference<String> because = new AtomicReference<>();
     Answer answer = answering(spec, about, against, asking, label, because);
     if (answer instanceof Answer.Refused refused) {
-      trail.audit(
+      trail.refused(
           AuditRecord.Operation.QUERY,
           about.id(),
           spec.name(),
-          AuditRecord.Outcome.REFUSED,
-          Why.of(refused.reason().name(), because.get()),
+          RefusalReason.of(refused.reason()),
+          because.get(),
           label.get(),
           asking);
     }
@@ -134,11 +134,10 @@ final class Querying {
           Answer.Reason.FAILED, "'" + name + "' failed while reading the value" + Gate.threw(e));
     }
     // The answer, never what was asked: the argument can itself be sensitive.
-    trail.audit(
+    trail.allowed(
         AuditRecord.Operation.QUERY,
         held.id(),
         name,
-        AuditRecord.Outcome.ALLOWED,
         Why.of("answered " + answer),
         entry.label(),
         context);

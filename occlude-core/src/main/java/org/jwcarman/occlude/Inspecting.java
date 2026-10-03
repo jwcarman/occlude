@@ -52,12 +52,12 @@ final class Inspecting {
                 () -> storage.metadata(held.id()))
             .orElse(null);
     if (entry == null) {
-      trail.audit(
+      trail.refused(
           AuditRecord.Operation.INSPECT,
           held.id(),
           by,
-          AuditRecord.Outcome.REFUSED,
-          Why.of(Inspected.Reason.NO_SUCH_VALUE.name()),
+          RefusalReason.NO_SUCH_VALUE,
+          null,
           null,
           asking);
       return new Inspected.Refused(Inspected.Reason.NO_SUCH_VALUE, Gate.NOT_HOLDING + held.id());
@@ -65,12 +65,12 @@ final class Inspecting {
     Gate.Consulted<Ceiling> consulted = gate.ceilingOf(() -> inspection.ceilingFor(asking));
     Ceiling ceiling = consulted.answer();
     if (ceiling == null) {
-      trail.audit(
+      trail.refused(
           AuditRecord.Operation.INSPECT,
           held.id(),
           by,
-          AuditRecord.Outcome.REFUSED,
-          Why.of(Inspected.Reason.ABOVE_CEILING.name(), consulted.failure()),
+          RefusalReason.ABOVE_CEILING,
+          consulted.failure(),
           entry.label(),
           asking);
       return new Inspected.Refused(
@@ -78,25 +78,19 @@ final class Inspecting {
           "'" + by + Gate.COULD_NOT_SAY_WHAT_IT_ACCEPTS + consulted.threw());
     }
     if (!gate.admits(ceiling, entry.label())) {
-      trail.audit(
+      trail.refused(
           AuditRecord.Operation.INSPECT,
           held.id(),
           by,
-          AuditRecord.Outcome.REFUSED,
-          Why.of(Inspected.Reason.ABOVE_CEILING.name(), Gate.because(entry.label(), ceiling)),
+          RefusalReason.ABOVE_CEILING,
+          Gate.because(entry.label(), ceiling),
           entry.label(),
           asking);
       return new Inspected.Refused(
           Inspected.Reason.ABOVE_CEILING, held.id() + " may not be inspected by '" + by + "'");
     }
-    trail.audit(
-        AuditRecord.Operation.INSPECT,
-        held.id(),
-        by,
-        AuditRecord.Outcome.ALLOWED,
-        Why.nothing(),
-        entry.label(),
-        asking);
+    trail.allowed(
+        AuditRecord.Operation.INSPECT, held.id(), by, Why.nothing(), entry.label(), asking);
     return new Inspected.Seen(entry.label(), entry.lineage());
   }
 }

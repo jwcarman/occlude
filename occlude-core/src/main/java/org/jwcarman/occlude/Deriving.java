@@ -67,12 +67,12 @@ final class Deriving {
     AtomicReference<String> because = new AtomicReference<>();
     Derived<O> result = deriving(spec, parents, asking, label, because);
     if (result instanceof Derived.Refused<O> refused) {
-      trail.audit(
+      trail.refused(
           AuditRecord.Operation.DERIVE,
           parents.isEmpty() ? storage.freshId() : parents.getFirst().id(),
           spec.name(),
-          AuditRecord.Outcome.REFUSED,
-          Why.of(refused.reason().name(), because.get()),
+          RefusalReason.of(refused.reason()),
+          because.get(),
           label.get(),
           asking);
     }
@@ -391,12 +391,12 @@ final class Deriving {
       // happened, so this is a refusal that has to be recorded, not an exception that escapes
       // past the audit -- the same rule that covers application code failing after it has seen
       // the value.
-      trail.audit(
+      trail.refused(
           AuditRecord.Operation.DERIVE,
           newId,
           id,
-          AuditRecord.Outcome.REFUSED,
-          Why.of("could not be written"),
+          RefusalReason.NO_SUCH_VALUE,
+          "could not be written",
           label,
           context);
       return new Derived.Refused<>(

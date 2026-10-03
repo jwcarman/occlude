@@ -15,6 +15,7 @@
  */
 package org.jwcarman.occlude;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.jwcarman.occlude.lattice.Label;
@@ -32,33 +33,80 @@ import org.jwcarman.occlude.storage.StorageUnreadableException;
 final class Trail {
 
   private final Storage storage;
+  private final RefusalListener refusals;
 
   Trail(Storage storage) {
+    this(storage, event -> {});
+  }
+
+  Trail(Storage storage, RefusalListener refusals) {
     this.storage = storage;
+    this.refusals = refusals;
   }
 
   /**
-   * Writes the record. There is no way to turn this off, which is the point of it.
+   * Writes the line for an operation that was allowed. There is no way to turn this off, which is
+   * the point of it.
    *
    * <p>A control whose log is silently dropping entries still produces the report, so an access
    * that cannot be audited does not happen.
    */
-  void audit(
+  void allowed(
       AuditRecord.Operation operation,
       String value,
       String target,
-      AuditRecord.Outcome outcome,
       Why why,
       Label label,
       AccessContext context) {
-    storage.append(entry(operation, value, target, outcome, why, label, context));
+    storage.append(
+        entry(operation, value, target, AuditRecord.Outcome.ALLOWED, why, label, context));
   }
 
-  /** The reason a line gives when what a store holds turned out not to be what it signed. */
-  static final String NOT_AS_SIGNED = "NOT_AS_SIGNED";
+  /**
+   * Writes the line for a refusal, then tells the listener.
+   *
+   * <p>The reason is a {@link RefusalReason}, never free text, so every refused line gives a code
+   * that an alert can match. The prose belongs in the detail, which is encrypted.
+   */
+  void refused(
+      AuditRecord.Operation operation,
+      String value,
+      String target,
+      RefusalReason reason,
+      String detail,
+      Label label,
+      AccessContext context) {
+    storage.append(
+        entry(
+            operation,
+            value,
+            target,
+            AuditRecord.Outcome.REFUSED,
+            Why.of(reason.name(), detail),
+            label,
+            context));
+    told(operation, value, target, reason, context);
+  }
 
-  /** The reason a line gives when a store could not read back what it holds. */
-  static final String UNREADABLE = "UNREADABLE";
+  /**
+   * Tells the listener of a refusal whose line is already written.
+   *
+   * <p>Only after the store accepts the line, so an event never describes a line that is not in the
+   * record. A listener that throws changes nothing: the outcome is already decided. The event is
+   * built inside the same guard, so that nothing here can throw past a line that is written.
+   */
+  private void told(
+      AuditRecord.Operation operation,
+      String value,
+      String target,
+      RefusalReason reason,
+      AccessContext context) {
+    try {
+      refusals.refused(new RefusalEvent(Instant.now(), operation, target, value, reason, context));
+    } catch (RuntimeException _) {
+      // A listener never decides an outcome, and this outcome is already decided.
+    }
+  }
 
   /**
    * Reads from storage, and records it if what came back was not what was signed.
@@ -77,9 +125,9 @@ final class Trail {
     try {
       return read.get();
     } catch (StorageIntegrityException e) {
-      throw recorded(e, NOT_AS_SIGNED, operation, value, target, context);
+      throw recorded(e, RefusalReason.NOT_AS_SIGNED, operation, value, target, context);
     } catch (StorageUnreadableException e) {
-      throw recorded(e, UNREADABLE, operation, value, target, context);
+      throw recorded(e, RefusalReason.UNREADABLE, operation, value, target, context);
     }
   }
 
@@ -91,20 +139,13 @@ final class Trail {
    */
   private <E extends RuntimeException> E recorded(
       E failure,
-      String reason,
+      RefusalReason reason,
       AuditRecord.Operation operation,
       String value,
       String target,
       AccessContext context) {
     try {
-      audit(
-          operation,
-          value,
-          target,
-          AuditRecord.Outcome.REFUSED,
-          Why.of(reason, failure.getMessage()),
-          null,
-          context);
+      refused(operation, value, target, reason, failure.getMessage(), null, context);
     } catch (RuntimeException unrecorded) {
       failure.addSuppressed(unrecorded);
     }

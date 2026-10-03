@@ -70,10 +70,10 @@ final class Observing {
       settle.accept(context, result);
       return result;
     } catch (StorageIntegrityException e) {
-      context.refused(Trail.NOT_AS_SIGNED, e);
+      context.refused(RefusalReason.NOT_AS_SIGNED.name(), e);
       throw failed(observation, e);
     } catch (StorageUnreadableException e) {
-      context.refused(Trail.UNREADABLE, e);
+      context.refused(RefusalReason.UNREADABLE.name(), e);
       throw failed(observation, e);
     } catch (RefusedException e) {
       context.refused(e.reason(), null);

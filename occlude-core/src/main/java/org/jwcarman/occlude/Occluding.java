@@ -58,12 +58,12 @@ final class Occluding {
     Label label = consulted.answer();
     if (label == null) {
       String detail = "'" + source + "' could not say what it labels values" + consulted.threw();
-      trail.audit(
+      trail.refused(
           AuditRecord.Operation.CONCEAL,
           storage.freshId(),
           source,
-          AuditRecord.Outcome.REFUSED,
-          Why.of("the source could not say how to label this", detail),
+          RefusalReason.SOURCE_CANNOT_LABEL,
+          detail,
           null,
           asking);
       throw new RefusedException("SOURCE_CANNOT_LABEL", detail);
@@ -71,12 +71,12 @@ final class Occluding {
     // One of two places a label can be incomplete. Join only moves up, so an ordinary derivation
     // cannot lose what was said here -- but a privileged one may relabel, so deriving checks too.
     if (gate.leavesARequiredAxisUnsaid(label)) {
-      trail.audit(
+      trail.refused(
           AuditRecord.Operation.CONCEAL,
           storage.freshId(),
           source,
-          AuditRecord.Outcome.REFUSED,
-          Why.of("the label leaves a required axis unsaid"),
+          RefusalReason.INCOMPLETE_LABEL,
+          "the label leaves a required axis unsaid",
           label,
           asking);
       throw new RefusedException(

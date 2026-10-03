@@ -127,14 +127,8 @@ final class Revealing {
           context);
     }
     // Recorded before it is handed over, and only once it is in hand.
-    trail.audit(
-        AuditRecord.Operation.REVEAL,
-        held.id(),
-        to,
-        AuditRecord.Outcome.ALLOWED,
-        Why.nothing(),
-        entry.label(),
-        context);
+    trail.allowed(
+        AuditRecord.Operation.REVEAL, held.id(), to, Why.nothing(), entry.label(), context);
     return new Revealed.Allowed<>(value.get());
   }
 
@@ -146,12 +140,12 @@ final class Revealing {
       String target,
       Label label,
       AccessContext context) {
-    trail.audit(
+    trail.refused(
         AuditRecord.Operation.REVEAL,
         value,
         target,
-        AuditRecord.Outcome.REFUSED,
-        Why.of(reason.name(), because),
+        RefusalReason.of(reason),
+        because,
         label,
         context);
     return new Revealed.Denied<>(reason, detail);

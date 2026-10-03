@@ -1,6 +1,6 @@
 # Refusal events
 
-Status: agreed, not started. James decided every question on 2026-10-03.
+Status: landed. James decided every question on 2026-10-03.
 
 ## What prompted this
 
@@ -60,7 +60,7 @@ public record RefusalEvent(
     AuditRecord.Operation operation,
     String portal,
     String valueId,
-    String reason,
+    RefusalReason reason,
     AccessContext context) {}
 
 @FunctionalInterface
@@ -166,7 +166,7 @@ default RefusalListener async(Executor executor) {
 The event carries:
 
 - the time, the operation and the portal
-- the reason code, for example `ABOVE_CEILING` or `FAILED`
+- the reason, a `RefusalReason`, for example `ABOVE_CEILING` or `FAILED`
 - the value id that the line names
 - the access context, which tells who asked
 
@@ -203,7 +203,7 @@ Spring wraps a plain object in a `PayloadApplicationEvent`, so `RefusalEvent` do
 @EventListener
 @Async
 void on(RefusalEvent event) {
-  if (event.reason().equals("ABOVE_CEILING")) {
+  if (event.reason() == RefusalReason.ABOVE_CEILING) {
     alerts.raise(event.portal(), event.context());
   }
 }
@@ -265,6 +265,11 @@ James decided these on 2026-10-03:
    chooses asynchronous delivery with `@Async`, on Boot's executor. An earlier draft gave the
    starter an executor of Occlude's own, with virtual threads. That draft took a decision from the
    application that Boot already gives to `spring.threads.virtual.enabled`.
+7. **One event type, with an enum for the reason.** `RefusalReason` lists every code that a
+   refused line can give. Every refused line now takes a `RefusalReason`, so no line gives prose
+   as its reason. Five once did: two in `Erasing`, two in `Occluding` and one in `Deriving`. Separate
+   event types for each operation were rejected, because the important alerts cross operations and
+   some reasons, such as `NOT_AS_SIGNED`, belong to no single operation.
 
 ## Testing
 

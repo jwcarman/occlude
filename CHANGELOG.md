@@ -7,7 +7,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Refusal events.** A `RefusalListener` on `Bindings.onRefusal(...)` is told of every refusal,
+  after its line is in the record. The `RefusalEvent` carries the time, the operation, the portal,
+  the reason as a `RefusalReason`, the value id and the access context. It never carries the value, the label, the
+  detail or an exception. A listener that throws changes nothing. `RefusalListener.async(Executor)`
+  moves the work off the request thread. The Spring starter publishes each refusal as an
+  application event, synchronously; add `@Async` to a listener that does slow work. The design is
+  `docs/design/2026-10-03-refusal-events-design.md`.
+
 ### Changed
+
+- **Every refused line gives a code.** Five kinds of refused line gave prose as their reason. They
+  now give `NO_SUCH_VALUE` (an erasure of a value nobody holds, and a derivation whose result could
+  not be written), `NOT_PERMITTED`, `SOURCE_CANNOT_LABEL` and `INCOMPLETE_LABEL`. The prose is in
+  the detail. Lines written before keep what they said, and their signatures stay valid. A query or
+  an alert on the old text must change.
 
 - **A function that throws is `FAILED`, not a decline.** `Derived.Reason` and `Answer.Reason` each
   gain `FAILED`, the reason when a derivation's or a query's own function throws after it was

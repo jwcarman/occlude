@@ -231,6 +231,56 @@ The store can also check itself on a schedule, with each run observed the same w
 [Operating a Store](operating.md#on-a-schedule). To see all of it in Grafana, the example application
 runs the whole stack beside its database; its README says how.
 
+## Refusal events
+
+Every refusal is also a Spring application event, a `RefusalEvent`. Use it when somebody must know
+of a refusal now, and not at the next audit. For example, a reveal above a ceiling from an agent
+that reads untrusted mail can be a prompt-injection attempt.
+
+```java
+@EventListener
+@Async
+void on(RefusalEvent event) {
+  if (event.reason() == RefusalReason.ABOVE_CEILING) {
+    alerts.raise(event.portal(), event.context());
+  }
+}
+```
+
+The event carries the time, the operation, the portal, the reason, the value id and the access
+context. The reason is a `RefusalReason`, the same code that the line gives in the clear. It never carries the value, the label, the detail or an exception. The
+record is the truth; an event is a notice.
+
+The starter publishes each event synchronously, as Spring publishes any event:
+
+- **Add `@Async` for a listener that does slow work.** Without it, the listener runs on the request
+  thread and slows the request. With `@Async` and `@EnableAsync`, Spring Boot's executor delivers
+  the event. Thus, `spring.threads.virtual.enabled` and `spring.task.execution.*` apply, as they do
+  to any other `@Async` work.
+- **Use `@EventListener`, not `@TransactionalEventListener`.** A synchronous listener runs inside
+  the caller's transaction. If that transaction rolls back, a transactional listener does not run.
+  But the line stays in the record, because the store commits it on its own connection. The alert
+  is then lost for a refusal that really happened.
+- **Throttle in the listener.** Occlude does not throttle. A listener that calls a slow service,
+  such as a chat webhook, must limit itself.
+- **A listener cannot change an outcome.** If it throws, the refusal and its line stay as they are.
+
+Occlude does not log refusals; the record is the log. To put refusals in the application log,
+add a listener that logs them, at the level that you choose:
+
+```java
+@EventListener
+void log(RefusalEvent event) {
+  log.warn("{} refused at {}: {}", event.operation(), event.portal(), event.reason());
+}
+```
+
+A `RefusalListener` bean of your own replaces the starter's, and then no events are published.
+
+Plain Java gets the same with `Bindings.of(storage).withIdentity(...).onRefusal(listener)`. The
+trail calls the listener on the request thread. To move the work to an executor that you own, use
+`listener.async(executor)`.
+
 ## Logging the manifest at startup
 
 On by default: the manifest is printed as the charter is bound. Turn it off with

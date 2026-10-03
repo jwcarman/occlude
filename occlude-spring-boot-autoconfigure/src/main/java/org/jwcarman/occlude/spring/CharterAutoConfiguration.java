@@ -20,6 +20,8 @@ import org.jwcarman.occlude.AccessContextProvider;
 import org.jwcarman.occlude.Bindings;
 import org.jwcarman.occlude.Charter;
 import org.jwcarman.occlude.DefaultCharter;
+import org.jwcarman.occlude.RefusalEvent;
+import org.jwcarman.occlude.RefusalListener;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.storage.Storage;
 import org.slf4j.Logger;
@@ -31,6 +33,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.micrometer.observation.autoconfigure.ObservationAutoConfiguration;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -115,9 +118,13 @@ public class CharterAutoConfiguration {
    * as Boot's own observation auto-configurations do. With no handler it records nothing; Actuator
    * or a tracing bridge adds one, and every operation shows up.
    *
+   * <p>Every refusal goes to the {@link RefusalListener} bean. By default, that listener publishes
+   * the refusal as an application event.
+   *
    * @param storage the charter's store, found by name
    * @param access where identity comes from
    * @param observations the registry every operation is observed through
+   * @param refusals the listener told of every refusal
    * @param properties the starter's configuration
    * @return the initializer that binds the charter once the context is ready
    */
@@ -127,16 +134,42 @@ public class CharterAutoConfiguration {
       @Qualifier(STORAGE) Storage storage,
       AccessContextProvider access,
       ObservationRegistry observations,
+      RefusalListener refusals,
       CharterProperties properties) {
     return () -> {
       if (constituted == null) {
         return;
       }
-      constituted.bind(Bindings.of(storage).withIdentity(access).observedBy(observations));
+      constituted.bind(
+          Bindings.of(storage).withIdentity(access).observedBy(observations).onRefusal(refusals));
       if (properties.isLogManifest()) {
         log.info("\n{}", constituted.manifest());
       }
     };
+  }
+
+  /**
+   * Publishes every refusal as an application event, synchronously. Any {@link RefusalListener} the
+   * application contributes replaces it.
+   *
+   * <p>Synchronous, as the Spring Framework reference says events are by default. The listener
+   * chooses asynchronous delivery with {@code @Async}, on Spring Boot's executor, so {@code
+   * spring.threads.virtual.enabled} and {@code spring.task.execution.*} apply as they do to any
+   * other {@code @Async} work.
+   *
+   * <p>Use {@code @EventListener} for a {@link RefusalEvent}, not
+   * {@code @TransactionalEventListener}. A synchronous listener runs inside the caller's
+   * transaction. If that transaction rolls back, a transactional listener does not run, but the
+   * line stays in the record. The alert is then lost for a refusal that really happened.
+   *
+   * @param publisher where the refusals are published
+   * @return a listener that publishes each refusal
+   */
+  @Bean
+  @ConditionalOnBean(Axes.class)
+  @ConditionalOnMissingBean
+  public RefusalListener refusalListener(ApplicationEventPublisher publisher) {
+    return publisher::publishEvent;
   }
 
   /**

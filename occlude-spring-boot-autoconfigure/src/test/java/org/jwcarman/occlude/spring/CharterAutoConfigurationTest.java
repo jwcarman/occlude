@@ -29,6 +29,8 @@ import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,6 +48,9 @@ import org.jwcarman.occlude.Occlude;
 import org.jwcarman.occlude.Occluded;
 import org.jwcarman.occlude.OccludedType;
 import org.jwcarman.occlude.Query;
+import org.jwcarman.occlude.RefusalEvent;
+import org.jwcarman.occlude.RefusalListener;
+import org.jwcarman.occlude.RefusalReason;
 import org.jwcarman.occlude.Reveal;
 import org.jwcarman.occlude.lattice.Axes;
 import org.jwcarman.occlude.lattice.Axis;
@@ -64,9 +69,14 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.micrometer.observation.autoconfigure.ObservationAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.event.EventListener;
 import org.springframework.core.ResolvableType;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 /**
  * Wiring, which is the part that fails quietly.
@@ -850,5 +860,135 @@ class CharterAutoConfigurationTest {
                   .isInstanceOf(IllegalStateException.class)
                   .hasMessageContaining("has been bound");
             });
+  }
+
+  /**
+   * Every refusal is also a Spring application event, published synchronously as Spring's own
+   * guidance says. The application chooses asynchronous delivery with {@code @Async}.
+   */
+  @Nested
+  @DisplayName("publishing refusals")
+  class PublishingRefusals {
+
+    /** A refusal that any application can produce: a reveal of a value nobody is holding. */
+    private static void refuse(ApplicationContext context) {
+      Reveal<String> reporting =
+          context
+              .<Reveal<String>>getBeanProvider(
+                  ResolvableType.forClassWithGenerics(Reveal.class, String.class))
+              .getObject();
+      assertThat(reporting.reveal(Occluded.of("occ_never-minted")).succeeded()).isFalse();
+    }
+
+    @Test
+    @DisplayName("publishes each refusal as an event, on the request thread")
+    void publishes_each_refusal_on_the_request_thread() {
+      runner
+          .withUserConfiguration(AnApplication.class, Listening.class)
+          .run(
+              context -> {
+                assertThat(context).hasNotFailed();
+
+                refuse(context);
+
+                Listening listening = context.getBean(Listening.class);
+                assertThat(listening.events)
+                    .singleElement()
+                    .satisfies(
+                        event -> {
+                          assertThat(event.portal()).isEqualTo("reporting");
+                          assertThat(event.reason()).isEqualTo(RefusalReason.NO_SUCH_VALUE);
+                          assertThat(event.valueId()).isEqualTo("occ_never-minted");
+                        });
+                assertThat(listening.threads).containsExactly(Thread.currentThread().getName());
+              });
+    }
+
+    @Test
+    @DisplayName("delivers to an @Async listener on the application's executor")
+    void delivers_to_an_async_listener() {
+      runner
+          .withUserConfiguration(AnApplication.class, ListeningAsynchronously.class)
+          .run(
+              context -> {
+                assertThat(context).hasNotFailed();
+
+                refuse(context);
+
+                ListeningAsynchronously listening = context.getBean(ListeningAsynchronously.class);
+                assertThat(listening.heardWithinSeconds(5)).isTrue();
+                assertThat(listening.thread()).startsWith("async-refusal-");
+              });
+    }
+
+    @Test
+    @DisplayName("gives way to a listener the application contributes")
+    void gives_way_to_the_applications_listener() {
+      runner
+          .withUserConfiguration(AnApplication.class, OwnListener.class, Listening.class)
+          .run(
+              context -> {
+                assertThat(context).hasNotFailed();
+
+                refuse(context);
+
+                assertThat(context.getBean(OwnListener.class).events).hasSize(1);
+                assertThat(context.getBean(Listening.class).events).isEmpty();
+              });
+    }
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class Listening {
+
+    private final List<RefusalEvent> events = new ArrayList<>();
+    private final List<String> threads = new ArrayList<>();
+
+    @EventListener
+    void on(RefusalEvent event) {
+      events.add(event);
+      threads.add(Thread.currentThread().getName());
+    }
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  @EnableAsync
+  static class ListeningAsynchronously {
+
+    private final CountDownLatch heard = new CountDownLatch(1);
+    private volatile String thread;
+
+    @Bean
+    SimpleAsyncTaskExecutor taskExecutor() {
+      return new SimpleAsyncTaskExecutor("async-refusal-");
+    }
+
+    @Async
+    @EventListener
+    public void on(RefusalEvent event) {
+      thread = Thread.currentThread().getName();
+      heard.countDown();
+    }
+
+    /** Through a method, because {@code @EnableAsync} proxies this bean and its fields are not. */
+    public boolean heardWithinSeconds(long seconds) throws InterruptedException {
+      return heard.await(seconds, TimeUnit.SECONDS);
+    }
+
+    /** Through a method, for the same reason. */
+    public String thread() {
+      return thread;
+    }
+  }
+
+  @Configuration(proxyBeanMethods = false)
+  static class OwnListener {
+
+    private final List<RefusalEvent> events = new ArrayList<>();
+
+    @Bean
+    RefusalListener refusalListener() {
+      return events::add;
+    }
   }
 }

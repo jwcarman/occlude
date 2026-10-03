@@ -54,11 +54,12 @@ final class Operations {
       Axes axes,
       Storage storage,
       AccessContextProvider currentAccess,
-      ObservationRegistry observations) {
+      ObservationRegistry observations,
+      RefusalListener refusals) {
     // Built first, published once. Whoever loses the compare-and-set -- a second bind, or one that
     // raced the first -- is refused the same way, and what it built is never seen by anything.
     Gate gate = new Gate(axes, currentAccess);
-    Trail trail = new Trail(storage);
+    Trail trail = new Trail(storage, refusals);
     Bound operations =
         new Bound(
             new Observing(observations),

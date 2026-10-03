@@ -38,12 +38,20 @@ public final class Bindings {
   private final Storage storage;
   private final AccessContextProvider currentAccess;
   private final ObservationRegistry observations;
+  private final RefusalListener refusals;
+
+  /** Nobody listens, which is harmless: the record still has every line. */
+  private static final RefusalListener NOBODY = event -> {};
 
   private Bindings(
-      Storage storage, AccessContextProvider currentAccess, ObservationRegistry observations) {
+      Storage storage,
+      AccessContextProvider currentAccess,
+      ObservationRegistry observations,
+      RefusalListener refusals) {
     this.storage = storage;
     this.currentAccess = currentAccess;
     this.observations = observations;
+    this.refusals = refusals;
   }
 
   /**
@@ -68,6 +76,10 @@ public final class Bindings {
     return observations;
   }
 
+  RefusalListener refusals() {
+    return refusals;
+  }
+
   /**
    * The same, with every operation observed through this registry.
    *
@@ -83,7 +95,27 @@ public final class Bindings {
     return new Bindings(
         storage,
         currentAccess,
-        Objects.requireNonNull(observations, "observed by some registry, even a no-op one"));
+        Objects.requireNonNull(observations, "observed by some registry, even a no-op one"),
+        refusals);
+  }
+
+  /**
+   * The same, with this listener told of every refusal.
+   *
+   * <p>The trail calls the listener on the request thread, after it writes the refused line. A
+   * listener that throws changes nothing. Use {@link RefusalListener#async} for a listener that
+   * does slow work. Without this, nobody is told, and the record still has every line.
+   *
+   * @param refusals the listener told of every refusal, never null
+   * @return these bindings, with that listener
+   */
+  public Bindings onRefusal(RefusalListener refusals) {
+    return new Bindings(
+        storage,
+        currentAccess,
+        observations,
+        Objects.requireNonNull(
+            refusals, "a listener for refusals, or no call to onRefusal at all"));
   }
 
   /** A store chosen, and identity not yet decided. */
@@ -109,7 +141,8 @@ public final class Bindings {
       return new Bindings(
           storage,
           Objects.requireNonNull(currentAccess, "a charter is told where identity comes from"),
-          ObservationRegistry.NOOP);
+          ObservationRegistry.NOOP,
+          NOBODY);
     }
 
     /**
@@ -121,7 +154,7 @@ public final class Bindings {
      * @return bindings with no identity behind any access
      */
     public Bindings withoutIdentity() {
-      return new Bindings(storage, AccessContextProvider.none(), ObservationRegistry.NOOP);
+      return new Bindings(storage, AccessContextProvider.none(), ObservationRegistry.NOOP, NOBODY);
     }
   }
 }

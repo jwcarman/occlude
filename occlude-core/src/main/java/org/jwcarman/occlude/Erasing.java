@@ -61,12 +61,12 @@ final class Erasing {
       // Recorded like every other operation. Asking to destroy something that is not here is an
       // event worth seeing -- a probe looks exactly like this, repeatedly -- and a trail that
       // records only the attempts that found something cannot show it.
-      trail.audit(
+      trail.refused(
           AuditRecord.Operation.ERASE,
           root.id(),
           erasure.name(),
-          AuditRecord.Outcome.REFUSED,
-          Why.of("no such value"),
+          RefusalReason.NO_SUCH_VALUE,
+          null,
           null,
           asking);
       return new Erased.Refused(Erased.Reason.NO_SUCH_VALUE, Gate.NOT_HOLDING + root.id());
@@ -77,12 +77,12 @@ final class Erasing {
         Gate.Consulted.asking(() -> erasure.mayErase().test(entry.label(), asking));
     if (!permitted.saidYes()) {
       String detail = "'" + erasure.name() + "' may not erase " + root.id() + permitted.threw();
-      trail.audit(
+      trail.refused(
           AuditRecord.Operation.ERASE,
           root.id(),
           erasure.name(),
-          AuditRecord.Outcome.REFUSED,
-          Why.of("not permitted to erase", detail),
+          RefusalReason.NOT_PERMITTED,
+          detail,
           entry.label(),
           asking);
       return new Erased.Refused(Erased.Reason.NOT_PERMITTED, detail);
