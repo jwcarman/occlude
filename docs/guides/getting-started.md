@@ -13,7 +13,7 @@ Import the BOM once, and every Occlude module agrees on a version:
     <dependency>
       <groupId>org.jwcarman.occlude</groupId>
       <artifactId>occlude-bom</artifactId>
-      <version>0.1.0</version>
+      <version>0.2.0</version>
       <type>pom</type>
       <scope>import</scope>
     </dependency>

@@ -6,7 +6,7 @@ Add the starter and declare your axes. That is the whole of the wiring.
 <dependency>
   <groupId>org.jwcarman.occlude</groupId>
   <artifactId>occlude-spring-boot-starter</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
