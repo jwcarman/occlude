@@ -21,6 +21,20 @@ Import the BOM once, and every Occlude module agrees on a version:
 </dependencyManagement>
 ```
 
+The BOM also pins Jackson 3 to 3.1.7, which fixes three CVEs in `jackson-databind` below 3.1.6. Spring
+Boot 4.1.1 manages 3.1.5. Maven uses the first imported BOM that manages an artifact. Thus, put
+`occlude-bom` before `spring-boot-dependencies`. If you put it after, Boot's 3.1.5 wins.
+
+| Your build | Jackson that you get |
+|---|---|
+| `occlude-bom` imported before `spring-boot-dependencies` | 3.1.7 |
+| `occlude-bom` imported after `spring-boot-dependencies` | 3.1.5 |
+| `spring-boot-starter-parent` as the parent, with `occlude-bom` imported | 3.1.7 |
+
+These results come from Maven 3.9.16. To choose another Jackson, import your own
+`tools.jackson:jackson-bom` before `occlude-bom`. With `spring-boot-starter-parent`, the
+`jackson-bom.version` property does not change it, because `occlude-bom` is imported first.
+
 Then one of three, depending on where you are:
 
 | You have | Add |

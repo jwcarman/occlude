@@ -64,6 +64,18 @@
         <artifactId>occlude-spring-boot-starter</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <!-- The one exception to the rule above. Spring Boot 4.1.1 manages Jackson 3.1.5, and
+           jackson-databind below 3.1.6 has CVE-2026-68497, CVE-2026-83557 and CVE-2026-19032. A
+           scanner reports those against Occlude when Occlude's BOM brings them, so the BOM pins a
+           fixed version. An application can still override it. Drop this with the jackson.version
+           pin in occlude-parent, once Boot manages a fixed version. -->
+      <dependency>
+        <groupId>tools.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 

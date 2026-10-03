@@ -19,6 +19,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The BOM pins Jackson 3.1.7.** `occlude-bom` now imports `tools.jackson:jackson-bom` 3.1.7. Spring
+  Boot 4.1.1 manages 3.1.5, and `jackson-databind` below 3.1.6 has CVE-2026-68497, CVE-2026-83557
+  and CVE-2026-19032. Import `occlude-bom` before `spring-boot-dependencies`, or Boot's version
+  wins. An application can still choose its own version; see Getting Started.
 - **Every refused line gives a code.** Five kinds of refused line gave prose as their reason. They
   now give `NO_SUCH_VALUE` (an erasure of a value nobody holds, and a derivation whose result could
   not be written), `NOT_PERMITTED`, `SOURCE_CANNOT_LABEL` and `INCOMPLETE_LABEL`. The prose is in
