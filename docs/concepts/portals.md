@@ -149,7 +149,7 @@ The reason is a code that names a rule and never a value; each refusal also carr
 whoever handles it. When application code a portal runs — a ceiling, a derivation — throws, the
 refusal says which exception, by class name, and never its message. When that code is a derivation's
 or a query's own function, already handed the plaintext, the reason is `FAILED`: a fault, so a caller
-can tell it from a `DECLINED` or a `NOT_AVAILABLE_HERE` without reading the record.
+can tell it from a `DECLINED` or a `NOT_AVAILABLE_HERE` without reading the trail.
 
 ## Occluded references disclose nothing
 
