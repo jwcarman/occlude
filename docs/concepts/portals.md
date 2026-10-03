@@ -140,14 +140,16 @@ that cannot go on without it, which throws a `RefusedException` naming the reaso
 | portal | result | when it succeeds | reasons it refuses |
 |---|---|---|---|
 | `Reveal` | `Revealed` | `Allowed(plaintext)` | `NO_SUCH_VALUE`, `WRONG_TYPE`, `ABOVE_CEILING` |
-| `Derivation`, `Fold` | `Derived` | `Made(occluded)` | `NO_PARENTS`, `NO_SUCH_VALUE`, `WRONG_TYPE`, `ABOVE_CEILING`, `NOT_AVAILABLE_HERE`, `NOT_A_LOWERING`, `DECLINED` |
-| `Query` | `Answer` | `Answered(value)` — see `isTrue()` / `isFalse()` | `NO_SUCH_VALUE`, `WRONG_TYPE`, `ABOVE_CEILING`, `NOT_AVAILABLE_HERE` |
+| `Derivation`, `Fold` | `Derived` | `Made(occluded)` | `NO_PARENTS`, `NO_SUCH_VALUE`, `WRONG_TYPE`, `ABOVE_CEILING`, `NOT_AVAILABLE_HERE`, `NOT_A_LOWERING`, `DECLINED`, `FAILED` |
+| `Query` | `Answer` | `Answered(value)` — see `isTrue()` / `isFalse()` | `NO_SUCH_VALUE`, `WRONG_TYPE`, `ABOVE_CEILING`, `NOT_AVAILABLE_HERE`, `FAILED` |
 | `Erasure` | `Erased` | `Removed(count)` | `NO_SUCH_VALUE`, `NOT_PERMITTED` |
 | `Inspection` | `Inspected` | `Seen(label, lineage)` | `NO_SUCH_VALUE`, `ABOVE_CEILING` |
 
 The reason is a code that names a rule and never a value; each refusal also carries a `detail` for
 whoever handles it. When application code a portal runs — a ceiling, a derivation — throws, the
-refusal says which exception, by class name, and never its message.
+refusal says which exception, by class name, and never its message. When that code is a derivation's
+or a query's own function, already handed the plaintext, the reason is `FAILED`: a fault, so a caller
+can tell it from a `DECLINED` or a `NOT_AVAILABLE_HERE` without reading the record.
 
 ## Occluded references disclose nothing
 

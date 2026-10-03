@@ -78,7 +78,8 @@ application's function.
 
 If that function then fails — throws, or answers with nothing — the read already happened, so it is
 recorded as a refusal rather than allowed to escape as an exception. A crash must not be quieter
-than a decline.
+than a decline, and it must not pass for one either: a function that throws is refused as
+`FAILED`, one that returns nothing as `DECLINED`.
 
 ## Every derivation makes a new value
 

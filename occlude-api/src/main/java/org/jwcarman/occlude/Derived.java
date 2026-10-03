@@ -62,7 +62,12 @@ public sealed interface Derived<O> {
      */
     NOT_A_LOWERING,
     /** The registered function refused, on its own terms. */
-    DECLINED
+    DECLINED,
+    /**
+     * The registered function threw after it was handed the plaintext. A fault, not a decision, so
+     * it has a reason of its own rather than passing for a decline.
+     */
+    FAILED
   }
 
   /**

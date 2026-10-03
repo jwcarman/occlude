@@ -220,10 +220,12 @@ class PolicyThatCannotDecideTest {
     Derived<String> result = functionThrows.derive(held);
 
     assertThat(result.value()).isEmpty();
-    assertThat(((Derived.Refused<String>) result).reason()).isEqualTo(Derived.Reason.DECLINED);
+    assertThat(((Derived.Refused<String>) result).reason()).isEqualTo(Derived.Reason.FAILED);
     assertThat(storage.audit()).isNotEmpty();
     assertThat(storage.audit())
         .allSatisfy(entry -> assertThat(entry.outcome()).isEqualTo(AuditRecord.Outcome.REFUSED));
+    assertThat(storage.audit().getLast().reason())
+        .hasValueSatisfying(why -> assertThat(why).startsWith("FAILED"));
   }
 
   /**

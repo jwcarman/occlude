@@ -281,7 +281,7 @@ final class Deriving {
       return new Produced<>(
           Optional.empty(),
           new Derived.Refused<>(
-              Derived.Reason.DECLINED,
+              Derived.Reason.FAILED,
               "'" + spec.name() + "' failed while reading the value" + Gate.threw(e)));
     }
   }

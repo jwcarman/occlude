@@ -117,7 +117,6 @@ class QueryEdgeCasesTest {
 
     assertThat(answer)
         .isInstanceOfSatisfying(
-            Answer.Refused.class,
-            r -> assertThat(r.reason()).isEqualTo(Answer.Reason.NOT_AVAILABLE_HERE));
+            Answer.Refused.class, r -> assertThat(r.reason()).isEqualTo(Answer.Reason.FAILED));
   }
 }

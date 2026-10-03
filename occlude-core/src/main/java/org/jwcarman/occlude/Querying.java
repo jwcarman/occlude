@@ -131,8 +131,7 @@ final class Querying {
       // It has already read the plaintext, so this refusal is recorded like any other.
       because.set(Gate.failure(e));
       return new Answer.Refused(
-          Answer.Reason.NOT_AVAILABLE_HERE,
-          "'" + name + "' failed while reading the value" + Gate.threw(e));
+          Answer.Reason.FAILED, "'" + name + "' failed while reading the value" + Gate.threw(e));
     }
     // The answer, never what was asked: the argument can itself be sensitive.
     trail.audit(

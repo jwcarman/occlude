@@ -88,8 +88,13 @@ public sealed interface Answer {
     WRONG_TYPE,
     /** The value's label is above what this question may look at. */
     ABOVE_CEILING,
-    /** This question is not offered in this context, or failed while reading the value. */
-    NOT_AVAILABLE_HERE
+    /** This question is not offered in this context. */
+    NOT_AVAILABLE_HERE,
+    /**
+     * The question threw after it was handed the plaintext. A fault, not a policy outcome, so it
+     * has a reason of its own rather than passing for one.
+     */
+    FAILED
   }
 
   /**
