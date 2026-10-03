@@ -40,17 +40,19 @@ class RefusalReasonTest {
   @Test
   @DisplayName("exists for every reason that a portal's result can give")
   void exists_for_every_portal_reason() {
-    List<String> refusalReasons = namesOf(RefusalReason.class);
+    List<String> portalReasons =
+        Stream.of(
+                Revealed.Reason.class,
+                Derived.Reason.class,
+                Answer.Reason.class,
+                Erased.Reason.class,
+                Inspected.Reason.class)
+            .flatMap(reasons -> namesOf(reasons).stream())
+            .toList();
 
-    assertThat(
-            Stream.of(
-                    Revealed.Reason.class,
-                    Derived.Reason.class,
-                    Answer.Reason.class,
-                    Erased.Reason.class,
-                    Inspected.Reason.class)
-                .flatMap(reasons -> namesOf(reasons).stream()))
-        .allSatisfy(name -> assertThat(refusalReasons).contains(name));
+    // Not empty, or the check below would pass while proving nothing.
+    assertThat(portalReasons).isNotEmpty();
+    assertThat(namesOf(RefusalReason.class)).containsAll(portalReasons);
   }
 
   @Test

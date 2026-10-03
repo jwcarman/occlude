@@ -258,8 +258,8 @@ class RefusalEventsTest {
       elsewhere.reveal(held);
       echo.derive(held);
 
-      assertThat(events).hasSize(2);
       assertThat(events)
+          .hasSize(2)
           .allSatisfy(
               event ->
                   assertThat(event.toString())
