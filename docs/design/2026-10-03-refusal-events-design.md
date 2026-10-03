@@ -5,8 +5,8 @@ Status: agreed, not started. James decided every question on 2026-10-03.
 ## What prompted this
 
 The nessy-ap desk uses Occlude 0.1.0 to quarantine vendor mail. In its first live run, every
-reading failed. The desk saw nothing, because Occlude wrote each refusal to the trail and told
-nobody else. The desk found the failures only when it read the trail.
+reading failed. The desk saw nothing, because Occlude wrote each refusal to the record and told
+nobody else. The desk found the failures only when it read the record.
 
 The `FAILED` reason (landed in `7fe8dd3`) fixes one half of that problem. A caller can now tell a
 fault from a decline. The other half is still open: an application has no way to learn of a
@@ -37,7 +37,7 @@ That is not sufficient for two reasons:
 Authorization systems usually keep two channels:
 
 - **A record of every decision.** Examples are Vault's audit devices, OPA's decision logs, AWS
-  CloudTrail and the SELinux audit log. In Occlude, this is the trail.
+  CloudTrail and the SELinux audit log. In Occlude, this is the record.
 - **An application log that carries faults, not denials.** Spring Security logs a denial at DEBUG
   or TRACE. For alerts, it publishes an `AuthorizationDeniedEvent` that the application can listen
   to.
@@ -115,7 +115,7 @@ try {
 }
 ```
 
-A listener that throws thus has no effect on the outcome or on the trail.
+A listener that throws thus has no effect on the outcome or on the record.
 
 A plain listener runs on the request thread and slows the request if it is slow. Spring Security's
 events behave the same way. The docs must recommend `async(...)` for a listener that does slow
@@ -159,7 +159,7 @@ default RefusalListener async(Executor executor) {
   access context itself.
 - **Delivery is best-effort.** The order of two events is not fixed. An event can be lost at
   shutdown.
-- **The trail is the truth.** An event is a notice. The docs must say this in plain words.
+- **The record is the truth.** An event is a notice. The docs must say this in plain words.
 
 ### What the event carries, and what it does not
 
@@ -240,7 +240,8 @@ application decides the level.
 
 ## What does not change
 
-- The trail is still the only record, and the application still cannot turn it off.
+- The record is still the only account of what happened, and the application still cannot turn it
+  off.
 - A listener cannot change an outcome. A listener that throws has no effect.
 - The observations keep the same keys. No value id or context attribute goes into telemetry.
 - Core starts no threads.
@@ -254,7 +255,7 @@ James decided these on 2026-10-03:
 2. **Core does not log refusals.** Applications log from a listener. This replaces an earlier idea
    to log `FAILED` at WARN, which went against the observability design.
 3. **Refusals only.** Occlude publishes no event for an allowed operation. The allowed operation is
-   the normal case, and the trail already has it.
+   the normal case, and the record already has it.
 4. **The names are `RefusalEvent`, `RefusalListener` and `Bindings.onRefusal(...)`.**
 5. **Delivery belongs to the listener.** Core calls the listener synchronously, and
    `RefusalListener.async(Executor)` moves delivery off the request thread. An earlier draft had

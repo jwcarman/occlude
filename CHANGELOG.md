@@ -12,7 +12,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **A function that throws is `FAILED`, not a decline.** `Derived.Reason` and `Answer.Reason` each
   gain `FAILED`, the reason when a derivation's or a query's own function throws after it was
   handed the plaintext. A derivation reported this as `DECLINED` and a query as
-  `NOT_AVAILABLE_HERE`, so a fault looked like a decision until someone read the trail. Code that
+  `NOT_AVAILABLE_HERE`, so a fault looked like a decision until someone read the record. Code that
   switches over either enum without a default needs the new case. Records already written keep the
   reason they were written with; nothing stored changes.
 

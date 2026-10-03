@@ -23,10 +23,11 @@ measured data. Do not rewrite text that you quote.
 - Use one word for one meaning, and use it every time. The approved dictionary is
   Occlude's own terms: charter, portal, source, sink, occluded reference, label,
   axis, ceiling, lowering, derivation, fold, query, reveal, erasure, inspection,
-  refusal, reason, detail, access context, binding, manifest, store. The audit
-  trail is "the trail", and one entry in it is "a line"; do not call the trail "the
-  record". This dictionary wins over STE's word list. Do not use a synonym for
-  variety.
+  refusal, reason, detail, access context, binding, manifest, store. Three audit
+  terms have three meanings: "the record" is everything that the audit keeps (the
+  concept that `docs/concepts/the-record.md` names); "the trail" is only the keyed
+  hash chain of lines; "a line" is one entry. This dictionary wins over STE's word
+  list. Do not use a synonym for variety.
 - Keep the articles ("the", "a"). Do not write telegraphic text.
 - Do not use idioms, metaphors, slang or phrasal verbs when a single verb exists
   ("start", not "kick off"; "find", not "figure out").
