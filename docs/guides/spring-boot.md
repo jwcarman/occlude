@@ -74,6 +74,56 @@ The starter binds the charter with this, beside the storage. The tenant reaches 
 being threaded through every call, and nothing a caller passes can influence it. Without one, every
 access is nobody in particular.
 
+### Several roles: give the ceiling a capability
+
+An access context holds one value for each key. A person can have several roles, for example
+`ap-clerk` and `auditor`. Do not put the roles into the context and test them in each ceiling.
+Instead, turn the roles into a capability in the provider, and let the ceiling ask about the
+capability:
+
+```java
+private static final Set<String> WORK_CASES = Set.of("ap-clerk", "ap-approver", "auditor");
+
+@Bean
+AccessContextProvider currentAccess() {
+  return () -> {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || !auth.isAuthenticated()) {
+      return AccessContext.empty();
+    }
+    Map<String, String> who = new LinkedHashMap<>();
+    who.put("principal", auth.getName());
+    if (auth.getAuthorities().stream()
+        .map(GrantedAuthority::getAuthority)
+        .anyMatch(WORK_CASES::contains)) {
+      who.put("works-cases", "true");
+    }
+    return AccessContext.of(who);
+  };
+}
+```
+
+```java
+d -> d.accepting(ctx -> ctx.has("works-cases", "true")
+    ? Ceiling.of(INTEGRITY, Constraint.any())
+    : Ceiling.nothing())
+```
+
+This is better than a list of roles in each ceiling, for three reasons:
+
+- **The ceiling states the rule.** "People who work cases may read this" is what the ceiling
+  enforces. A list of roles only implies it.
+- **A change to the roles changes one place.** When a new role works cases, only the provider
+  changes. With role lists in the ceilings, each ceiling that must allow the new role needs a
+  change. A ceiling that you miss refuses, and nothing tells you.
+- **The provider already translates identity.** Its job is to turn what the identity system says
+  into what the charter asks about.
+
+The record stores the access context on every line, so the capability flag is in the record too.
+An auditor sees that the reader worked cases, not which role gave that right. If the auditor must
+see the role, put the principal in the context, as above, and find the roles from the identity
+system.
+
 ## Storage
 
 Put `occlude-jdbc` on the classpath and give it a `DataSource`, keys and a root, or contribute a
