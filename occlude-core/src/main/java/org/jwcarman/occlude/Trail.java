@@ -35,10 +35,6 @@ final class Trail {
   private final Storage storage;
   private final RefusalListener refusals;
 
-  Trail(Storage storage) {
-    this(storage, event -> {});
-  }
-
   Trail(Storage storage, RefusalListener refusals) {
     this.storage = storage;
     this.refusals = refusals;

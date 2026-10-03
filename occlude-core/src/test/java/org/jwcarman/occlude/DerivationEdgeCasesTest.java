@@ -71,7 +71,9 @@ class DerivationEdgeCasesTest {
     MemoryStorage storage = new MemoryStorage();
     Deriving deriving =
         new Deriving(
-            new Gate(Axes.of(TENANT), AccessContextProvider.none()), new Trail(storage), storage);
+            new Gate(Axes.of(TENANT), AccessContextProvider.none()),
+            new Trail(storage, event -> {}),
+            storage);
     DerivationSpec<String> oneParent =
         new DerivationSpec<>(
             "upper",
