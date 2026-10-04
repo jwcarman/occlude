@@ -31,7 +31,7 @@ import org.jwcarman.occlude.lattice.Axis;
  * What a database-backed store needs that has nothing to do with policy.
  *
  * <p>Deliberately not a kind of {@link Charter}. An application declares what it allows -- the
- * labels, the doors, who may reach them -- without knowing or caring where the values end up, and
+ * labels, the portals, who may reach them -- without knowing or caring where the values end up, and
  * the code declaring portals should compile against the generic thing. This is the other half:
  * where the tables are, how values are serialised, whose keys encrypt them, and what the record is
  * signed under. Both are asked for the {@link JdbcStorage} a charter is bound to.

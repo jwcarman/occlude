@@ -12,7 +12,7 @@ Three rules decide where the line is:
    authority is handed out rather than looked up, and weakening anything takes an explicit act.
 2. **Weakening is visible.** What makes protection weaker shows up at startup or in the
    [manifest](guides/reviewing.md) — a lowering, a question asked with something that could carry
-   the value, a door nothing can reach — never silently.
+   the value, a portal nothing can reach — never silently.
 3. **It does not defend against deliberate misuse from inside the process.** Code in the same JVM
    that means to get around it can: by reflection, with the `DataSource` and the keys from
    configuration, from a heap dump. Occlude makes the honest path easy and the dishonest one

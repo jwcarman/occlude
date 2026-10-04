@@ -30,7 +30,7 @@ import org.jwcarman.occlude.manifest.Manifest;
  * What an application declares its authority with.
  *
  * <p>A charter constitutes the portals an application holds: the questions it asks about every
- * value, the doors values may reach, the transformations that are legal, and what each of them is
+ * value, the portals values may reach, the transformations that are legal, and what each of them is
  * entitled to see. Declaring one hands back the portal, and holding that portal is the only way to
  * perform the operation -- there is no registry and no lookup by name.
  *
@@ -64,24 +64,24 @@ public interface Charter {
   // ------------------------------------------------------------------ constituting authority
 
   /**
-   * A door values enter through, labelled the same way every time.
+   * A portal values enter through, labelled the same way every time.
    *
-   * @param <T> what the door admits
+   * @param <T> what the portal admits
    * @param name the name the manifest and the record know it by, never blank
    * @param type the type of value that enters
    * @param label the label every value entering is given
-   * @return the door
+   * @return the portal
    */
   <T> Occlude<T> source(String name, OccludedType<T> type, Label label);
 
   /**
    * The same, for a label that depends on who is acting.
    *
-   * @param <T> what the door admits
+   * @param <T> what the portal admits
    * @param name the name the manifest and the record know it by, never blank
    * @param type the type of value that enters
    * @param labelling chooses the label from who is acting
-   * @return the door
+   * @return the portal
    */
   <T> Occlude<T> source(
       String name, OccludedType<T> type, Function<AccessContext, Label> labelling);
@@ -89,11 +89,11 @@ public interface Charter {
   /**
    * The same, for a label that also depends on what is arriving.
    *
-   * @param <T> what the door admits
+   * @param <T> what the portal admits
    * @param name the name the manifest and the record know it by, never blank
    * @param type the type of value that enters
    * @param labelling chooses the label from what is arriving and who is acting
-   * @return the door
+   * @return the portal
    */
   <T> Occlude<T> source(
       String name, OccludedType<T> type, BiFunction<T, AccessContext, Label> labelling);
@@ -119,27 +119,27 @@ public interface Charter {
   Sink sink(String name, Ceiling ceiling, OccludedType<?>... reads);
 
   /**
-   * A door that reads one type, and the portal that reads it through that door, in one step.
+   * A sink that reads one type, and the portal that reads it through that sink, in one step.
    *
    * <p>The common case. {@code reveal(name, ceiling, MAIL)} is {@code sink(name, ceiling,
-   * MAIL).reading(MAIL)}; a door that reads several types is still declared with {@link #sink}.
+   * MAIL).reading(MAIL)}; a portal that reads several types is still declared with {@link #sink}.
    *
-   * @param <T> what the door reads
+   * @param <T> what the portal reads
    * @param name the name the manifest and the record know it by, never blank
-   * @param ceiling chooses what the door may see from who is asking
-   * @param type the type the door reads and the portal reveals
-   * @return the portal that reads that type through the door
+   * @param ceiling chooses what the portal may see from who is asking
+   * @param type the type the sink reads and the portal reveals
+   * @return the portal that reads that type through the sink
    */
   <T> Reveal<T> reveal(String name, Function<AccessContext, Ceiling> ceiling, OccludedType<T> type);
 
   /**
    * The same, for a ceiling that does not depend on who is asking.
    *
-   * @param <T> what the door reads
+   * @param <T> what the portal reads
    * @param name the name the manifest and the record know it by, never blank
-   * @param ceiling what the door may see, whoever is asking
-   * @param type the type the door reads and the portal reveals
-   * @return the portal that reads that type through the door
+   * @param ceiling what the portal may see, whoever is asking
+   * @param type the type the sink reads and the portal reveals
+   * @return the portal that reads that type through the sink
    */
   <T> Reveal<T> reveal(String name, Ceiling ceiling, OccludedType<T> type);
 
@@ -269,11 +269,11 @@ public interface Charter {
   /**
    * The same, rendered for one access.
    *
-   * <p>A door whose ceiling reads the tenant out of the access cannot say what it accepts without
-   * one, and in a multi-tenant application that is every door. Rendered for nobody, such a manifest
-   * reports that it could not evaluate a single ceiling -- useless in exactly the case it is for.
-   * There is no such thing as what a door accepts in general, so a manifest names the access it was
-   * rendered for and a build renders one per representative caller.
+   * <p>A portal whose ceiling reads the tenant out of the access cannot say what it accepts without
+   * one, and in a multi-tenant application that is every portal. Rendered for nobody, such a
+   * manifest reports that it could not evaluate a single ceiling -- useless in exactly the case it
+   * is for. There is no such thing as what a portal accepts in general, so a manifest names the
+   * access it was rendered for and a build renders one per representative caller.
    *
    * @param as the access the manifest is rendered for
    * @return what this charter permits that access

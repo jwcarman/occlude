@@ -53,7 +53,7 @@ public class CharterProperties {
   /**
    * Whether to write what this application allows into the log at startup.
    *
-   * <p>On by default. The manifest is the whole access space in one page -- every door, what it
+   * <p>On by default. The manifest is the whole access space in one page -- every portal, what it
    * accepts, and which operations weaken a label -- and it is worth somebody seeing it go past when
    * it changes.
    */

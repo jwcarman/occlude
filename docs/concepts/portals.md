@@ -15,8 +15,8 @@ one object able to perform that operation — a **portal**.
 
 ## Authority is held, never looked up
 
-There is deliberately no method that trades a name for the door it names. A name is what the
-manifest and the audit trail call a door; it is not a way through it.
+There is deliberately no method that trades a name for the portal it names. A name is what the
+manifest and the audit trail call a portal; it is not a way through it.
 
 Miller's four ways to come by a capability are initial conditions, parenthood, endowment and
 introduction. **Lookup by name is not among them**, and adding it would quietly return this library
@@ -44,12 +44,12 @@ Occlude<Mail> customerMail =
 Occluded<Mail> held = customerMail.occlude(incoming);   // no label argument
 ```
 
-The door carries its own label, decided once when it was declared, so code holding it writes at
-that label and no other. A service handed the door for customer-submitted disputes **cannot create
+The portal carries its own label, decided once when it was declared, so code holding it writes at
+that label and no other. A service handed the portal for customer-submitted disputes **cannot create
 cardholder data** — not "is refused at runtime", but cannot express the operation, because the only
-door it has says something else. Writing at another tenant's label is less refused than unsayable.
+portal it has says something else. Writing at another tenant's label is less refused than unsayable.
 
-The label may still depend on who is acting: a door fixes what is a property of the door itself —
+The label may still depend on who is acting: a portal fixes what is a property of the portal itself —
 what arrives there, how far it is trusted, how sensitive it is — and reads the tenant from ambient
 context. So it is not quite a constant, but nothing a caller passes influences it. A source takes its
 label in one of three shapes:
@@ -61,14 +61,14 @@ charter.source("claims", CLAIM, (claim, ctx) -> labelFor(claim, ctx));    // and
 ```
 
 The last reads the arriving value itself — a claim that mentions a card is labelled `CARDHOLDER`,
-say. It is the door's function doing it, declared once and listed in the manifest, not the caller.
+say. It is the portal's function doing it, declared once and listed in the manifest, not the caller.
 Occluding is refused with a `RefusedException` when the function cannot say (`SOURCE_CANNOT_LABEL`)
 or leaves a required axis unsaid (`INCOMPLETE_LABEL`).
 
 !!! note "Occluding is the axiom"
     Occluding is where data enters, and at that moment there is no earlier label to check against.
     Monotone join makes it a *theorem* that derivation cannot weaken a label; occluding is the
-    axiom that theorem rests on. Declaring doors makes those axioms enumerable, which is all
+    axiom that theorem rests on. Declaring portals makes those axioms enumerable, which is all
     anything can do.
 
 ## There is no reveal without a sink
@@ -77,7 +77,7 @@ or leaves a required axis unsaid (`INCOMPLETE_LABEL`).
 Reveal<Invoice> paymentProcessor =
     charter.reveal("payment-processor", ctx -> ceiling(ctx, ENDORSED, CARDHOLDER), INVOICE);
 
-// a door that reads several types is declared once, and read through per type:
+// a portal that reads several types is declared once, and read through per type:
 Sink vendor = charter.sink("vendor", ctx -> ceiling(ctx, ENDORSED, ORDINARY), MAIL, NOTE);
 Reveal<Mail> vendorMail = vendor.reading(MAIL);
 

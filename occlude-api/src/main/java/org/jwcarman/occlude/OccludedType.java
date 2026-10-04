@@ -42,7 +42,7 @@ import org.jwcarman.codec.TypeRef;
  * and the store checks each one against the class it was declared as, which no object is an
  * instance of when that class is primitive.
  *
- * <p>Holding one grants nothing -- it names a type, it does not open a door -- and a mismatched
+ * <p>Holding one grants nothing -- it names a type, it does not open a portal -- and a mismatched
  * pairing gains nothing either. A reader still only reaches names its sink declared and its store
  * recorded, so the worst a wrong pairing does is fail to decode something you could already read.
  *

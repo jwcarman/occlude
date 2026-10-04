@@ -334,7 +334,8 @@ final class Deriving {
     }
     // atOrBelow cannot see this one. An axis a label stops mentioning joins as bottom, so a label
     // that drops one is at or below everything -- including the label it came from. The check that
-    // runs at the door has to run here too, because this is the other way a value can come to exist
+    // runs at the portal has to run here too, because this is the other way a value can come to
+    // exist
     // with a required axis missing.
     if (gate.leavesARequiredAxisUnsaid(label)) {
       because.set(Gate.because(label, joined));

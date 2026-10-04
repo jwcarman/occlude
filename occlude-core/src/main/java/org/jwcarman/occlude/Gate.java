@@ -63,9 +63,9 @@ final class Gate {
   /**
    * Whether a label leaves an axis unsaid that this store said it must not.
    *
-   * <p>Checked at the one door a label is written through. Unsaid is the bottom of an axis's order,
-   * which is below every ceiling, so a value that left a required axis unsaid would be readable by
-   * everyone -- silently, and in the direction nobody would notice.
+   * <p>Checked at the one portal a label is written through. Unsaid is the bottom of an axis's
+   * order, which is below every ceiling, so a value that left a required axis unsaid would be
+   * readable by everyone -- silently, and in the direction nobody would notice.
    */
   boolean leavesARequiredAxisUnsaid(Label label) {
     for (Axis<?> axis : axes) {
@@ -169,7 +169,7 @@ final class Gate {
    * <p>A refusal message that explains itself is an oracle: code that may not read a value could
    * still learn its classification by asking often enough and reading the answers. So the label and
    * the ceiling go to the audit, where they are protected like any other label, and the caller
-   * learns which door said no and a coarse reason.
+   * learns which portal said no and a coarse reason.
    */
   static String because(Label label, Object ceiling) {
     return "labelled " + label + "; accepts " + ceiling;

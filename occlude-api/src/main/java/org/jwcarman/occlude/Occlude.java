@@ -19,23 +19,23 @@ package org.jwcarman.occlude;
  * The authority to occlude a value: to hand over the real thing and leave with an occluded
  * reference that stands in for it.
  *
- * <p><b>There is no label argument.</b> This door carries its own, decided once when it was
- * declared, so code holding it writes at that label and no other. A service handed the door for
+ * <p><b>There is no label argument.</b> This portal carries its own, decided once when it was
+ * declared, so code holding it writes at that label and no other. A service handed the portal for
  * customer-submitted disputes cannot create cardholder data -- not "is refused at runtime", but
- * cannot express the operation, because the only door it has says something else. "Which code in
+ * cannot express the operation, because the only portal it has says something else. "Which code in
  * this application can create an endorsed value?" is answered by grepping for a constructor
  * parameter.
  *
  * <p><b>Declared during configuration, obtained only by being handed one.</b> There is deliberately
- * no method that trades a name for the door it names. A name is what the manifest and the audit
- * trail call this door; it is not a way through it. Miller's four ways to come by a capability are
- * initial conditions, parenthood, endowment and introduction -- lookup by name is not among them,
- * and adding it here would quietly return this library to policing labels rather than distributing
- * authority.
+ * no method that trades a name for the portal it names. A name is what the manifest and the audit
+ * trail call this portal; it is not a way through it. Miller's four ways to come by a capability
+ * are initial conditions, parenthood, endowment and introduction -- lookup by name is not among
+ * them, and adding it here would quietly return this library to policing labels rather than
+ * distributing authority.
  *
- * <p>The label may still depend on who is acting. A door fixes the parts that are properties of the
- * door itself -- what arrives there, how far it is trusted, how sensitive it is -- and reads the
- * rest, typically a tenant, from ambient context. So it is not quite a constant, but nothing a
+ * <p>The label may still depend on who is acting. A portal fixes the parts that are properties of
+ * the portal itself -- what arrives there, how far it is trusted, how sensitive it is -- and reads
+ * the rest, typically a tenant, from ambient context. So it is not quite a constant, but nothing a
  * caller passes influences it.
  *
  * <p>What this does not establish is that a value deserves the label it gets. Occluding is where
@@ -43,7 +43,7 @@ package org.jwcarman.occlude;
  * it a theorem that derivation cannot weaken a label; occluding is the axiom that theorem rests on.
  * This makes the axioms enumerable, which is all anything can do.
  *
- * @param <T> the type of value this door accepts
+ * @param <T> the type of value this portal accepts
  */
 public interface Occlude<T> {
 
@@ -61,8 +61,8 @@ public interface Occlude<T> {
    * @param value the real value, never null
    * @return the occluded reference that stands in for it
    * @throws IllegalArgumentException if the value is null
-   * @throws RefusedException if this door cannot say how to label what arrived
-   * @throws IllegalStateException if this door was never brought into force
+   * @throws RefusedException if this portal cannot say how to label what arrived
+   * @throws IllegalStateException if this portal was never brought into force
    */
   Occluded<T> occlude(T value);
 }

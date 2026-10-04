@@ -143,7 +143,7 @@ class CharterAutoConfigurationTest {
 
   /**
    * An application with enough vocabulary to exercise every section of the charter endpoint: a
-   * derivation, a question, and a door that reads a type nothing here ever produces -- the
+   * derivation, a question, and a portal that reads a type nothing here ever produces -- the
    * endpoint's one provable finding.
    */
   @Configuration(proxyBeanMethods = false)
@@ -383,7 +383,7 @@ class CharterAutoConfigurationTest {
 
               // One named declaration.
               assertThat(found(endpoint.named("sources", "notes"))).containsEntry("name", "notes");
-              assertThat(endpoint.named("sources", "no-such-door").getStatus())
+              assertThat(endpoint.named("sources", "no-such-portal").getStatus())
                   .isEqualTo(WebEndpointResponse.STATUS_NOT_FOUND);
 
               // A type nobody declared is answered, not refused.
@@ -395,7 +395,7 @@ class CharterAutoConfigurationTest {
 
   /**
    * The rest of what the endpoint can be asked: every section by name, a declaration drilled into
-   * within each of them, and the one finding this charter can prove -- a door reading a type
+   * within each of them, and the one finding this charter can prove -- a portal reading a type
    * nothing here can ever produce.
    */
   @Nested
@@ -480,7 +480,7 @@ class CharterAutoConfigurationTest {
           });
     }
 
-    /** The finding a type-level drill-down can prove: a door reading what nothing produces. */
+    /** The finding a type-level drill-down can prove: a portal reading what nothing produces. */
     @Test
     @DisplayName("carries a type's own finding into its drill-down")
     void carries_a_types_own_finding() {

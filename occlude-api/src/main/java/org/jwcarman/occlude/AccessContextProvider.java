@@ -30,10 +30,10 @@ import java.util.function.Supplier;
  * store has no opinion about how a request scope works.
  *
  * <p><b>Whatever this returns is taken as fact.</b> It is the one input a caller cannot argue with:
- * the ceiling of every door is evaluated against it, and a caller that could influence it could let
- * itself through. So it has to read from somewhere the caller does not control -- a verified token,
- * a header a gateway sets and strips from client traffic -- and never from anything the request
- * body carries.
+ * the ceiling of every portal is evaluated against it, and a caller that could influence it could
+ * let itself through. So it has to read from somewhere the caller does not control -- a verified
+ * token, a header a gateway sets and strips from client traffic -- and never from anything the
+ * request body carries.
  *
  * <p>Returning an empty context is allowed and means nobody is acting. That is not a way through:
  * an empty context has no tenant, no role and no clearance, so a ceiling that asks for any of them

@@ -25,9 +25,9 @@ joins its parents' labels, so an ordinary derivation *cannot* weaken one — tha
 the algebra rather than a rule somebody enforces. This is Denning's lattice model, applied per axis.
 
 **Object capabilities.** Authority is held, never looked up. There is no registry and no
-`charter.get("customer-mail")`. Code can occlude at a door because something handed it that door,
+`charter.get("customer-mail")`. Code can occlude at a portal because something handed it that portal,
 so *"what can this class do?"* is answered by reading its constructor parameters — and a service
-handed the door for customer disputes **cannot express** the operation of creating cardholder data.
+handed the portal for customer disputes **cannot express** the operation of creating cardholder data.
 
 ## What it is for
 

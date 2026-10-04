@@ -26,7 +26,7 @@ import java.util.Set;
  * declaration that clashes with an earlier one.
  *
  * <p>Nothing at runtime reads this: every portal carries its own declaration. It exists because a
- * manifest has to say what the whole charter permits, and because two doors under one name or two
+ * manifest has to say what the whole charter permits, and because two portals under one name or two
  * types under one stored name are mistakes worth refusing at startup.
  *
  * <p>Not thread-safe on its own. {@link DefaultCharter} reads and writes it only under one lock,
@@ -39,11 +39,11 @@ final class Declarations {
   private final Map<String, OccludedType<?>> sources = new LinkedHashMap<>();
 
   /**
-   * What each door hands out.
+   * What each portal hands out.
    *
-   * <p>The readable types live in the portal handed back to whoever declared the door, so without
+   * <p>The readable types live in the portal handed back to whoever declared the sink, so without
    * this nothing could report what a sink produces or work out whether anything produces what it
-   * reads. A door nobody can reach is dead authority, and it is also the shape a half-applied
+   * reads. A portal nobody can reach is dead authority, and it is also the shape a half-applied
    * rename takes.
    */
   private final Map<String, Set<String>> sinkReads = new LinkedHashMap<>();

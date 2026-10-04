@@ -27,7 +27,7 @@ package org.jwcarman.occlude;
  * it enforces the ceiling that was already there, and refuses a type that was not declared. So a
  * reader can be constituted where it is needed and thrown away, and <b>a sink is safe to hand to
  * the service that talks to that subsystem</b>. It holds no configuration and cannot declare a new
- * door -- only look through this one.
+ * portal -- only look through this one.
  *
  * <p>It is still more authority than any one reader, because it can constitute a reader for every
  * type it was declared to read. Hand out the sink when a service talks to the whole subsystem; hand

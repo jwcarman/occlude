@@ -23,21 +23,21 @@ package org.jwcarman.occlude;
  * other, and each is named for what it does rather than for where it sits in a dataflow -- two
  * flows cross here, plaintext and occluded references, so "source" and "sink" cannot say which one
  * they belong to. Those words name the places at either end instead: a {@link Sink} is where a
- * value leaves to, and this is one door into it.
+ * value leaves to, and this is one portal into it.
  *
  * <p><b>Declared during configuration, obtained only by being handed one.</b> Before this existed,
- * a caller named the door it wanted, and the factory for those names was public -- so any class
- * could construct the name of any door and present it, and the only thing between an arbitrary
+ * a caller named the portal it wanted, and the factory for those names was public -- so any class
+ * could construct the name of any portal and present it, and the only thing between an arbitrary
  * caller and cardholder plaintext was a ceiling re-checked on every call. Holding this is now the
  * authority, and there is no method that trades a name for one.
  *
- * <p>The ceiling is still checked, and still may depend on who is asking: this is a door, not a
- * bypass. What changed is that reaching the door at all is no longer something a caller can decide
- * for itself.
+ * <p>The ceiling is still checked, and still may depend on who is asking: this is a portal, not a
+ * bypass. What changed is that reaching the portal at all is no longer something a caller can
+ * decide for itself.
  *
  * <p><b>Narrowed by type as well as by label</b>, because a label alone is a coarse instrument. The
  * day somebody holds a session token at the same label as an invoice -- not maliciously, just
- * without thinking about it -- a door that accepts any type reads it. Saying what comes out is a
+ * without thinking about it -- a portal that accepts any type reads it. Saying what comes out is a
  * second, independent narrowing, and the authority this confers is smaller for it.
  *
  * <p>It also moves the type check left. {@code Reveal<Invoice>.reveal(occludedMail)} does not
@@ -46,33 +46,33 @@ package org.jwcarman.occlude;
  * type you ask for, so what the store actually wrote is still the only ground truth, and it is
  * still what gets compared.
  *
- * @param <T> the type of value this door will hand over, and no other
+ * @param <T> the type of value this portal will hand over, and no other
  */
 public interface Reveal<T> {
 
   /**
    * What comes out of it.
    *
-   * @return the type this door hands over, and the name it is stored under
+   * @return the type this portal hands over, and the name it is stored under
    */
   OccludedType<T> type();
 
   /**
    * Gives back the value an occluded reference stands in for, if its label is at or below what this
-   * door accepts.
+   * portal accepts.
    *
    * <p>Returns a refusal rather than throwing, because being turned away is an ordinary outcome
    * that calling code is expected to handle: show the reference instead, ask for approval, take the
    * other branch.
    *
-   * <p>A refusal says which door said no and a coarse reason. It does not say what the value was
-   * labelled or what this door accepts -- that detail goes to the audit record, because a refusal
+   * <p>A refusal says which portal said no and a coarse reason. It does not say what the value was
+   * labelled or what this portal accepts -- that detail goes to the audit record, because a refusal
    * message that explains itself is an oracle: code that may not read a value could still learn its
    * classification by asking often enough.
    *
    * @param occluded the reference to the value wanted
    * @return the value, or the refusal
-   * @throws IllegalStateException if this door was never brought into force
+   * @throws IllegalStateException if this portal was never brought into force
    */
   Revealed<T> reveal(Occluded<T> occluded);
 }

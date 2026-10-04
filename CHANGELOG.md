@@ -7,6 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **The manifest says "portal", not "door".** The lines that report a charter with no sources and
+  no unreachable portals now use the word that the docs and the types use.
+
+### Documentation
+
+- **"Portal", everywhere.** The docs and the javadoc called a portal a "door" about as often as a
+  "portal". They now say "portal", and "sink" where a sentence is about a sink and the `Reveal` that
+  it hands back.
+
 ## [0.2.0] - 2026-10-03
 
 ### Breaking changes

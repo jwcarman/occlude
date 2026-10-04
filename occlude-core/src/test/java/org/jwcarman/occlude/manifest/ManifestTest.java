@@ -78,7 +78,7 @@ class ManifestTest {
             List.of(),
             List.of(
                 new Manifest.Finding(
-                    "no-writer", "some-door", "reads 'card', which nothing produces"),
+                    "no-writer", "some-portal", "reads 'card', which nothing produces"),
                 new Manifest.Finding(
                     "no-reader", "unrelated", "writes 'invoice', which nothing reads")),
             AccessContext.empty());
@@ -107,7 +107,9 @@ class ManifestTest {
     void keeps_only_the_findings_that_mention_it() {
       Manifest about = manifest.about("card");
 
-      assertThat(about.findings()).extracting(Manifest.Finding::about).containsExactly("some-door");
+      assertThat(about.findings())
+          .extracting(Manifest.Finding::about)
+          .containsExactly("some-portal");
     }
 
     @Test

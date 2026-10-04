@@ -151,8 +151,8 @@ class BillingScenarioTest {
   /**
    * The generic labelling function every source below is declared with: it reads the whole label,
    * axis by axis, out of whatever context {@link #holdAs} put there. An source is still the only
-   * door a value can enter through, and its name is still a fixed property of the door -- but the
-   * four label axes themselves come from the access, the same way a tenant always did.
+   * portal a value can enter through, and its name is still a fixed property of the portal -- but
+   * the four label axes themselves come from the access, the same way a tenant always did.
    */
   private static Label labelFrom(AccessContext ctx) {
     return label(
@@ -183,7 +183,7 @@ class BillingScenarioTest {
 
   private final DefaultCharter config = new DefaultCharter(TENANT, INTEGRITY, TLP, DATA_CLASS);
 
-  // ---------------------------------------------------------------- doors in
+  // ---------------------------------------------------------------- portals in
 
   private final Occlude<String> customerMail =
       config.source("customer-mail", STRING_TYPE, BillingScenarioTest::labelFrom);
@@ -203,10 +203,10 @@ class BillingScenarioTest {
   private final Occlude<Account> accounts =
       config.source("accounts", ACCOUNT_TYPE, BillingScenarioTest::labelFrom);
 
-  // ---------------------------------------------------------------- doors out: one per (door,
-  // type) pair. A reader is narrowed by type as well as by label, so a door that used to admit
+  // ---------------------------------------------------------------- sinks: one per (sink,
+  // type) pair. A reader is narrowed by type as well as by label, so a sink that used to admit
   // whatever handle a caller presented is now one capability per shape of value it actually reads.
-  // Holding everything text-shaped as a plain String (rather than one wrapper record per door)
+  // Holding everything text-shaped as a plain String (rather than one wrapper record per sink)
   // keeps this down to one text reader per sink instead of three.
 
   // A vendor's model: nothing personal, nothing unendorsed.
@@ -402,13 +402,13 @@ class BillingScenarioTest {
   }
 
   /**
-   * Holds a value at exactly the label given, by encoding it into the ambient context a door's
+   * Holds a value at exactly the label given, by encoding it into the ambient context a portal's
    * generic {@link #labelFrom} reads back out, then restoring whatever the edge held before.
    *
    * <p>This is the plumbing equivalent of the old {@code config.hold(value, type, label)}: the
    * label is still asserted by trusted code at a boundary, not computed, and still fixed before the
    * value is stored. What changed is the mechanism -- there is no method left that takes a label as
-   * an argument, so the label has to travel through the one channel a door reads.
+   * an argument, so the label has to travel through the one channel a portal reads.
    */
   private <T> Occluded<T> holdAs(
       String tenant,
@@ -687,9 +687,9 @@ class BillingScenarioTest {
 
     /**
      * This used to invent a sink name and assert the config refused it. There is no longer a method
-     * that takes one: a door is reached by holding the sink, and outlets are declared during
-     * configuration. What is worth asserting is that the door really is gone, because it is exactly
-     * the sort of thing that gets added back for a test fixture and left there.
+     * that takes one: a portal is reached by holding the sink, and outlets are declared during
+     * configuration. What is worth asserting is that the portal really is gone, because it is
+     * exactly the sort of thing that gets added back for a test fixture and left there.
      */
     @Test
     @DisplayName("refuses a sink nobody registered")
@@ -725,7 +725,7 @@ class BillingScenarioTest {
      * <p>Knowing that an occluded reference is a card rather than a display name is a disclosure in
      * itself, which is why {@link Occluded} carries no type at runtime. Checking the type before
      * the ceiling handed that back in the refusal: a reader whose ceiling could never admit the
-     * value still learned what kind of value it was, just by naming the wrong type at the door.
+     * value still learned what kind of value it was, just by naming the wrong type at the portal.
      */
     @Test
     @DisplayName("does not say what kind of value it is to a reader who may not see it")

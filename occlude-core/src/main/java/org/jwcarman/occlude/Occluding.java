@@ -42,11 +42,11 @@ final class Occluding {
   }
 
   /**
-   * Holding through a door, which is holding without being told a label.
+   * Holding through a portal, which is holding without being told a label.
    *
    * <p>No {@code mayHold} check, because there is nothing left to check. That policy existed to
-   * police a label the caller supplied; a door's label is a property of the door, decided during
-   * configuration, and the caller contributes nothing to it.
+   * police a label the caller supplied; a portal's label is a property of the portal, decided
+   * during configuration, and the caller contributes nothing to it.
    */
   <T> Occluded<T> occlude(
       String source, OccludedType<T> type, BiFunction<T, AccessContext, Label> labelling, T value) {
@@ -88,7 +88,7 @@ final class Occluding {
     }
     String id = storage.freshId();
     // One act: the value and the record that it arrived. The source is named, so the record says
-    // which door it came in through.
+    // which portal it came in through.
     AuditRecord entry =
         trail.entry(
             AuditRecord.Operation.CONCEAL,

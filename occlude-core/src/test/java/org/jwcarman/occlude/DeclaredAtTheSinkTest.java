@@ -31,14 +31,14 @@ import org.jwcarman.occlude.storage.MemoryStorage;
  *
  * <p>The ceiling says which labels may reach it and the type list says what it reads. Neither can
  * be widened afterwards, and that is what makes a reader safe to hand out and safe to throw away: a
- * reader is a typed view of a door, not a grant of anything the door did not already have.
+ * reader is a typed view of a sink, not a grant of anything the sink did not already have.
  *
- * <p>Which in turn is what makes the sink itself handable. Give a service the door to the subsystem
- * it talks to and let it take whatever readers it needs. It holds no configuration, so it cannot
- * declare a new door -- only look through this one.
+ * <p>Which in turn is what makes the sink itself handable. Give a service the portal to the
+ * subsystem it talks to and let it take whatever readers it needs. It holds no configuration, so it
+ * cannot declare a new portal -- only look through this one.
  */
 @DisplayName("A sink")
-class DeclaredAtTheDoorTest {
+class DeclaredAtTheSinkTest {
 
   private static final OccludedType<Card> CARD_TYPE = OccludedType.of(Card.class);
   private static final OccludedType<SessionToken> SESSION_TOKEN_TYPE =
@@ -107,7 +107,7 @@ class DeclaredAtTheDoorTest {
         .hasMessageContaining("[card, last4]");
   }
 
-  /** Same label, same ceiling, and still out of reach, because the door never read that type. */
+  /** Same label, same ceiling, and still out of reach, because the portal never read that type. */
   @Test
   @DisplayName("so a value it was never meant to see stays out of reach")
   void a_value_it_was_never_meant_to_see_stays_out_of_reach() {
@@ -119,7 +119,7 @@ class DeclaredAtTheDoorTest {
   }
 
   @Test
-  @DisplayName("has to say what it reads, because a door that reads anything reads everything")
+  @DisplayName("has to say what it reads, because a portal that reads anything reads everything")
   void has_to_say_what_it_reads() {
     assertThatThrownBy(
             () -> config.sink("vague", ctx -> Ceiling.of(TENANT, Constraint.atMost("acme"))))
@@ -129,7 +129,7 @@ class DeclaredAtTheDoorTest {
 
   /** Readers are views, so taking the same one twice is not taking anything twice. */
   @Test
-  @DisplayName("constitutes readers on demand, because they grant nothing the door did not have")
+  @DisplayName("constitutes readers on demand, because they grant nothing the portal did not have")
   void constitutes_readers_on_demand() {
     Occluded<Card> card = cards.occlude(new Card("4111111111114821"));
 

@@ -90,11 +90,11 @@ class WhatACharterPermitsTest {
           d -> d.accepting(ctx -> upTo(Sensitivity.PERSONAL)));
 
   /**
-   * A door whose ceiling reads the access cannot be rendered without one.
+   * A portal whose ceiling reads the access cannot be rendered without one.
    *
-   * <p>In a multi-tenant application that is every door, so a manifest rendered for nobody reported
-   * that it could not evaluate a single ceiling -- the report being useless in exactly the case it
-   * exists for. There is no such thing as what a door accepts in general.
+   * <p>In a multi-tenant application that is every portal, so a manifest rendered for nobody
+   * reported that it could not evaluate a single ceiling -- the report being useless in exactly the
+   * case it exists for. There is no such thing as what a portal accepts in general.
    */
   @Test
   @DisplayName("shows a tenant-scoped ceiling when it is rendered for a tenant")
@@ -138,7 +138,7 @@ class WhatACharterPermitsTest {
    * What an auditor came to find out, and the part of it that is provable.
    *
    * <p>Which types anything can produce, which types anything reads, and whether a path exists
-   * between them is a graph over the declarations -- so a door nobody can reach, or one reading a
+   * between them is a graph over the declarations -- so a portal nobody can reach, or one reading a
    * type nothing makes, is a fact rather than a suspicion. The second is usually a rename that went
    * half-applied, and without this it fails as a refusal at request time instead of at startup.
    */
@@ -149,8 +149,8 @@ class WhatACharterPermitsTest {
   }
 
   @Test
-  @DisplayName("finds a door that reads a type nothing can produce")
-  void finds_a_door_nothing_can_feed() {
+  @DisplayName("finds a portal that reads a type nothing can produce")
+  void finds_a_portal_nothing_can_feed() {
     DefaultCharter orphan = new DefaultCharter(TENANT, SENSITIVITY);
     orphan.source("card-intake", CARD, ctx -> Label.of(TENANT, "acme"));
     orphan.sink("desk", upTo(Sensitivity.ORDINARY), LAST4);
@@ -189,8 +189,8 @@ class WhatACharterPermitsTest {
   }
 
   @Test
-  @DisplayName("names every door and what it accepts")
-  void names_every_door() {
+  @DisplayName("names every portal and what it accepts")
+  void names_every_portal() {
     Manifest manifest = charter.manifest();
 
     assertThat(manifest.sinks()).isNotEmpty();

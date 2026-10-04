@@ -167,7 +167,7 @@ public final class DefaultCharter implements Charter {
   /**
    * The same, for a label that does not depend on what is arriving.
    *
-   * <p>The common case: a door knows what it is, so mail from customers is untrusted whatever it
+   * <p>The common case: a portal knows what it is, so mail from customers is untrusted whatever it
    * says. Reach for the other form when the label is a property of the value -- a classification
    * marking inside a document, a sender the ingest verified, a scan that found card numbers.
    */

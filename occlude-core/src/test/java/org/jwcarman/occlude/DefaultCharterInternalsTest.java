@@ -222,8 +222,8 @@ class DefaultCharterInternalsTest {
 
     /** One step for the common case, and exactly what the two-step form declares. */
     @Test
-    @DisplayName("declares a one-type door and its portal in one step")
-    void declares_a_one_type_door_in_one_step() {
+    @DisplayName("declares a one-type sink and its portal in one step")
+    void declares_a_one_type_sink_in_one_step() {
       DefaultCharter charter = new DefaultCharter(TENANT);
       Occlude<String> notes = charter.source("notes", STRING_TYPE, Label.of(TENANT, "acme"));
       Reveal<String> desk =
@@ -242,8 +242,8 @@ class DefaultCharterInternalsTest {
     }
 
     @Test
-    @DisplayName("refuses a one-step door with no type or no ceiling")
-    void refuses_a_one_step_door_without_a_type_or_ceiling() {
+    @DisplayName("refuses a one-step portal with no type or no ceiling")
+    void refuses_a_one_step_portal_without_a_type_or_ceiling() {
       DefaultCharter charter = new DefaultCharter(TENANT);
       Ceiling anything = Ceiling.of(TENANT, Constraint.any());
 
@@ -338,8 +338,8 @@ class DefaultCharterInternalsTest {
     }
 
     @Test
-    @DisplayName("a reader says what it reads and names its door")
-    void a_reader_says_what_it_reads_and_names_its_door() {
+    @DisplayName("a reader says what it reads and names its portal")
+    void a_reader_says_what_it_reads_and_names_its_portal() {
       assertThat(outbox.type()).isEqualTo(STRING_TYPE);
       assertThat(outbox.toString()).contains("outbox").contains("string");
     }

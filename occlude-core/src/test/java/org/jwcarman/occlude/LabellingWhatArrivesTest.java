@@ -28,15 +28,15 @@ import org.jwcarman.occlude.storage.MemoryStorage;
 /**
  * A source labels what arrives, and sometimes only the thing itself can say how.
  *
- * <p>Some of a label is a property of the door: mail from customers is untrusted because of where
+ * <p>Some of a label is a property of the portal: mail from customers is untrusted because of where
  * it came in, whatever it contains. The rest is a property of the value. Whether the sender was
  * verified is in the message. Whether a document is restricted is written on the document. Whether
  * something holds card numbers is a question you answer by looking.
  *
  * <p>So the labelling function sees both. That is not a way for a caller to choose a label -- the
  * caller passes a value and nothing else, and the function deciding is the one declared when the
- * source was declared. What changes is that the door can read what it was handed before saying what
- * it is.
+ * source was declared. What changes is that the portal can read what it was handed before saying
+ * what it is.
  */
 @DisplayName("Labelling what arrives")
 class LabellingWhatArrivesTest {

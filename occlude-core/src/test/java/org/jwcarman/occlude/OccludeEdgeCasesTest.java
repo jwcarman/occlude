@@ -24,8 +24,8 @@ import org.jwcarman.occlude.lattice.Label;
 import org.jwcarman.occlude.storage.MemoryStorage;
 
 /**
- * A source is a door, and a door can misbehave two ways: handed nothing to label, or unable to say
- * what it labels.
+ * A source is a portal, and a portal can misbehave two ways: handed nothing to label, or unable to
+ * say what it labels.
  */
 @DisplayName("Occluding through a source")
 class OccludeEdgeCasesTest {

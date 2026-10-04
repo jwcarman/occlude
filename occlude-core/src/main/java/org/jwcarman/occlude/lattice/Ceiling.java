@@ -48,7 +48,7 @@ public final class Ceiling {
    * A ceiling entitled to nothing, because it has yet to say what it is entitled to.
    *
    * <p>It admits a label that says nothing at all, which is the only thing below every ceiling, and
-   * refuses everything else -- so it is the fail-closed starting point rather than a closed door.
+   * refuses everything else -- so it is the fail-closed starting point rather than a closed portal.
    *
    * @return a ceiling that constrains no axis
    */

@@ -199,8 +199,8 @@ management:
 /actuator/charter                       everything, and what to ask next
 /actuator/charter/types                 every occluded type this charter mentions
 /actuator/charter/types/{name}          everything declared about values of that type
-/actuator/charter/sources[/{name}]      the doors values enter through
-/actuator/charter/sinks[/{name}]        the doors values leave through
+/actuator/charter/sources[/{name}]      the portals values enter through
+/actuator/charter/sinks[/{name}]        the portals values leave through
 /actuator/charter/derivations[/{name}]  what makes one value from others
 /actuator/charter/questions[/{name}]    what asks one bit of a value
 /actuator/charter/erasures[/{name}]     what may forget a value and its descendants
@@ -233,7 +233,7 @@ label.
 ### Findings are proofs
 
 `findings` reports what is provable from the declarations alone: a source whose values can never be
-revealed anywhere, a door reading a type nothing can produce, a derivation whose output nothing
+revealed anywhere, a portal reading a type nothing can produce, a derivation whose output nothing
 reads. These are facts about a graph, not heuristics — and the middle one is usually a rename that
 went half-applied, which without this surfaces as a refusal at request time rather than at startup.
 
@@ -244,7 +244,7 @@ answer — only one per caller. Render a manifest for that caller and read the c
 ### What it does not report
 
 No label, no lineage, no identifier of anything held. And no evaluated ceilings: the access at an
-operations endpoint belongs to whoever is looking at it, not to the caller a door was declared for.
+operations endpoint belongs to whoever is looking at it, not to the caller a portal was declared for.
 
 It is still a map of your security posture. Protect it as you would `/actuator/beans`.
 
@@ -340,7 +340,7 @@ occlude:
   log-manifest: false
 ```
 
-It is rendered for nobody, since there is no request at startup, so a door whose ceiling reads the
+It is rendered for nobody, since there is no request at startup, so a portal whose ceiling reads the
 tenant prints `(could not decide for this access (it threw ...))` rather than what it accepts. The
 declarations, the weakening list and the findings are all still there, and those are what a log at
 startup is for. Pair it with a build that renders one per

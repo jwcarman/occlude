@@ -28,7 +28,7 @@ import org.jwcarman.occlude.lattice.Constraint;
  * is declared rather than the first time a reader picks the wrong one.
  *
  * <p>Nothing looks a declaration up by its name -- every portal carries its own -- but a name is
- * what the record and the manifest say, and two doors answering to one name make both lie.
+ * what the record and the manifest say, and two portals answering to one name make both lie.
  */
 @DisplayName("Two declarations claiming the same name")
 class DuplicateRegistrationTest {

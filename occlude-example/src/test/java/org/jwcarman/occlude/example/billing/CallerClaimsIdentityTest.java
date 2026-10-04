@@ -59,8 +59,8 @@ class CallerClaimsIdentityTest {
    * <p>This test used to fabricate a value at acme's label and assert the store refused it. It
    * cannot be written any more: nothing on a charter takes a label, so there is no way to say what
    * a value should be labelled except by holding the source that decides. What is left worth
-   * asserting is that the door really is gone, because it is the sort of thing that gets added back
-   * for a test fixture and never removed.
+   * asserting is that the portal really is gone, because it is the sort of thing that gets added
+   * back for a test fixture and never removed.
    */
   @Test
   @DisplayName("cannot create a value through the charter, because nothing there creates values")

@@ -385,7 +385,7 @@ class PolicyThatCannotDecideTest {
     }
 
     @Test
-    @DisplayName("in the manifest, for a door that cannot say what it accepts")
+    @DisplayName("in the manifest, for a portal that cannot say what it accepts")
     void in_the_manifest() {
       assertThat(config.manifest().toString()).contains(THREW);
     }

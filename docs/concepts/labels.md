@@ -128,7 +128,7 @@ rests on, and an unanswered matching axis is readable by everyone. Leaving `requ
 legitimate choice for an axis that genuinely may go unsaid — it is just not this one. Nothing warns
 you, because whether a gap is a mistake is yours to know.
 
-**Say it at every door from ambient identity, never from the caller.**
+**Say it at every portal from ambient identity, never from the caller.**
 
 ```java
 Occlude<Invoice> invoices = charter.source("invoices", INVOICE,
@@ -143,8 +143,8 @@ wherever the request established it. A call site cannot pass one, so code holdin
 name itself somebody else's tenant.
 
 **Decide what happens with no tenant.** A batch job or a message consumer may run with nothing in
-context. With `orElseThrow()` above, a source refuses and a door accepts nothing, which is usually
-right. Something that genuinely acts for every tenant is declared as its own door, with
+context. With `orElseThrow()` above, a source refuses and a portal accepts nothing, which is usually
+right. Something that genuinely acts for every tenant is declared as its own portal, with
 `Constraint.any()` on the axis, where a reviewer will see it in the manifest.
 
 **Let the lattice do the rest.** A value derived from two tenants' data carries a mixture, and no

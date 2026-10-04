@@ -26,8 +26,10 @@ measured data. Do not rewrite text that you quote.
   refusal, reason, detail, access context, binding, manifest, store. Three audit
   terms have three meanings: "the record" is everything that the audit keeps (the
   concept that `docs/concepts/the-record.md` names); "the trail" is only the keyed
-  hash chain of lines; "a line" is one entry. This dictionary wins over STE's word
-  list. Do not use a synonym for variety.
+  hash chain of lines; "a line" is one entry. Say "portal", never "door" (James
+  ruled this on 2026-10-04). Where a sentence is about a sink and the `Reveal` that
+  it hands back, say "sink" for the one and "portal" for the other. This dictionary
+  wins over STE's word list. Do not use a synonym for variety.
 - Keep the articles ("the", "a"). Do not write telegraphic text.
 - Do not use idioms, metaphors, slang or phrasal verbs when a single verb exists
   ("start", not "kick off"; "find", not "figure out").

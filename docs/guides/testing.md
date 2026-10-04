@@ -59,7 +59,7 @@ assert there are none, or only the ones you have accepted:
 assertThat(charter.manifest().findings()).isEmpty();
 ```
 
-That catches a door reading a type nothing produces — the usual shape of a rename that went
+That catches a portal reading a type nothing produces — the usual shape of a rename that went
 half-applied — before anything runs.
 
 ## Your Spring wiring, without a database

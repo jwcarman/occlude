@@ -41,8 +41,8 @@ import org.jwcarman.occlude.AccessContext;
  * every question against the value it was asked about.
  *
  * @param bottom how a label that says nothing renders
- * @param sources the doors values enter through
- * @param sinks the doors values leave through
+ * @param sources the portals values enter through
+ * @param sinks the portals values leave through
  * @param derivations what makes one value from others
  * @param questions what asks one bit of a value without the value leaving
  * @param erasures what may forget a value and everything derived from it
@@ -69,7 +69,7 @@ public record Manifest(
    *
    * @param name the declaration's name
    * @param detail what it does, for a person to read
-   * @param reads the occluded types this takes in; empty for a door values only enter through
+   * @param reads the occluded types this takes in; empty for a portal values only enter through
    * @param writes the occluded type this produces, or null when it produces no value at all -- a
    *     sink hands a value out of the system, and a question answers a bit
    * @param weakens whether this operation can make a label less constrained
@@ -96,8 +96,8 @@ public record Manifest(
   /**
    * Something provable about the declarations, without running anything.
    *
-   * <p>What can be proved here is a question about <b>types</b>: which doors can be reached from
-   * which, and whether anything can ever produce what a door reads. That is a graph over
+   * <p>What can be proved here is a question about <b>types</b>: which portals can be reached from
+   * which, and whether anything can ever produce what a portal reads. That is a graph over
    * declarations, and it is complete -- a finding is a fact, not a heuristic.
    *
    * <p>What cannot be proved here is a question about <b>labels</b>. A source's label and a sink's
@@ -136,8 +136,8 @@ public record Manifest(
    * Everything this charter declares about one occluded type, and nothing else.
    *
    * <p>The question somebody actually arrives with: not "what does this application permit" but
-   * "what can happen to a card". Which doors it enters through, which doors it leaves by, what can
-   * be made from it and what it can be made from, what may be asked about it.
+   * "what can happen to a card". Which portals it enters through, which portals it leaves by, what
+   * can be made from it and what it can be made from, what may be asked about it.
    *
    * @param type the occluded type's name
    * @return a manifest of only what concerns that type
@@ -181,14 +181,14 @@ public record Manifest(
     lines.add("");
     lines.add("  unconstrained label (bottom)");
     lines.add("    " + bottom);
-    section(lines, "sources", sources, "  nothing can be occluded: this charter has no doors in");
+    section(lines, "sources", sources, "  nothing can be occluded: this charter has no portals in");
     section(lines, "sinks", sinks, "  nothing may be dereferenced anywhere");
     if (!sinks.isEmpty()) {
       lines.add(
           renderedFor.attributes().isEmpty()
               ? "    (a ceiling that reads the access cannot be shown without one -- render this"
                   + " manifest for a representative access to see them)"
-              : "    (what these doors accept for this access; another may be offered more or"
+              : "    (what these portals accept for this access; another may be offered more or"
                   + " less)");
     }
     section(lines, "derivations", derivations, "  no value can be made from another");
@@ -210,7 +210,7 @@ public record Manifest(
     }
     lines.add("");
     if (findings.isEmpty()) {
-      lines.add("  nothing unreachable: every door can be used and every type can exist");
+      lines.add("  nothing unreachable: every portal can be used and every type can exist");
     } else {
       lines.add("  " + findings.size() + " finding(s):");
       int width = findings.stream().mapToInt(f -> f.about().length()).max().orElse(0);

@@ -15,7 +15,7 @@
  */
 
 /**
- * What a charter permits, rendered: every door, derivation and question it declared, and what can
+ * What a charter permits, rendered: every portal, derivation and question it declared, and what can
  * be proved about them without running anything.
  *
  * <p>A description of the system rather than of any value, so it is safe to print at startup, paste

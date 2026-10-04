@@ -30,10 +30,10 @@ import org.jwcarman.occlude.storage.MemoryStorage;
  * Nothing can be declared after a charter is bound.
  *
  * <p>This is what makes holding a portal mean anything. A charter constitutes authority, so anyone
- * still holding one could otherwise manufacture a door at any label, or a derivation reading
+ * still holding one could otherwise manufacture a portal at any label, or a derivation reading
  * anything, long after startup decided what the application was allowed to do.
  *
- * <p>All of these were measured doing exactly that before the lifecycle existed. A door declared
+ * <p>All of these were measured doing exactly that before the lifecycle existed. A portal declared
  * after startup planted a value at another tenant's label; a derivation declared after startup read
  * a cardholder token.
  *

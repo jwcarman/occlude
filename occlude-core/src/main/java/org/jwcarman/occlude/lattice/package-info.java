@@ -19,7 +19,7 @@
  * how values on each axis order against each other.
  *
  * <p>A {@link org.jwcarman.occlude.lattice.Label} says what a value is; a {@link
- * org.jwcarman.occlude.lattice.Ceiling} says the most a door accepts. Everything a charter decides
- * is a comparison between the two.
+ * org.jwcarman.occlude.lattice.Ceiling} says the most a portal accepts. Everything a charter
+ * decides is a comparison between the two.
  */
 package org.jwcarman.occlude.lattice;

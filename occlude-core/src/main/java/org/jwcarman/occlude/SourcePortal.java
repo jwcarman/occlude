@@ -19,7 +19,7 @@ import java.util.function.BiFunction;
 import org.jwcarman.occlude.lattice.Label;
 import org.jwcarman.occlude.storage.AuditRecord;
 
-/** A door values enter through: its name, what it accepts, and how it labels what arrives. */
+/** A portal values enter through: its name, what it accepts, and how it labels what arrives. */
 final class SourcePortal<T> implements Occlude<T> {
 
   private final String name;

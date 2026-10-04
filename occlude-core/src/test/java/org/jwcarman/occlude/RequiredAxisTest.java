@@ -151,7 +151,7 @@ class RequiredAxisTest {
   }
 
   /**
-   * The invariant has to survive derivation, not just the door.
+   * The invariant has to survive derivation, not just the portal.
    *
    * <p>Occluding is the only place a label is asserted rather than computed, so it is where the
    * required-axis check was written. But a privileged derivation may rewrite the label, and {@code
@@ -163,7 +163,7 @@ class RequiredAxisTest {
   @DisplayName("cannot be dropped by a lowering, which is where atOrBelow cannot see it")
   void cannot_be_dropped_by_a_lowering() {
     DefaultCharter own = new DefaultCharter(TENANT, LEVEL);
-    Occlude<Note> door =
+    Occlude<Note> portal =
         own.source("notes", NOTE_TYPE, ctx -> Label.of(TENANT, "acme").with(LEVEL, Level.HIGH));
     Derivation<Note, Note> redact =
         own.derivation(
@@ -182,7 +182,7 @@ class RequiredAxisTest {
     own.bind(Bindings.of(storage).withIdentity(edge::get));
     edge.set(AccessContext.of(Map.of("tenant", "acme")));
 
-    Derived<Note> result = redact.derive(door.occlude(new Note("ours")));
+    Derived<Note> result = redact.derive(portal.occlude(new Note("ours")));
 
     assertThat(result.value()).isEmpty();
     assertThat(((Derived.Refused<Note>) result).reason()).isEqualTo(Derived.Reason.NOT_A_LOWERING);
@@ -194,11 +194,11 @@ class RequiredAxisTest {
   /**
    * The guarantee has to be about values, not about writes.
    *
-   * <p>Refusing an incomplete label at the door covers everything written through a door. It does
-   * not cover what is already in the store: mark an axis {@code required()} on a system that has
-   * been writing without it, and every row already there leaves it unsaid. Unsaid is the bottom of
-   * its order, which is below every ceiling, so those rows are not unreadable -- they are readable
-   * by <i>everyone</i>, which is the opposite of what the marking was for.
+   * <p>Refusing an incomplete label at the portal covers everything written through a portal. It
+   * does not cover what is already in the store: mark an axis {@code required()} on a system that
+   * has been writing without it, and every row already there leaves it unsaid. Unsaid is the bottom
+   * of its order, which is below every ceiling, so those rows are not unreadable -- they are
+   * readable by <i>everyone</i>, which is the opposite of what the marking was for.
    *
    * <p>Written here through the storage SPI, which is what a pre-existing row looks like by the
    * time the engine reads it back.

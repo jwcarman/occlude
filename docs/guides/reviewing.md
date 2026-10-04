@@ -22,7 +22,7 @@ charter manifest, as {tenant=acme}
     support-ui         accepts up to {tenant=acme, integrity=ENDORSED, sensitivity=ORDINARY}
     approval-desk      accepts up to {tenant=acme, integrity=ENDORSED, sensitivity=ORDINARY}
     payment-processor  accepts up to {tenant=acme, integrity=ENDORSED, sensitivity=CARDHOLDER}
-    (what these doors accept for this access; another may be offered more or less)
+    (what these portals accept for this access; another may be offered more or less)
 
   derivations (2)
     mail.confirmedInvoice  mail -> invoice   << WEAKENS LABELS
@@ -43,7 +43,7 @@ charter manifest, as {tenant=acme}
     mail.confirmedInvoice  mail -> invoice
     invoice.card.last4  invoice -> last4
 
-  nothing unreachable: every door can be used and every type can exist
+  nothing unreachable: every portal can be used and every type can exist
 ```
 
 That is the example application's charter, rendered for one tenant. The approval desk shows what
@@ -52,9 +52,9 @@ offers more.
 
 ## Render it for somebody
 
-Pass an access. A door whose ceiling reads the tenant cannot say what it accepts without one, and
-in a multi-tenant application that is every door — so a manifest rendered for nobody reports that
-it could not evaluate a single ceiling. There is no such thing as what a door accepts in general,
+Pass an access. A portal whose ceiling reads the tenant cannot say what it accepts without one, and
+in a multi-tenant application that is every portal — so a manifest rendered for nobody reports that
+it could not evaluate a single ceiling. There is no such thing as what a portal accepts in general,
 so render one per representative caller.
 
 ## What to look for
@@ -79,7 +79,7 @@ string, an exact number, a `UUID`, an enum, a `java.time` value, or a record of 
 as a `not-a-plain-value` finding. It is not refused, because only whoever wrote the function knows
 what it does; it is listed because that is exactly where a review has to look.
 
-**Doors that read a type nothing produces, or produce a type nothing reads.** A door nobody can
+**Portals that read a type nothing produces, or produce a type nothing reads.** A portal nobody can
 reach is dead authority; it is also the shape a mistake takes when a rename went half-applied.
 
 ## Diffing it in CI

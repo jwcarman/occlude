@@ -76,7 +76,7 @@ DefaultCharter charter = new DefaultCharter(Axes.of(TENANT, INTEGRITY, SENSITIVI
 A charter is where authority is declared. It knows nothing yet about where values live or who is
 asking; both arrive when it is brought into force.
 
-## 3. Declare the doors
+## 3. Declare the portals
 
 ```java
 static final OccludedType<Mail> MAIL = OccludedType.of("mail", Mail.class);

@@ -37,7 +37,7 @@ Say `any()` when you mean it. Breadth is a decision worth writing down.
 
 ## Ceilings usually depend on who is asking
 
-A door's ceiling is a function of the access, not a constant:
+A portal's ceiling is a function of the access, not a constant:
 
 ```java
 charter.sink(

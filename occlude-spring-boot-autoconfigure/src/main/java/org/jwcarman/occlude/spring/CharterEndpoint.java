@@ -41,8 +41,8 @@ import org.springframework.boot.actuate.endpoint.web.annotation.WebEndpoint;
  * /actuator/charter                      everything, plus what can be drilled into
  * /actuator/charter/types                every occluded type this charter mentions
  * /actuator/charter/types/{name}         everything declared about values of that type
- * /actuator/charter/sources/{name}       one door in
- * /actuator/charter/sinks/{name}  one door out
+ * /actuator/charter/sources/{name}       one portal in
+ * /actuator/charter/sinks/{name}  one portal out
  * /actuator/charter/derivations/{name}   one way of making a value from another
  * /actuator/charter/questions/{name}     one question
  * /actuator/charter/erasures/{name}      one authority to erase
@@ -56,11 +56,11 @@ import org.springframework.boot.actuate.endpoint.web.annotation.WebEndpoint;
  * makes this safe to expose at all.
  *
  * <p><b>No evaluated ceilings.</b> A ceiling reads the access, and the access here belongs to
- * whoever is looking at an operations endpoint rather than to the caller a door was declared for.
+ * whoever is looking at an operations endpoint rather than to the caller a portal was declared for.
  * Rendering them would produce a page of "could not decide", or worse, one tenant's limits shown to
  * somebody else. What is reported instead is what does not vary.
  *
- * <p>Still worth protecting. A list of every door and every declassification is a map of the
+ * <p>Still worth protecting. A list of every portal and every declassification is a map of the
  * application's security posture, useful to somebody attacking it even though it discloses no data.
  * Treat it as you would {@code /actuator/beans}.
  */
@@ -99,15 +99,15 @@ public class CharterEndpoint {
     report.put("axes", axes());
     report.put(TYPES, types(manifest));
     report.put(SOURCES, entries(manifest.sources()));
-    report.put(SINKS, doors(manifest.sinks()));
+    report.put(SINKS, portals(manifest.sinks()));
     report.put(DERIVATIONS, entries(manifest.derivations()));
     report.put(QUESTIONS, entries(manifest.questions()));
     report.put(ERASURES, entries(manifest.erasures()));
     // An inspection's detail is its ceiling evaluated for an access, which this endpoint will not
     // render, for the reason a sink's is not.
-    report.put(INSPECTIONS, doors(manifest.inspections()));
+    report.put(INSPECTIONS, portals(manifest.inspections()));
     report.put("weakening", entries(manifest.weakening()));
-    // What an auditor came for: a door nobody can reach, or one reading a type nothing makes.
+    // What an auditor came for: a portal nobody can reach, or one reading a type nothing makes.
     // Provable from the declarations, so a finding is a fact rather than a suspicion.
     report.put(FINDINGS, findings(manifest));
     return report;
@@ -130,11 +130,11 @@ public class CharterEndpoint {
     switch (section) {
       case TYPES -> report.put(TYPES, types(manifest));
       case SOURCES -> report.put(SOURCES, entries(manifest.sources()));
-      case SINKS -> report.put(SINKS, doors(manifest.sinks()));
+      case SINKS -> report.put(SINKS, portals(manifest.sinks()));
       case DERIVATIONS -> report.put(DERIVATIONS, entries(manifest.derivations()));
       case QUESTIONS -> report.put(QUESTIONS, entries(manifest.questions()));
       case ERASURES -> report.put(ERASURES, entries(manifest.erasures()));
-      case INSPECTIONS -> report.put(INSPECTIONS, doors(manifest.inspections()));
+      case INSPECTIONS -> report.put(INSPECTIONS, portals(manifest.inspections()));
       case FINDINGS -> report.put(FINDINGS, findings(manifest));
       default -> {
         return notFound();
@@ -147,9 +147,9 @@ public class CharterEndpoint {
    * One named thing, or everything about one occluded type.
    *
    * <p>{@code types/card} is the question somebody actually arrives with. Not "what does this
-   * application permit" but "what can happen to a card": which doors it enters through, which doors
-   * it leaves by, what can be made from it, what it can be made from, what may be asked about it,
-   * and anything provably wrong with that.
+   * application permit" but "what can happen to a card": which portals it enters through, which
+   * portals it leaves by, what can be made from it, what it can be made from, what may be asked
+   * about it, and anything provably wrong with that.
    *
    * <p>A type nobody declared answers with empty lists rather than 404. That it is mentioned
    * nowhere is the answer, and a different fact from there being no such section.
@@ -168,7 +168,7 @@ public class CharterEndpoint {
       Map<String, Object> report = new LinkedHashMap<>();
       report.put("type", name);
       report.put("occludedBy", entries(about.sources()));
-      report.put("revealedAt", doors(about.sinks()));
+      report.put("revealedAt", portals(about.sinks()));
       report.put(
           "madeBy",
           entries(about.derivations().stream().filter(e -> name.equals(e.writes())).toList()));
@@ -254,13 +254,13 @@ public class CharterEndpoint {
   }
 
   /**
-   * A door, without the one thing this endpoint will not report.
+   * A portal, without the one thing this endpoint will not report.
    *
    * <p>A sink's {@code detail} is its ceiling rendered for an access, and there is no access here
    * worth rendering for -- so it would read "could not decide" on every row, which is noise that
-   * looks like a fault. What a door reads does not vary, and that is reported.
+   * looks like a fault. What a portal reads does not vary, and that is reported.
    */
-  private static List<Map<String, Object>> doors(List<Manifest.Entry> entries) {
+  private static List<Map<String, Object>> portals(List<Manifest.Entry> entries) {
     return entries.stream()
         .map(
             entry -> {

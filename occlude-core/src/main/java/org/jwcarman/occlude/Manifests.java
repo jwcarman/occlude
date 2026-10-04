@@ -166,8 +166,8 @@ final class Manifests {
    * What can be proved about the declarations without running anything.
    *
    * <p>A question about types, and therefore answerable: which types anything can produce, which
-   * types anything reads, and whether a path exists between them. A door nobody can reach is dead
-   * authority; a door that reads a type nothing makes is usually a rename that went half-applied,
+   * types anything reads, and whether a path exists between them. A portal nobody can reach is dead
+   * authority; a portal that reads a type nothing makes is usually a rename that went half-applied,
    * and it fails as a refusal at request time rather than at startup, which is the worst moment to
    * find out.
    *
@@ -197,21 +197,21 @@ final class Manifests {
         .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
-  /** Every type something in this charter reads: a door's, a derivation's, or a question's. */
+  /** Every type something in this charter reads: a portal's, a derivation's, or a question's. */
   private static Set<String> readTypes(Declarations configuration) {
-    Stream<String> byDoors = configuration.sinkReads().values().stream().flatMap(Set::stream);
+    Stream<String> byPortals = configuration.sinkReads().values().stream().flatMap(Set::stream);
     Stream<String> byDerivations =
         configuration.derivations().stream()
             .flatMap(derivation -> derivation.inputTypes().stream())
             .map(OccludedType::name);
     Stream<String> byQueries =
         configuration.queries().stream().map(query -> query.inputType().name());
-    return Stream.of(byDoors, byDerivations, byQueries)
+    return Stream.of(byPortals, byDerivations, byQueries)
         .flatMap(names -> names)
         .collect(Collectors.toCollection(LinkedHashSet::new));
   }
 
-  /** Whether this charter has any door in and any door out at all. */
+  /** Whether this charter has any portal in and any portal out at all. */
   private static void declarationPresenceFindings(
       Declarations configuration, List<Manifest.Finding> findings) {
     if (configuration.sources().isEmpty()) {
@@ -227,8 +227,8 @@ final class Manifests {
   }
 
   /**
-   * A value occluded here can reach a door only if some chain of derivations gets its type to one a
-   * door reads. Walked rather than assumed: a derivation in the middle is easy to miss.
+   * A value occluded here can reach a portal only if some chain of derivations gets its type to one
+   * a portal reads. Walked rather than assumed: a derivation in the middle is easy to miss.
    */
   private static void unreachableSourceFindings(
       Declarations configuration, List<Manifest.Finding> findings) {
@@ -244,16 +244,16 @@ final class Manifests {
     }
   }
 
-  /** A door that reads a type nothing in this charter can ever produce. */
+  /** A portal that reads a type nothing in this charter can ever produce. */
   private static void unproducedSinkReadFindings(
       Declarations configuration, Set<String> produced, List<Manifest.Finding> findings) {
-    for (var door : configuration.sinkReads().entrySet()) {
-      for (String type : door.getValue()) {
+    for (var portal : configuration.sinkReads().entrySet()) {
+      for (String type : portal.getValue()) {
         if (!produced.contains(type)) {
           findings.add(
               new Manifest.Finding(
                   NO_WRITER,
-                  door.getKey(),
+                  portal.getKey(),
                   "reads '%s', which nothing in this charter can produce".formatted(type)));
         }
       }
@@ -349,14 +349,14 @@ final class Manifests {
   private static boolean reaches(String type, Declarations configuration) {
     Set<String> seen = new LinkedHashSet<>();
     Deque<String> pending = new ArrayDeque<>(List.of(type));
-    Set<String> doorsRead = new LinkedHashSet<>();
-    configuration.sinkReads().values().forEach(doorsRead::addAll);
+    Set<String> portalsRead = new LinkedHashSet<>();
+    configuration.sinkReads().values().forEach(portalsRead::addAll);
     while (!pending.isEmpty()) {
       String next = pending.removeFirst();
       if (!seen.add(next)) {
         continue;
       }
-      if (doorsRead.contains(next)) {
+      if (portalsRead.contains(next)) {
         return true;
       }
       for (DerivationSpec<?> derivation : configuration.derivations()) {
@@ -371,22 +371,22 @@ final class Manifests {
   }
 
   /**
-   * What this door accepts for one access.
+   * What this portal accepts for one access.
    *
    * <p>A ceiling that reads the tenant out of the access cannot be rendered without one, and in a
    * multi-tenant application that is every ceiling there is -- so a manifest rendered for nobody
-   * printed "could not be evaluated" against every door, which is the report being useless in
+   * printed "could not be evaluated" against every portal, which is the report being useless in
    * exactly the case it exists for. It is rendered for an access because there is no such thing as
-   * what a door accepts in general.
+   * what a portal accepts in general.
    *
    * <p>For the manifest only, and evaluated against an empty access when the caller does not supply
    * one, because a manifest is a statement about the system rather than about one request. A
    * ceiling that reads a tenant will refuse to answer that, and saying so is more honest than
    * printing what it would allow nobody.
    */
-  private static String accepts(Function<AccessContext, Ceiling> door, AccessContext as) {
+  private static String accepts(Function<AccessContext, Ceiling> portal, AccessContext as) {
     try {
-      Ceiling ceiling = door.apply(as);
+      Ceiling ceiling = portal.apply(as);
       return ceiling == null ? "(said nothing for this access)" : ceiling.toString();
     } catch (RuntimeException e) {
       return "(could not decide for this access" + Gate.threw(e) + ")";
