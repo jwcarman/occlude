@@ -16,8 +16,11 @@
 package org.jwcarman.occlude.example.billing;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.jwcarman.occlude.AccessContext;
 import org.jwcarman.occlude.AccessContextProvider;
 import org.springframework.stereotype.Component;
@@ -35,9 +38,19 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * <p>Headers here because the example has no identity provider. A real service would read {@code
  * SecurityContextHolder}; the charter never learns the difference, because it is handed a supplier
  * and asks it.
+ *
+ * <p>The roles never reach the context. A ceiling asks what a person may do, so this provider turns
+ * the roles into capabilities, such as {@link #APPROVES_DISPUTES}. It is the one place that knows
+ * which roles grant which capability, and a person with several roles loses none of them.
  */
 @Component
 public final class CurrentAccess implements AccessContextProvider {
+
+  /** The capability to see what an approval needs, and to truncate a card for it. */
+  public static final String APPROVES_DISPUTES = "approves-disputes";
+
+  /** The roles that grant {@link #APPROVES_DISPUTES}. */
+  private static final Set<String> APPROVERS = Set.of("approver");
 
   /** Creates the provider, which Spring instantiates. */
   public CurrentAccess() {}
@@ -50,9 +63,19 @@ public final class CurrentAccess implements AccessContextProvider {
     HttpServletRequest request = attrs.getRequest();
     Map<String, String> who = new LinkedHashMap<>();
     put(who, "tenant", request.getHeader("X-Tenant"));
-    put(who, "role", request.getHeader("X-Role"));
     put(who, "principal", request.getHeader("X-User"));
+    if (roles(request.getHeader("X-Roles")).stream().anyMatch(APPROVERS::contains)) {
+      who.put(APPROVES_DISPUTES, "true");
+    }
     return AccessContext.of(who);
+  }
+
+  /** A comma-separated list, as an identity provider's roles would arrive here. */
+  private static List<String> roles(String header) {
+    if (header == null) {
+      return List.of();
+    }
+    return Arrays.stream(header.split(",")).map(String::trim).filter(r -> !r.isEmpty()).toList();
   }
 
   private static void put(Map<String, String> who, String key, String value) {

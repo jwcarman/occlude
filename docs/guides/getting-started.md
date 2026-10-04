@@ -110,7 +110,8 @@ refused at startup. A container needs a name and a `TypeRef`:
 Erasing a value and reading its label are portals too, each declared with what decides it:
 
 ```java
-Erasure compliance = charter.erasure("compliance", (label, ctx) -> ctx.has("role", "compliance"));
+Erasure compliance = charter.erasure("compliance",
+    (label, ctx) -> ctx.has("erases-for-compliance", "true"));
 Inspection supportDesk = charter.inspection("support-desk",
     ctx -> Ceiling.of(TENANT, Constraint.atMost(ctx.get("tenant").orElseThrow()))
                   .with(INTEGRITY, Constraint.any())
@@ -123,10 +124,19 @@ look them up later.
 ## 4. Bring it into force
 
 ```java
-charter.bind(Bindings.of(new MemoryStorage()).withIdentity(() -> AccessContext.of(Map.of(
-    "tenant", CurrentTenant.get(),
-    "role", currentRole()))));
+charter.bind(Bindings.of(new MemoryStorage()).withIdentity(() -> {
+  Map<String, String> who = new LinkedHashMap<>();
+  who.put("tenant", CurrentTenant.get());
+  if (currentRoles().contains("compliance-officer")) {
+    who.put("erases-for-compliance", "true");
+  }
+  return AccessContext.of(who);
+}));
 ```
+
+The provider turns the identity system's roles into the capabilities that the charter asks about.
+The erasure above asks "may this person erase for compliance?", not "which role does this person
+have?". The [Spring guide](spring-boot.md#give-a-ceiling-a-capability-not-a-role) says why.
 
 Once, irreversibly. Before this, no portal works; after it, no further authority can be
 constituted, and the charter itself is no longer needed.

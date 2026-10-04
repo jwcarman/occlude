@@ -18,7 +18,7 @@ that decides it:
 
 ```java
 Erasure compliance = charter.erasure("compliance", (label, ctx) ->
-    ctx.has("role", "compliance")
+    ctx.has("erases-for-compliance", "true")
         && ctx.get("tenant")
               .map(t -> Ceiling.of(TENANT, Constraint.atMost(t)).with(SENSITIVITY, Constraint.any())
                                .permits(label))

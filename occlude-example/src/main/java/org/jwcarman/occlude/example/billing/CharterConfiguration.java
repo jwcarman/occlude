@@ -97,7 +97,7 @@ public class CharterConfiguration {
     Reveal<Domain.Last4> approvalDesk =
         charter.reveal(
             "approval-desk",
-            ctx -> ceiling(ctx, ENDORSED, ctx.has("role", "approver") ? PERSONAL : ORDINARY),
+            ctx -> ceiling(ctx, ENDORSED, approves(ctx) ? PERSONAL : ORDINARY),
             Domain.LAST4);
     Reveal<Domain.Invoice> paymentProcessor =
         charter.reveal(
@@ -126,7 +126,7 @@ public class CharterConfiguration {
             d ->
                 d.accepting(ctx -> ceiling(ctx, ENDORSED, CARDHOLDER))
                     .lowering(joined -> joined.with(BillingAxes.SENSITIVITY, PERSONAL))
-                    .availableTo(ctx -> ctx.has("role", "approver")));
+                    .availableTo(CharterConfiguration::approves));
 
     // ---- one bit, without the value leaving ------------------------------------
     Query<Domain.Mail, String> mailMentions =
@@ -180,6 +180,14 @@ public class CharterConfiguration {
     return Ceiling.of(BillingAxes.TENANT, Constraint.atMost(tenant))
         .with(BillingAxes.INTEGRITY, Constraint.atMost(integrity))
         .with(BillingAxes.SENSITIVITY, Constraint.atMost(sensitivity));
+  }
+
+  /**
+   * Whether this person may approve disputes: a capability that {@link CurrentAccess} grants, not a
+   * role that each portal must interpret.
+   */
+  private static boolean approves(AccessContext ctx) {
+    return ctx.has(CurrentAccess.APPROVES_DISPUTES, "true");
   }
 
   /** Trust is earned by matching the claim against the mailbox it arrived from. */

@@ -66,7 +66,7 @@ it is, and none of these is used before the context is ready.
 AccessContextProvider currentAccess() {
   return () -> AccessContext.of(Map.of(
       "tenant", CurrentTenant.get(),
-      "role", currentRole()));
+      "principal", currentPrincipal()));
 }
 ```
 
@@ -74,12 +74,19 @@ The starter binds the charter with this, beside the storage. The tenant reaches 
 being threaded through every call, and nothing a caller passes can influence it. Without one, every
 access is nobody in particular.
 
-### Several roles: give the ceiling a capability
+### Give a ceiling a capability, not a role
 
-An access context holds one value for each key. A person can have several roles, for example
-`ap-clerk` and `auditor`. Do not put the roles into the context and test them in each ceiling.
-Instead, turn the roles into a capability in the provider, and let the ceiling ask about the
-capability:
+A ceiling decides what a person may see. Thus, the access context must say what the person may
+do, in the charter's own terms. It must not say how the identity system groups people.
+
+Put a capability into the context, such as `works-cases`, and let each ceiling ask about it. The
+provider is the one trusted place that turns the identity system's roles into capabilities. This
+is the information-flow rule that authority comes from one trusted place, and that policy is
+written in its own terms.
+
+A role is the identity system's word, and a person can have several. An access context holds one
+value for each key, so a `role` key forces the provider to choose one role and lose the others. A
+capability has no such problem:
 
 ```java
 private static final Set<String> WORK_CASES = Set.of("ap-clerk", "ap-approver", "auditor");
@@ -109,7 +116,7 @@ d -> d.accepting(ctx -> ctx.has("works-cases", "true")
     : Ceiling.nothing())
 ```
 
-This is better than a list of roles in each ceiling, for three reasons:
+This is better than a role in the context, for four reasons:
 
 - **The ceiling states the rule.** "People who work cases may read this" is what the ceiling
   enforces. A list of roles only implies it.
@@ -118,6 +125,8 @@ This is better than a list of roles in each ceiling, for three reasons:
   change. A ceiling that you miss refuses, and nothing tells you.
 - **The provider already translates identity.** Its job is to turn what the identity system says
   into what the charter asks about.
+- **The manifest and the record show authority.** An auditor checks what a person may do. A
+  capability says that directly; a role needs the identity system to explain it.
 
 The record stores the access context on every line, so the capability flag is in the record too.
 An auditor sees that the reader worked cases, not which role gave that right. If the auditor must

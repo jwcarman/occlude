@@ -105,7 +105,7 @@ A question looks at the value and returns one bit, and the value never leaves:
 Query<Mail, String> mentions = charter.query("mail.mentions", MAIL, String.class,
     (mail, text, ctx) -> mail.body().contains(text),
     q -> q.accepting(ctx -> ceiling(ctx, UNENDORSED, PERSONAL))
-          .availableTo(ctx -> ctx.has("role", "agent")));
+          .availableTo(ctx -> ctx.has("handles-disputes", "true")));
 
 Answer answer = mentions.ask(held, "INV-4471");
 if (answer.isTrue()) { ... }         // ran, and said yes

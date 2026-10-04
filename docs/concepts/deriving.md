@@ -10,7 +10,7 @@ Derivation<Invoice, Last4> cardLast4 =
         invoice -> new Last4(last4(invoice.cardToken())),
         d -> d.accepting(ctx -> ceiling(ctx, ENDORSED, CARDHOLDER))
               .lowering(joined -> joined.with(SENSITIVITY, PERSONAL))
-              .availableTo(ctx -> ctx.has("role", "approver")));
+              .availableTo(ctx -> ctx.has("approves-disputes", "true")));
 ```
 
 Three things are settled at declaration and cannot change afterwards, which is what makes the

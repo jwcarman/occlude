@@ -51,15 +51,39 @@ class CurrentAccessTest {
   void is_whoever_the_headers_say() {
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.addHeader("X-Tenant", "acme");
-    request.addHeader("X-Role", "approver");
+    request.addHeader("X-Roles", "approver");
     request.addHeader("X-User", "dana@acme.example");
     during(request);
 
     assertThat(currentAccess.get().attributes())
         .containsExactly(
             entry("tenant", "acme"),
-            entry("role", "approver"),
-            entry("principal", "dana@acme.example"));
+            entry("principal", "dana@acme.example"),
+            entry(CurrentAccess.APPROVES_DISPUTES, "true"));
+  }
+
+  /** The roles stay out of the context. What a ceiling asks about is what they grant. */
+  @Test
+  @DisplayName("grants a capability from any of several roles, and keeps no role")
+  void grants_a_capability_from_several_roles() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.addHeader("X-Tenant", "acme");
+    request.addHeader("X-Roles", "agent, approver");
+    during(request);
+
+    assertThat(currentAccess.get().attributes())
+        .containsExactly(entry("tenant", "acme"), entry(CurrentAccess.APPROVES_DISPUTES, "true"));
+  }
+
+  @Test
+  @DisplayName("grants nothing to a role that carries no capability")
+  void grants_nothing_to_a_plain_role() {
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.addHeader("X-Tenant", "acme");
+    request.addHeader("X-Roles", "agent");
+    during(request);
+
+    assertThat(currentAccess.get().attributes()).containsOnlyKeys("tenant");
   }
 
   /** A blank header is not a tenant called "", which a ceiling might otherwise match. */
@@ -68,10 +92,11 @@ class CurrentAccessTest {
   void leaves_out_blank_headers() {
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.addHeader("X-Tenant", "  ");
-    request.addHeader("X-Role", "agent");
+    request.addHeader("X-User", "dana@acme.example");
+    request.addHeader("X-Roles", " , ");
     during(request);
 
-    assertThat(currentAccess.get().attributes()).containsOnlyKeys("role");
+    assertThat(currentAccess.get().attributes()).containsOnlyKeys("principal");
   }
 
   private static Map.Entry<String, String> entry(String key, String value) {

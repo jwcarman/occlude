@@ -61,7 +61,7 @@ class BillingSupportTest {
       String tenant, String role, HttpMethod method, String path, Object body, Class<T> type) {
     HttpHeaders headers = new HttpHeaders();
     headers.set("X-Tenant", tenant);
-    headers.set("X-Role", role);
+    headers.set("X-Roles", role);
     headers.set("X-User", role + "@support.example");
     return http.exchange(
         "http://localhost:" + port + path, method, new HttpEntity<>(body, headers), type);
