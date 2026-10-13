@@ -87,7 +87,7 @@
          Spring Boot's BOM: an imported BOM resolves its own tomcat.version, which is why the example
          declares each Tomcat artifact rather than setting this and hoping. -->
     <tomcat.version>11.0.26</tomcat.version>
-    <postgresql.version>42.7.13</postgresql.version>
+    <postgresql.version>42.7.14</postgresql.version>
     <testcontainers.version>2.0.5</testcontainers.version>
 
     <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
