@@ -82,7 +82,7 @@
     <!-- Ahead of Spring Boot's own, for CVE-2026-68497, CVE-2026-83557 and CVE-2026-19032 in
          jackson-databind below 3.1.6. Boot 4.1.1 manages 3.1.5; drop this once it manages a fixed
          version. -->
-    <jackson.version>3.1.7</jackson.version>
+    <jackson.version>3.2.4</jackson.version>
     <!-- Used by occlude-example's Tomcat pins, the only module that serves HTTP. It does not steer
          Spring Boot's BOM: an imported BOM resolves its own tomcat.version, which is why the example
          declares each Tomcat artifact rather than setting this and hoping. -->
