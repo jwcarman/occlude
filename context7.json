@@ -1,0 +1,17 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "Occlude (opaque references to sensitive values for Java)",
+  "description": "Occlude (org.jwcarman.occlude) keeps sensitive values in custody and hands out occluded references labelled on application-defined axes; revealing a value is the one checked operation, decided against the destination's ceiling. Built on the lattice and object-capability models, with JDBC storage and Spring Boot support.",
+  "folders": [
+    "docs"
+  ],
+  "excludeFolders": [
+    "docs/design"
+  ],
+  "rules": [
+    "Declare sources and reveals on a charter and pass the returned objects to the code that needs them: Occlude has no registry to look authority up from.",
+    "Pass Occluded<T> references around and reveal only at a declared reveal point, never by converting the value to a String early.",
+    "For Spring Boot add occlude-spring-boot-starter and a PostgreSQL JDBC driver.",
+    "Check https://github.com/jwcarman/occlude/blob/main/CHANGELOG.md against the Occlude version in use: entries under Unreleased are not in any release yet."
+  ]
+}
