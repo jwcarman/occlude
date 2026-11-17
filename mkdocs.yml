@@ -25,6 +25,7 @@ docs_dir: docs
 
 # Design records are working notes, not documentation. They stay out of the site.
 exclude_docs: |
+  /requirements.*
   /design/
 
 theme:
@@ -65,6 +66,38 @@ markdown_extensions:
   - pymdownx.highlight
   - pymdownx.inlinehilite
   - pymdownx.superfences
+
+# Declaring plugins replaces MkDocs' default list, so search is named here too.
+plugins:
+  - search
+  # https://llmstxt.org: an index of the docs for coding agents at /llms.txt, every page in
+  # one file at /llms-full.txt, and a Markdown copy of each page beside its HTML.
+  - llmstxt:
+      full_output: llms-full.txt
+      markdown_description: |
+        Occlude keeps sensitive values in custody and hands out opaque, labelled references; revealing a
+        value is the one checked operation. Maven coordinates: `org.jwcarman.occlude`; for Spring Boot add
+        `occlude-spring-boot-starter` and a PostgreSQL driver. The changelog says what each version has:
+        https://github.com/jwcarman/occlude/blob/main/CHANGELOG.md.
+      sections:
+        Start here:
+          - index.md: what Occlude is and the model in one page
+          - guides/getting-started.md: "a worked example: a support desk that must not leak customer email"
+          - guides/spring-boot.md: "the starter: declaring axes and wiring a charter in Spring Boot"
+          - configuration.md: every occlude.* property the starter reads
+        Concepts:
+          - concepts/labels.md: axes and the labels values carry
+          - concepts/ceilings.md: ceilings, what a reader is entitled to see
+          - concepts/portals.md: the charter and the portals its declarations hand back
+          - concepts/deriving.md: how a derived value's label joins its parents'
+          - concepts/the-record.md: the record every operation writes, allowed or refused
+          - concepts/erasing.md: erasing a subject's values by following lineage
+        Guides:
+          - guides/storage.md: "the PostgreSQL store: encryption, signing and setup"
+          - guides/operating.md: checking, anchoring and rotating keys and roots in a store
+          - guides/reviewing.md: reviewing a charter with manifest()
+          - guides/testing.md: testing declarations, Spring wiring and a real store
+          - limits.md: what Occlude does not do
 
 nav:
   - Home: index.md
